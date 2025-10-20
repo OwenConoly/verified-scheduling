@@ -905,19 +905,14 @@ Definition is_None {X} (x : option X) :=
   end.
 
 Lemma filter_pad_r_empty : forall k l0 x,
-    (0 <= k)%Z ->
+    (0 <= k) ->
     filter
       (fun x1 : list Z =>
          negb
            (is_None
               (result_lookup_Z_option
                  x1
-                 (V
-                    (x ++
-                       gen_pad_list
-                       (Z.to_nat k ::
-                                 map Z.to_nat
-                                 (map (eval_Zexpr_Z_total $0) l0)))))))
+                 (V (x ++ gen_pad_list (k :: l0))))))
       (map
          (fun l : list Z =>
             match l with
@@ -925,11 +920,9 @@ Lemma filter_pad_r_empty : forall k l0 x,
             | i :: is => (i + Z.of_nat (length x))%Z :: is
             end)
          (mesh_grid
-            (Z.of_nat (Z.to_nat k)
-                      :: map Z.of_nat
-                      (filter_until
-                         (map Z.to_nat
-                              (map (eval_Zexpr_Z_total $0) l0)) 0)))) = [].
+            (Z.of_nat k
+               :: map Z.of_nat
+               (filter_until l0 0)))) = [].
 Proof.
   intros.
   eapply filter_empty.
@@ -947,12 +940,8 @@ Proof.
 Qed.
 
 Lemma filter_pad_r_mesh_grid : forall m x l0 k,
-    result_has_shape
-      (V (gen_pad_list
-            (Z.to_nat k
-                      :: map Z.to_nat (map (eval_Zexpr_Z_total $0) l0)) ++ x))
-      (map Z.to_nat (map (eval_Zexpr_Z_total $0) (m :: l0))) ->
-    (0 <= k)%Z ->
+    result_has_shape (V (gen_pad_list (k :: l0) ++ x)) (m :: l0) ->
+    (0 <= k) ->
     filter
           (fun x1 : list Z =>
            negb
@@ -960,21 +949,15 @@ Lemma filter_pad_r_mesh_grid : forall m x l0 k,
                 (result_lookup_Z_option x1
                    (V
                       (x ++
-                         gen_pad_list
-                         (Z.to_nat k
-                                   :: map Z.to_nat
-                                   (map (eval_Zexpr_Z_total $0) l0)))))))
+                         gen_pad_list (k :: l0))))))
       (mesh_grid
          (map Z.of_nat
               (filter_until
-                 (map Z.to_nat (map (eval_Zexpr_Z_total $0) (m :: l0))) 0))) =
+                 (m :: l0) 0))) =
         (filter (fun x0 => negb (is_None (result_lookup_Z_option x0 (V x))))
                 (mesh_grid
                    (map Z.of_nat
-                        (filter_until
-                           (Z.to_nat (eval_Zexpr_Z_total $0 m)
-                            - Z.to_nat k :: map Z.to_nat
-                                      (map (eval_Zexpr_Z_total $0) l0)) 0)))).
+                        (filter_until (m - k :: l0) 0)))).
 Proof.
   intros.
   simpl in H.
@@ -984,19 +967,19 @@ Proof.
   rewrite length_app in H1.
   rewrite repeat_length in H1.
 
-  cases (Z.to_nat (eval_Zexpr_Z_total $0 m)).
+  cases m.
   - reflexivity.
   - rewrite filter_until_0_cons by lia.
     rewrite <- H1.
-    replace (Z.to_nat k + length x - Z.to_nat k) with (length x) by lia.
+    replace (k + length x - k) with (length x) by lia.
     rewrite map_cons at 1.
     rewrite Nat2Z.inj_add by lia.
     rewrite Z.add_comm.
     rewrite mesh_grid_app by lia.
     rewrite filter_app.
-    replace (Z.to_nat (eval_Zexpr_Z_total $0 m)) with
-      (Z.to_nat k + (Z.to_nat (eval_Zexpr_Z_total $0 m) - Z.to_nat k))
-      by lia.
+    (* replace m with *)
+    (*   (k + m - k) *)
+    (*   by lia. *)
     rewrite filter_pad_r_empty.
     simpl map. cases x. simpl. auto. simpl map. simpl length. posnats.
     rewrite app_nil_r.
@@ -1019,14 +1002,13 @@ Lemma filter_pad_l_empty : forall k l0 x,
                  x0
                  (V
                     (gen_pad_list
-                       (k :: map Z.to_nat (map (eval_Zexpr_Z_total $0) l0)) ++
+                       (k :: l0) ++
                        x)))))
       (mesh_grid
          (Z.of_nat k
                    :: map Z.of_nat
                    (filter_until
-                      (map Z.to_nat
-                           (map (eval_Zexpr_Z_total $0) l0)) 0))) = [].
+                      l0 0))) = [].
 Proof.
   intros.
   eapply filter_empty.
@@ -1045,9 +1027,8 @@ Qed.
 Lemma filter_pad_l_mesh_grid : forall m x l0 k,
     result_has_shape
       (V (gen_pad_list
-            (Z.to_nat k
-                      :: map Z.to_nat (map (eval_Zexpr_Z_total $0) l0)) ++ x))
-      (map Z.to_nat (map (eval_Zexpr_Z_total $0) (m :: l0))) ->
+            (Z.to_nat k :: l0) ++ x))
+      (m :: l0) ->
     (0 <= k)%Z ->
     filter
       (fun x0 =>
@@ -1056,13 +1037,10 @@ Lemma filter_pad_l_mesh_grid : forall m x l0 k,
               (result_lookup_Z_option
                  x0
                  (V (gen_pad_list
-                       (Z.to_nat k
-                                 :: map Z.to_nat
-                                 (map (eval_Zexpr_Z_total $0) l0)) ++ x)))))
+                       (Z.to_nat k :: l0) ++ x)))))
       (mesh_grid
          (map Z.of_nat
-              (filter_until
-                 (map Z.to_nat (map (eval_Zexpr_Z_total $0) (m :: l0))) 0))) =
+              (filter_until (m :: l0) 0))) =
       map
         (fun l1 =>
            match l1 with
@@ -1072,10 +1050,7 @@ Lemma filter_pad_l_mesh_grid : forall m x l0 k,
         (filter (fun x0 => negb (is_None (result_lookup_Z_option x0 (V x))))
                 (mesh_grid
                    (map Z.of_nat
-                        (filter_until
-                           (Z.to_nat (eval_Zexpr_Z_total $0 m)
-                            - Z.to_nat k :: map Z.to_nat
-                                      (map (eval_Zexpr_Z_total $0) l0)) 0)))).
+                        (filter_until (m - Z.to_nat k :: l0) 0)))).
 Proof.
   intros.
   simpl in H.
@@ -1085,7 +1060,7 @@ Proof.
   rewrite length_app in H1.
   rewrite repeat_length in H1.
 
-  cases (Z.to_nat (eval_Zexpr_Z_total $0 m)).
+  cases m.
   - reflexivity.
   - rewrite filter_until_0_cons by lia.
     rewrite <- H1.
@@ -1094,8 +1069,8 @@ Proof.
     rewrite Nat2Z.inj_add by lia.
     rewrite mesh_grid_app by lia.
     rewrite filter_app.
-    replace (Z.to_nat (eval_Zexpr_Z_total $0 m)) with
-      (Z.to_nat k + (Z.to_nat (eval_Zexpr_Z_total $0 m) - Z.to_nat k))
+    replace (Datatypes.S m) with
+      (Z.to_nat k + (Datatypes.S m - Z.to_nat k))
       by lia.
     rewrite filter_pad_l_empty.
     rewrite app_nil_l.
@@ -1222,9 +1197,7 @@ Lemma filter_fun_pad_r : forall l k l0,
                 (V
                    (l ++
                       repeat
-                      (gen_pad
-                         (map Z.to_nat (map (eval_Zexpr_Z_total $0) l0)))
-                    (Z.to_nat (eval_Zexpr_Z_total $0 k))))))) =
+                      (gen_pad l0) k))))) =
     (fun x : list Z =>
         negb
           (is_None
@@ -1243,18 +1216,15 @@ Proof.
        - rewrite nth_error_app2 by lia.
          assert (length l <= Z.to_nat 0) by lia.
          eapply nth_error_None in H. rewrite H. simpl.
-         cases (
-           (repeat (gen_pad (map Z.to_nat (map (eval_Zexpr_Z_total $0) l0)))
-              (Z.to_nat (eval_Zexpr_Z_total $0 k)))).
+         cases ((repeat (gen_pad l0) k)).
          + auto. 
-         + cases (Z.to_nat (eval_Zexpr_Z_total $0 k)). invert Heq. invert Heq.
+         + cases k. invert Heq. invert Heq.
            rewrite result_lookup_Z_option_gen_pad. reflexivity.
        - rewrite nth_error_app2 by lia.
          assert (length l <= Z.to_nat (Z.pos p)) by lia.
          eapply nth_error_None in H. rewrite H. simpl.
          cases (nth_error
-           (repeat (gen_pad (map Z.to_nat (map (eval_Zexpr_Z_total $0) l0)))
-              (Z.to_nat (eval_Zexpr_Z_total $0 k)))
+           (repeat (gen_pad l0) k)
            (Pos.to_nat p - Datatypes.length l)).
          + pose proof Heq.
            eapply nth_error_Some in Heq.
@@ -1354,9 +1324,9 @@ Qed.
 Lemma result_lookup_Z_option_split : forall l k n z args1 sh,
     In args1 (mesh_grid (map Z.of_nat sh)) ->
     (0 <= z)%Z ->
-    (z < n)%Z ->
+    (z < Z.of_nat n)%Z ->
     0 < k ->
-    result_has_shape (V l) (Z.to_nat n::sh) ->
+    result_has_shape (V l) (n::sh) ->
     result_lookup_Z_option
       ((z / Z.of_nat k)%Z :: (z mod Z.of_nat k)%Z :: args1)
       (V (split_result k l)) =

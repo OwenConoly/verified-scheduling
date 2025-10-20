@@ -21,17 +21,12 @@ From Lower Require Import Zexpr Bexpr Array Range Sexpr Result ListMisc Meshgrid
 Open Scope string_scope.
 
 Definition contexts_agree
-           (ec : expr_context) (st : stack) (h : heap) sh :=
+           (ec : expr_context) (st : stack) (h : heap) (sh : context) :=
   forall x,
     (forall v, ec $? x = Some (V v) ->
-               exists l,
-                 sh $? x = Some l /\
-                   Forall (fun x => vars_of_Zexpr x = []) l /\
-                   result_has_shape
-                     (V v)
-                     (map Z.to_nat (map (eval_Zexpr_Z_total $0) l)) /\
-                   (Forall (fun x => 0 <= x)%Z
-                           (map (eval_Zexpr_Z_total $0) l)) /\
+               exists sz,
+                 sh $? x = Some sz /\
+                   result_has_shape (V v) sz /\
                exists arr,
                  h $? x = Some arr /\
                    array_add
@@ -40,17 +35,12 @@ Definition contexts_agree
                            (fold_left
                               Z.mul
                               (map Z.of_nat
-                                   (filter_until
-                                      (map Z.to_nat
-                                           (map (eval_Zexpr_Z_total $0) l)
-                                      ) 0)) 1%Z)) $0)
+                                   (filter_until sz 0)) 1%Z)) $0)
                      (tensor_to_array_delta
                         (partial_interpret_reindexer
                            (fun l => l)
                            (map Z.of_nat
-                                (filter_until
-                                   (map Z.to_nat
-                                        (map (eval_Zexpr_Z_total $0) l)) 0)) $0)
+                                (filter_until sz 0)) $0)
                         (V v)) = arr) /\
       (forall s, ec $? x = Some (S s) -> sh $? x = Some [] /\
                                            st $? x = Some (match s with
@@ -136,8 +126,8 @@ Proof.
   - eapply H1 in H. invs. rewrite H3 in H7. invert H7. cases r; auto.
   - rewrite H0 in *.
     invert H4.
-    rewrite map_fst_combine in H8 by auto.
-    rewrite map_snd_combine in H8 by auto.
+    rewrite map_fst_combine in H8 by (rewrite length_map; auto).
+    rewrite map_snd_combine in H8 by (rewrite length_map; auto).
     unfold contexts_agree in *.
     specialize (H3 x). invert H3. clear H5.
     eapply H4 in H.
@@ -148,19 +138,18 @@ Proof.
          (array_add
             (alloc_array
                (Z.to_nat
-                  (fold_left Z.mul (map Z.of_nat (filter_until (map Z.to_nat (map (eval_Zexpr_Z_total $0) x0)) 0))
+                  (fold_left Z.mul (map Z.of_nat (filter_until x0 0))
                      1%Z)) $0)
             (tensor_to_array_delta
-               (partial_interpret_reindexer (fun l : list (Zexpr * Zexpr) => l)
-                  (map Z.of_nat (filter_until (map Z.to_nat (map (eval_Zexpr_Z_total $0) x0)) 0)) $0) 
+               (partial_interpret_reindexer (fun l : list (Zexpr * Z) => l)
+                  (map Z.of_nat (filter_until x0 0)) $0) 
                (V rs))) = Some l0).
-    rewrite <- H9. eauto.
-    invert H6.
+    rewrite <- H5. eauto.
+    
     rewrite H0 in *. invert H.
     pose proof H2. eapply eval_get_eval_Zexprlist in H2. invs.
     eapply eval_Zexpr_Z_eval_Zexpr in H8.
     erewrite eval_Zexpr_Z_flatten_index_flatten in H8; eauto.
-    2: { eapply forall_no_vars_eval_Zexpr_Z_total. eauto. }
     invert H8.
 
     pose proof H.
@@ -173,46 +162,49 @@ Proof.
     unfold array_add in *.
     rewrite lookup_merge in *.
     erewrite result_has_shape_result_shape_Z in H14 by eauto.
-    pose proof H5.
-    eapply forall_nonneg_exists_zero_or_forall_pos_Z in H5.
-    invert H5.
-    + rewrite filter_until_0_id in H14.
-      2: { eapply Forall_map.
-           eapply Forall_impl. 2: apply H8. simpl. intros. lia. }
-      rewrite Z2Natid_list in * by auto.
+    pose proof forall_nonneg_exists_zero_or_forall_pos x0 as H'.
+    destruct H'.
+    + rewrite filter_until_0_id in H14 by assumption.
       
       rewrite result_lookup_Z_tensor_to_array_delta in *.
       eapply eval_get_In_meshgrid in H; eauto.
       erewrite result_has_shape_result_shape_Z in H; eauto.
       repeat decomp_index.
-      rewrite mesh_grid_map_Nat2Z_id in *.
+      (* rewrite mesh_grid_map_Nat2Z_id in *. *)
       cases rs.
-      { invert H4. cases x0. simpl in *. discriminate.
-        invert H5. rewrite map_cons in *. 
+      { invert H3. cases x1. simpl in *. contradiction.
+        invert H6. rewrite map_cons in *. 
         repeat decomp_index. lia. }
-      invert H4. simpl in *. cases x0. simpl in *. discriminate.
-      simpl map in *. invert H11.
+      invert H3. cases x1. invert H6. discriminate.
+      cbn [map] in *. invert H6.
       eapply in_mesh_grid_args_flatten_bounds in H.
       invert H.
-      2: { invert H2. eapply fold_left_mul_nonneg in H11.
-           2: apply H13.
-           lia. }
+      2: { invert H2.
+           enough (0 <= fold_left Z.mul (map Z.of_nat xs_shape)
+                         (Z.of_nat (Datatypes.S (Datatypes.length rs))))%Z by lia.
+           eapply fold_left_mul_nonneg. 2: lia. apply Forall_map.
+           apply Forall_forall. lia. }
       cases (alloc_array
-            (Z.to_nat
-               (fold_left Z.mul
-                  (eval_Zexpr_Z_total $0 z :: map (eval_Zexpr_Z_total $0) x0) 1%Z))
-            $0 $?
-          flatten (eval_Zexpr_Z_total $0 z :: map (eval_Zexpr_Z_total $0) x0) x1).
+        (Z.to_nat
+           (fold_left Z.mul
+              (Z.of_nat (Datatypes.S (Datatypes.length rs)) :: map Z.of_nat xs_shape)
+              1%Z))
+        $0 $?
+      flatten (Z.of_nat (Datatypes.S (Datatypes.length rs)) :: map Z.of_nat xs_shape)
+        (z :: x1)).
       * pose proof (lookup_alloc_array
                       (Z.to_nat
-               (fold_left Z.mul
-                  (eval_Zexpr_Z_total $0 z :: map (eval_Zexpr_Z_total $0) x0) 1%Z))
-                      (flatten (eval_Zexpr_Z_total $0 z :: map (eval_Zexpr_Z_total $0) x0) x1)).
-        invert H. rewrite H10 in *. discriminate.
-        rewrite H10 in *. invs.
-        cases (result_lookup_Z_option x1 (V (r :: rs))). invs.
-        rewrite Rplus_0_l.
+               (Z.to_nat
+           (fold_left Z.mul
+              (Z.of_nat (Datatypes.S (Datatypes.length rs)) :: map Z.of_nat xs_shape)
+              1%Z)))
+                      (Z.of_nat (Datatypes.S (Datatypes.length rs)) :: map Z.of_nat xs_shape) (z :: x1)).
+        invert H. rewrite H4 in *. discriminate.
+        rewrite H4 in *. simpl in *. invs.
+        cases (result_lookup_Z_option (z :: x1) (V (r :: rs))). invs.
         eapply result_lookup_Z_option_result_lookup_Z in Heq. rewrite Heq.
+        
+        Search r0.
         auto.
         invs.
         eapply result_lookup_Z_option_result_lookup_Z_None in Heq.
