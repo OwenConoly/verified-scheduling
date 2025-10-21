@@ -184,31 +184,20 @@ Proof.
                          (Z.of_nat (Datatypes.S (Datatypes.length rs))))%Z by lia.
            eapply fold_left_mul_nonneg. 2: lia. apply Forall_map.
            apply Forall_forall. lia. }
-      cases (alloc_array
-        (Z.to_nat
-           (fold_left Z.mul
-              (Z.of_nat (Datatypes.S (Datatypes.length rs)) :: map Z.of_nat xs_shape)
-              1%Z))
-        $0 $?
-      flatten (Z.of_nat (Datatypes.S (Datatypes.length rs)) :: map Z.of_nat xs_shape)
-        (z :: x1)).
-      * pose proof (lookup_alloc_array
-                      (Z.to_nat
-               (Z.to_nat
-           (fold_left Z.mul
-              (Z.of_nat (Datatypes.S (Datatypes.length rs)) :: map Z.of_nat xs_shape)
-              1%Z)))
-                      (Z.of_nat (Datatypes.S (Datatypes.length rs)) :: map Z.of_nat xs_shape) (z :: x1)).
-        invert H. rewrite H4 in *. discriminate.
-        rewrite H4 in *. simpl in *. invs.
+      match goal with
+      | H: match alloc_array ?arr1' _ $? ?arr2' with _ => _ end = _ |- _ => remember arr1' as arr1 eqn:E1; remember arr2' as arr2 eqn:E2
+      end.
+      cases (alloc_array arr1 $0 $? arr2).
+      * pose proof (lookup_alloc_array arr1 arr2).
+        invert H. subst. rewrite H4 in *. discriminate.
+        rewrite H4 in *. invs.
         cases (result_lookup_Z_option (z :: x1) (V (r :: rs))). invs.
+        rewrite Rplus_0_l.
         eapply result_lookup_Z_option_result_lookup_Z in Heq. rewrite Heq.
-        
-        Search r0.
         auto.
         invs.
         eapply result_lookup_Z_option_result_lookup_Z_None in Heq.
-        cases (result_lookup_Z x1 (V (r :: rs))); eauto.
+        cases (result_lookup_Z (z :: x1) (V (r :: rs))); eauto.
       * eapply result_lookup_Z_option_result_lookup_Z in H14. rewrite H14.
         auto.
       * eapply result_has_shape_self; eauto.
@@ -219,10 +208,7 @@ Proof.
       * unfold injective. intros. invs.
         eapply injective_flatten; eauto.
         erewrite result_has_shape_result_shape_Z by eauto.
-        rewrite filter_until_0_id.
-      2: { eapply Forall_map.
-           eapply Forall_impl. 2: apply H8. simpl. intros. lia. }
-      rewrite Z2Natid_list in * by auto.
+        rewrite filter_until_0_id by assumption.
       auto.
     + eapply eval_get_In_meshgrid in H; eauto.
       erewrite result_has_shape_result_shape_Z in H; eauto.
@@ -230,9 +216,7 @@ Proof.
       simpl in *. propositional.
       eapply exists_0_map_Z_of_nat.
       eapply exists_0_filter_until_0.
-      eapply Exists_map.
-      eapply Exists_impl. 2: eapply H8.
-      simpl. intros. subst. lia.
+      assumption.
       eapply result_has_shape_self; eauto.
   - eapply IHeval_Sexpr1 in H5; eauto.
     eapply IHeval_Sexpr2 in H9; eauto.
@@ -262,8 +246,7 @@ Proof.
     cases (x ==v p). subst. eapply lookup_Some_dom in H3. sets.
     rewrite lookup_add_ne by auto.
     eexists. split.
-    eassumption. split. eassumption. split. eassumption.
-    split. eassumption.
+    eassumption. split. eassumption.
     eexists. split. eassumption. reflexivity.
   - eapply H in H3. propositional.
   - eapply H in H3. propositional.
@@ -282,8 +265,6 @@ Proof.
     eexists.
     split. eassumption.
     split. eassumption.
-    split. eassumption.
-    split. eassumption.    
     eexists. unfold alloc_array_in_heap.
     rewrite lookup_add_ne by auto.
     split. eassumption. reflexivity.
@@ -352,26 +333,18 @@ Lemma contexts_agree_add_alloc_heap :
   forall ec st h sh x nz z esh1 l1,
   contexts_agree ec st h sh ->
   ec $? x = None ->
-  result_has_shape (V l1)
-                   (map Z.to_nat (map (eval_Zexpr_Z_total $0) (z :: esh1))) ->
-  Forall (fun x : Z => (0 <= x)%Z) (map (eval_Zexpr_Z_total $0) (z :: esh1))->
-  Forall (fun x : Zexpr => vars_of_Zexpr x = []) (z :: esh1) ->
+  result_has_shape (V l1) (z :: esh1) ->
   fold_left Z.mul
             (map Z.of_nat
-                 (filter_until
-                    (map Z.to_nat
-                         (map (eval_Zexpr_Z_total $0) (z :: esh1))) 0))
+                 (filter_until (z :: esh1) 0))
             1%Z = nz ->  
   contexts_agree (ec $+ (x, V l1)) st (h $+ (x,
           array_add (alloc_array (Z.to_nat nz) $0)
                     (tensor_to_array_delta
                        (partial_interpret_reindexer
-                          (fun l : list (Zexpr * Zexpr) => l)
+                          (fun l : list (Zexpr * Z) => l)
                           (map Z.of_nat
-                               (filter_until
-                                  (map Z.to_nat
-                                       (map (eval_Zexpr_Z_total $0)
-                                            (z :: esh1))) 0)) $0)
+                               (filter_until (z :: esh1) 0)) $0)
                        (V l1)))) (sh $+ (x, z :: esh1)).
 Proof.
   unfold contexts_agree. propositional.
@@ -381,28 +354,24 @@ Proof.
       eexists.
       split. reflexivity.
       split. eauto.
-      split. eauto.
-      split. eassumption.
       eexists. rewrite lookup_add_eq by auto.
       split. reflexivity.
-      f_equal.
+      reflexivity.
     + rewrite lookup_add_ne in * by auto.
-      eapply H in H5. clear H. invs.
+      apply H in H3. invs.
       eexists.
-      split. eassumption.
-      split. eassumption.
       split. eassumption.
       split. eassumption.
       eexists. rewrite lookup_add_ne by auto. split.
       eassumption. reflexivity.
   - cases (x ==v x0).
     + subst. rewrite lookup_add_eq in * by auto.
-      invert H5.
+      invert H3.
     + rewrite lookup_add_ne in * by auto.
       eapply H. eauto.
   - cases (x ==v x0).
     + subst. rewrite lookup_add_eq in * by auto.
-      invert H5.
+      invert H3.
     + rewrite lookup_add_ne in * by auto.
       eapply H. eauto.
 Qed.
@@ -410,11 +379,10 @@ Qed.
 Lemma contexts_agree_result_has_shape :
   forall ec st h sh,
   contexts_agree ec st h sh ->
-  (forall (x0 : var) (r0 : result) (size0 : list Zexpr),
+  (forall (x0 : var) (r0 : result) (size0 : list nat),
       sh $? x0 = Some size0 ->
       ec $? x0 = Some r0 ->
-      result_has_shape r0
-                       (map Z.to_nat (map (eval_Zexpr_Z_total $0) size0))).
+      result_has_shape r0 size0).
 Proof.
   unfold contexts_agree. intros. specialize (H x0).
   invs.

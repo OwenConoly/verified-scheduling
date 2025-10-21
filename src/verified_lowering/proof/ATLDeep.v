@@ -247,7 +247,9 @@ Inductive size_of : ATLexpr -> list nat -> Prop :=
     eval_Zexpr $0 hi hiz ->
     d = Z.to_nat (hiz - loz) ->
     size_of (Gen i lo hi body) (d :: sh)
-| SizeOfSum : forall i lo hi body sh,
+| SizeOfSum : forall i lo loz hi hiz body sh,
+    eval_Zexpr $0 lo loz ->
+    eval_Zexpr $0 hi hiz ->
     size_of body sh ->
     size_of (Sum i lo hi body) sh
 | SizeOfGuard : forall p e sh,
@@ -270,30 +272,31 @@ Inductive size_of : ATLexpr -> list nat -> Prop :=
     eval_Zexpr $0 k kz ->
     d1 = n //n (Z.to_nat kz) ->
     d2 = Z.to_nat kz ->
+    (0 < kz)%Z ->
     size_of (Split k e) (d1 :: d2 :: sh)
 | SizeOfTranspose : forall e n m sh,
     size_of e (n::m::sh) ->
     size_of (Transpose e) (m::n::sh)
-| SizeOfTruncr : forall n nz e m sh d,
+| SizeOfTruncr : forall k kz e m sh d,
     size_of e (m::sh) ->
-    eval_Zexpr $0 n nz ->
-    d = m - Z.to_nat nz ->
-    size_of (Truncr n e) (d :: sh)
-| SizeOfTruncl : forall n nz e m sh d,
+    eval_Zexpr $0 k kz ->
+    d = m - Z.to_nat kz ->
+    size_of (Truncr k e) (d :: sh)
+| SizeOfTruncl : forall k kz e m sh d,
     size_of e (m :: sh) ->
-    eval_Zexpr $0 n nz ->
-    d = m - Z.to_nat nz ->
-    size_of (Truncl n e) (d :: sh)
-| SizeOfPadr : forall n nz e m sh d,
+    eval_Zexpr $0 k kz ->
+    d = m - Z.to_nat kz ->
+    size_of (Truncl k e) (d :: sh)
+| SizeOfPadr : forall k kz e m sh d,
     size_of e (m :: sh) ->
-    eval_Zexpr $0 n nz ->
-    d = m + Z.to_nat nz ->
-    size_of (Padr n e) (d :: sh)
-| SizeOfPadl : forall n nz e m sh d,
+    eval_Zexpr $0 k kz ->
+    d = m + Z.to_nat kz ->
+    size_of (Padr k e) (d :: sh)
+| SizeOfPadl : forall k kz e m sh d,
     size_of e (m :: sh) ->
-    eval_Zexpr $0 n nz ->
-    d = m + Z.to_nat nz ->
-    size_of (Padl n e) (d :: sh)
+    eval_Zexpr $0 k kz ->
+    d = m + Z.to_nat kz ->
+    size_of (Padl k e) (d :: sh)
 | SizeOfScalar : forall s,
     size_of (Scalar s) [].
 
@@ -488,7 +491,6 @@ Inductive eval_expr (sh : context) :
 | EvalSplit : forall e v ec l k kz,
     eval_expr sh v ec e (V l) ->
     eval_Zexpr_Z $0 k = Some kz ->
-    (0 < kz)%Z ->
     Forall (fun x => exists v, x = V v) l ->
     eval_expr sh v ec (Split k e) (V (split_result (Z.to_nat kz) l))
 | EvalTruncr : forall e v ec k kz l,

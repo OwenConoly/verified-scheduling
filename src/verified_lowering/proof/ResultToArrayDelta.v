@@ -1383,7 +1383,7 @@ Proof.
     propositional.
 Qed.
 
-Lemma constant_nonneg_bounds_size_of_eval_expr_result_has_shape :
+Lemma size_of_eval_expr_result_has_shape :
   forall e sz,
     size_of e sz ->
     forall v sh ec r,
@@ -1426,10 +1426,10 @@ Proof.
       eapply result_has_shape_add_result.
       eassumption.
       eapply IHe. 2: eassumption. propositional.
-      eapply result_has_shape_for_sum with (n:=(Z.to_nat (hiz - (loz+1))%Z)).
+      eapply result_has_shape_for_sum.
       eapply IHe. propositional.
       4: eassumption. simpl. rewrite H4. reflexivity.
-      eassumption. lia.
+      eassumption. rewrite Z2Nat.id. reflexivity. lia.
     + (* EMPTY SUM *)
       eq_size_of. eq_eval_Zlist.
       eapply result_has_shape_gen_pad.
@@ -1443,7 +1443,7 @@ Proof.
   - invs. invert H0. eauto using result_has_shape_concat.
   - invs. invert H0. eauto using result_has_shape_flatten.
   - invs. invert H0.
-    apply eval_Zexpr_Z_eval_Zexpr in H4. rewrite H4 in H5. invs.
+    apply eval_Zexpr_Z_eval_Zexpr in H4. rewrite H4 in *. invs.
     eapply result_has_shape_split_result. lia. eauto.
   - invs. invert H0.
     simpl.
