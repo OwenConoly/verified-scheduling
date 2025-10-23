@@ -155,7 +155,7 @@ Fixpoint lower
   | Gen i lo hi body =>
       For i lo hi
           (lower body (fun l =>
-                         f ((ZMinus (ZVar i) lo,
+                         f (((! i ! - | eval_Zexpr_Z_total $0 lo |)%z,
                               eval_Zexpr_Z_total $0 (hi - lo)%z)::l)) p asn sh)
   | Sum i lo hi body =>
       For i lo hi
@@ -204,7 +204,7 @@ Fixpoint lower
   | Split k e =>
       let k := eval_Zexpr_Z_total $0 k in
       lower e (fun l => f (match l with
-                        | (v,d)::xs => ((v // | k |)%z, (d // k)%Z) ::(ZMod v (ZLit k),k )::xs
+                        | (v,d)::xs => ((v / | k |)%z, (d // k)%Z) ::(ZMod v (ZLit k),k )::xs
                                      | _ => l
                                       end)) p asn sh
   | Flatten e =>

@@ -1153,11 +1153,9 @@ Lemma well_formed_allocation_eval_step :
     result_has_shape (V (r :: l)) (result_shape_nat (V (r :: l))) ->
     ~ contains_substring "?" i ->
     ~ i \in dom v ->
-    eq_zexpr lo (| eval_Zexpr_Z_total $0 lo |)%z ->
-    eq_zexpr hi (| eval_Zexpr_Z_total $0 hi |)%z ->
-    (eval_Zexpr_Z_total $0 lo < eval_Zexpr_Z_total $0 hi)%Z ->
+    (lo < hi)%Z ->
     Datatypes.length l =
-      Z.to_nat (eval_Zexpr_Z_total $0 hi - (eval_Zexpr_Z_total $0 lo + 1)) ->
+      Z.to_nat (hi - (lo + 1)) ->
     partial_injective 
       (partial_interpret_reindexer
          reindexer (result_shape_Z (V (r :: l))) v)
@@ -1168,9 +1166,9 @@ Lemma well_formed_allocation_eval_step :
      ->
     well_formed_allocation
       (fun l1 : list (Zexpr * Z) =>
-         reindexer (((! i ! - lo)%z,
-                      (eval_Zexpr_Z_total $0 hi - eval_Zexpr_Z_total $0 lo)%Z) :: l1))
-      r st h p (v $+ (i, eval_Zexpr_Z_total $0 lo)).
+         reindexer (((! i ! - | lo |)%z,
+                      (hi - lo)%Z) :: l1))
+      r st h p (v $+ (i, lo)).
 Proof.
   unfold well_formed_allocation in *. propositional.
   cases (reindexer
@@ -1181,19 +1179,19 @@ Proof.
     simpl. inversion 1.   
   - clear Heq.
     destruct (reindexer
-      (((! i ! - lo)%z, _)
+      (((! i ! - | lo |)%z, _)
          :: shape_to_index (result_shape_Z r)
          (shape_to_vars (result_shape_Z r)))) eqn:Heq.
     + eapply reindexer_not_empty_vars_in_index in Heq. propositional. auto.
       simpl. unfold app_no_dups.
       rewrite <- union_constant.
-      unfold not. intros. eapply cup_empty in H14. invs.
-      eapply cup_empty in H15. invs.
-      eapply constant_not_empty in H14. propositional. inversion 1.
+      unfold not. intros. eapply cup_empty in H12. invs.
+      eapply cup_empty in H13. invs.
+      eapply constant_not_empty in H12. propositional. inversion 1.
     + clear Heq. invs.
       eexists. split. eassumption.
       eapply subseteq_transitivity.
-      2: eassumption.
+      2: eassumption. About constant_partial_reindexer_subseteq.
       eapply constant_partial_reindexer_subseteq; eauto.
       lia.
 Qed.
@@ -1319,10 +1317,10 @@ Lemma well_formed_allocation_shift_top_dim_reindexer :
                         (tensor_to_array_delta
                            (partial_interpret_reindexer
                               (fun l1 : list (Zexpr * Z) =>
-                                 reindexer (((! i ! - lo)%z,
-                                              (eval_Zexpr_Z_total $0 hi - eval_Zexpr_Z_total $0 lo)%Z) :: l1)) 
+                                 reindexer (((! i ! - | lo |)%z,
+                                              (hi - lo)%Z) :: l1)) 
                               (result_shape_Z r)
-                              (v $+ (i, eval_Zexpr_Z_total $0 lo))) r))) p v.
+                              (v $+ (i, lo))) r))) p v.
 Proof.
   intros ? ? ? ? ? ? ? ? ? ? ? Halloc Heq HeqZlist Hvar Hvarsub Hmap
          Hvarindexsub Hsh Hinj.
@@ -2273,17 +2271,16 @@ Qed.
 Lemma well_formed_allocation_split :
   forall reindexer st h p v k l0 l n,
     well_formed_allocation reindexer
-             (V (split_result (Z.to_nat (eval_Zexpr_Z_total $0 k)) l)) st h p v ->
+             (V (split_result (Z.to_nat k) l)) st h p v ->
 result_has_shape (V l) (n :: l0) ->
     (forall l0 : list (Zexpr * Z),
         vars_of_reindexer (reindexer l0) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l0) ->
-    (0 < eval_Zexpr_Z_total $0 k)%Z ->
+    (0 < k)%Z ->
     (forall (var : var) (k0 : Z) (l2 : list (Zexpr * Z)),
         ~ var \in vars_of_reindexer (reindexer []) ->
                   map (subst_var_in_Z_tup var k0) (reindexer l2) =
                     reindexer (map (subst_var_in_Z_tup var k0) l2)) ->
-    (eq_zexpr k (| eval_Zexpr_Z_total $0 k |)%z) ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
     vars_of_reindexer (reindexer []) \subseteq dom v ->
     (forall l2 l3 : list (Zexpr * Z),
@@ -2294,10 +2291,10 @@ well_formed_allocation
      reindexer
        match l2 with
        | [] => l2
-       | (v0, d) :: xs => ((v0 / k)%z, (d // (eval_Zexpr_Z_total $0 k))%Z) :: ((ZMod v0 k)%z, eval_Zexpr_Z_total $0 k) :: xs
+       | (v0, d) :: xs => ((v0 / | k |)%z, (d // k)%Z) :: ((v0 % | k |)%z, k) :: xs
        end) (V l) st h p v.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Halloc Hsh Hvarsub Hknonneg Hmap Hkz
+  intros ? ? ? ? ? ? ? ? ? Halloc Hsh Hvarsub Hknonneg Hmap
          Henv Hvarsubdom HeqZlist.
   eapply well_formed_allocation_result_V in Halloc; eauto.
   invs. unfold well_formed_allocation.
@@ -2306,7 +2303,7 @@ Proof.
            (shape_to_vars (result_shape_Z (V l)))).
   { eapply shape_to_index_not_empty_Z in Heq. propositional. }
   destruct (reindexer
-           (let (v0,d):= p0 in ((v0/k)%z, _)::((ZMod v0 k)%z, _)::l1)) eqn:Heq0.
+           (let (v0,d):= p0 in _)) eqn:Heq0.
   { eapply reindexer_not_empty_vars_in_index in Heq0.
     propositional. auto.
     unfold result_shape_Z,shape_to_index,shape_to_vars in Heq. simpl in *.
@@ -2339,8 +2336,7 @@ Proof.
     rewrite <- H.
     repeat rewrite map_cons.
     erewrite eq_partial_interpret_reindexer_split.
-    eexists ((z / eval_Zexpr_Z_total $0 k)%Z ::
-                                          (z mod eval_Zexpr_Z_total $0 k)%Z :: x1).
+    eexists ((z / k)%Z :: (z mod k)%Z :: x1).
     split. reflexivity.
     eapply filter_In. propositional.
     repeat decomp_goal_index.
@@ -2355,9 +2351,9 @@ Proof.
     eapply mod_upper_bound. lia.
     rewrite <- H4.
     f_equal. f_equal.
-    rewrite <- (Z2Nat.id (eval_Zexpr_Z_total $0 k)) at 1 by lia.
-    rewrite <- (Z2Nat.id (eval_Zexpr_Z_total $0 k)) at 2 by lia.
+    rewrite <- (Z2Nat.id k) at 1 by lia.
+    rewrite <- (Z2Nat.id k) at 2 by lia.
     erewrite result_lookup_Z_option_split. reflexivity.
     eauto. lia. eassumption. lia. eauto.
-    eauto. eauto. eauto. eauto. eauto. eauto. lia. eauto. lia.
+    eauto. eauto. eauto. eauto. eauto. eauto. eauto. lia.
 Qed.

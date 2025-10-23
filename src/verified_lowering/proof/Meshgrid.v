@@ -1404,15 +1404,15 @@ Lemma result_lookup_Z_option_split_true : forall z z0 x0 l k m sh,
   negb
           (is_None
              (result_lookup_Z_option (z :: z0 :: x0)
-                (V (split_result (Z.to_nat (eval_Zexpr_Z_total $0 k)) l)))) =
+                (V (split_result (Z.to_nat k) l)))) =
         true ->
-  (0 <= z < m // (eval_Zexpr_Z_total $0 k))%Z ->
-  (0 <= z0 < eval_Zexpr_Z_total $0 k)%Z ->
+  (0 <= z < m // k)%Z ->
+  (0 <= z0 < k)%Z ->
   (0 <= m)%Z ->
   In x0
      (mesh_grid (map Z.of_nat sh)) ->
   result_has_shape (V l) (Z.to_nat m::sh) ->
-  (z * eval_Zexpr_Z_total $0 k + z0 < m)%Z.
+  (z * k + z0 < m)%Z.
 Proof.
   intros. 
   erewrite <- result_lookup_Z_option_flatten in H; eauto; try lia.
@@ -1425,7 +1425,7 @@ Proof.
   2 : lia.
   rewrite Z2Nat.id in * by lia.
   simpl in H.
-  cases (z * eval_Zexpr_Z_total $0 k + z0)%Z.
+  cases (z * k + z0)%Z.
   3: { lia. }
   { cases l. rewrite nth_error_app2 in *. 2: simpl; lia.
     simpl in H. rewrite mod_0_l in * by lia. rewrite sub_0_r in * by lia.
@@ -1437,9 +1437,9 @@ Proof.
   2: { lia. }
   cases (nth_error
                (repeat (gen_pad sh)
-                  ((Z.to_nat (eval_Zexpr_Z_total $0 k) -
-                    Datatypes.length l mod Z.to_nat (eval_Zexpr_Z_total $0 k))
-                   mod Z.to_nat (eval_Zexpr_Z_total $0 k)))
+                  ((Z.to_nat k -
+                    Datatypes.length l mod Z.to_nat k)
+                   mod Z.to_nat k))
                (Z.to_nat (Z.pos p) - Datatypes.length l)).
   - pose proof Heq0.
     eapply nth_error_Some in H6. rewrite nth_error_repeat in Heq0.
