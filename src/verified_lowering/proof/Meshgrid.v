@@ -417,6 +417,8 @@ Proof.
       auto.
 Qed.
 
+(* Lemma in_mesh_grid_flatten_in_range_nat *)
+
 Lemma in_mesh_grid_flatten_in_range : forall sh x0,
     (Forall (fun x => 0 <= x)%Z sh) ->
     In x0 (mesh_grid sh) ->

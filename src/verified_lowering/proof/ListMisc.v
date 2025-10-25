@@ -1299,3 +1299,12 @@ Proof.
   2: { eapply le_trans. eapply Div0.mul_div_le. lia. }
   rewrite Div0.mod_eq by lia. eauto.
 Qed.
+
+Lemma fold_left_mul_filter_until l n :
+  fold_left mul (filter_until l 0) n = fold_left mul l n.
+Proof.
+  revert n. induction l; eauto.
+  assert (0 = a \/ 0 < a) as [?|?] by lia.
+  - subst. simpl. intros. rewrite fold_left_mul_assoc_nat. lia.
+  - rewrite filter_until_0_cons by lia. simpl. auto.
+Qed.
