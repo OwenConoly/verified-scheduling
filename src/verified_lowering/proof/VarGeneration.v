@@ -19,7 +19,7 @@ Definition shape_to_index (shape : list Z) (vars : list var) :=
         
 Lemma shape_to_index_cons : forall var vars s sh,
     shape_to_index (s::sh) (var::vars) =
-      (! var !,| s |)%z :: (shape_to_index sh vars).
+      (! var !, | s |)%z :: (shape_to_index sh vars).
 Proof. auto. Qed.
 
 Lemma map_subst_var_in_Zexpr_shape_to_index_id :

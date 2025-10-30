@@ -22,7 +22,7 @@ Definition shift_top_dim_reindexer
            (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr)) :=
   fun l => match l with
            | (var,dim)::xs => reindexer
-                                ((var + | 1 |,dim + | 1 |)%z :: xs)
+                                ((var + | 1 |, dim + | 1 |)%z :: xs)
            | _ => reindexer l
            end.
 
@@ -41,35 +41,15 @@ Lemma flatten_index_to_function_alt : forall sh args,
       index_to_function_alt (combine (map ZLit args) (map ZLit sh)) [] [].
 Proof.
   induction sh; intros; cases args; auto.
-  simpl. unfold flatten. cases sh; auto.
-  cases sh; cases args; simpl in *; try lia.
-  unfold index_to_function_alt. simpl. reflexivity.  
-  simpl. rewrite IHsh.
-  unfold index_to_function_alt.
-  unfold index_to_function_rec_alt.
-  simpl.
+  simpl. simpl in H. 
+  unfold index_to_function_alt. simpl.
+  rewrite map_fst_combine by (repeat rewrite length_map; simpl; lia).
+  rewrite map_snd_combine by (repeat rewrite length_map; simpl; lia).
   erewrite eval_Zexpr_Z_flatten_index_flatten.
-  2: { econstructor. eauto. rewrite map_snd_combine
-      by (repeat rewrite length_map; simpl; try lia).
-       eapply eval_Zexprlist_map_ZLit. }
-  2: { econstructor. eauto. rewrite map_fst_combine
-      by (repeat rewrite length_map; simpl; try lia).
-       eapply eval_Zexprlist_map_ZLit. }
-  rewrite map_snd_combine
-    by (repeat rewrite length_map; simpl; try lia).
-  erewrite eval_Zexpr_Z_fold_left_ZTimes.
-  2: eapply eval_Zexprlist_map_ZLit.
-  2: eauto.
-  unfold flatten_index. simpl.
-  rewrite map_snd_combine
-    by (repeat rewrite length_map; simpl; try lia).
-  rewrite map_fst_combine
-    by (repeat rewrite length_map; simpl; try lia).
-  erewrite eval_Zexpr_Z_flatten_index_flatten.
-  2: { econstructor. eauto. eapply eval_Zexprlist_map_ZLit. }
-  2: { econstructor. eauto. eapply eval_Zexprlist_map_ZLit. }
+  2: { eapply eval_Zexprlist_map_ZLit. }
+  2: { eapply eval_Zexprlist_map_ZLit. }
+  rewrite eval_Zexpr_Z_fold_left_ZTimes_ZLit.
   reflexivity.
-  simpl in *. lia.
 Qed.
 
 Definition interpret_reindexer
@@ -88,8 +68,7 @@ Lemma interpret_reindexer_id_flatten : forall sh x v,
       flatten sh x.
 Proof.
   induct sh; intros.
-  - simpl in *. propositional. subst.
-    reflexivity.
+  - simpl in *. propositional.
   - cases x.
     eapply not_In_empty_map2_cons in H; propositional.
     unfold interpret_reindexer.
@@ -106,11 +85,11 @@ Proof.
     rewrite map_cons.
     rewrite fold_left_subst_var_in_Z_tup_ZLit.
     rewrite map_fold_left_subst_var_in_Z_tup_shape_to_index.
-    simpl.
-    rewrite map_partially_eval_Z_tup_ZLit. simpl.
     rewrite flatten_index_to_function_alt.
+    simpl.
+    rewrite map_partially_eval_Z_tup_ZLit.
     reflexivity.
-    eapply length_mesh_grid_indices_Z. auto.
+    apply length_mesh_grid_indices_Z. auto.
     rewrite length_map. rewrite length_nat_range_rec.
     eapply length_mesh_grid_indices_Z in H. simpl in *. lia.
     eapply no_dup_var_generation.
@@ -217,13 +196,20 @@ Definition index_to_partial_function
                               | None => 0%Z
                               end) evaled_list_index))
   else None.
+Print shape_to_vars.
+Print shape_to_index.
+Print partially_eval_Z_tup.
+Print partially_eval_Zexpr.
+Print index_to_partial_function.
 
 Definition partial_interpret_reindexer
            (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr))
            (sh : list Z) (v : valuation) : list Z -> option Z :=
   let vars := shape_to_vars sh in
   let result_index := shape_to_index sh vars in
+  (*[(?, d1), (??, d2), ...]*)
   let full_index := reindexer result_index in
+  (*why would v have these ?? strings in its domain??*)
   let evaled_index := map (partially_eval_Z_tup v) full_index in
   index_to_partial_function evaled_index vars.
 
@@ -233,15 +219,10 @@ Lemma flatten_index_to_partial_function : forall sh args,
       index_to_partial_function (combine (map ZLit args) (map ZLit sh)) [] [].
 Proof.
   induction sh; intros; cases args; auto.
-  simpl. unfold flatten. cases sh; auto.
+  simpl.
   decomp_index.
   unfold index_to_partial_function. simpl.
   propositional.
-  replace (0 <=? z)%Z with true.
-  2: { symmetry. eapply Z.leb_le. lia. }
-  replace (z <? a)%Z with true.
-  2: { symmetry. eapply Z.ltb_lt. lia. }
-  simpl.
   rewrite map_id. rewrite map_eval_Zexpr_Z_tup_total_ZLit.
   2: { symmetry. eapply length_mesh_grid_indices_Z. auto. }
   rewrite map_map. rewrite map_map.
@@ -339,10 +320,10 @@ Proof.
     rewrite map_cons.
     rewrite fold_left_subst_var_in_Z_tup_ZLit.
     rewrite map_fold_left_subst_var_in_Z_tup_shape_to_index.
+    rewrite flatten_index_to_partial_function.
     simpl.
     rewrite map_partially_eval_Z_tup_ZLit. simpl.
     unfold partially_eval_Z_tup. simpl.
-    rewrite flatten_index_to_partial_function.
     reflexivity.
     erewrite <- in_mesh_grid_cons__. propositional.
 
@@ -468,4 +449,3 @@ Proof.
       eapply IHl. eapply H0.
     + simpl in *. right. eapply IHl. apply H.
 Qed.
-

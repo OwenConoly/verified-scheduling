@@ -11,6 +11,7 @@ From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import Reals.Rpower.
+From Stdlib Require Import QArith.
 
 Import ListNotations.
 
@@ -85,6 +86,10 @@ Ltac stringify_nat n :=
         let xstr := stringify_int x in
         let ystr := stringify_int y in
         constr:("((" ++ xstr ++ ") / (" ++ ystr ++"))")
+    | (?x // ?y)%Z =>
+        let xstr := stringify_int x in
+        let ystr := stringify_int y in
+        constr:("((" ++ xstr ++ ") + (" ++ ystr ++ ") - 1 ) / (" ++ ystr ++")")
     | Z.opp ?x =>
         let xstr :=
           match x with
@@ -156,7 +161,7 @@ Fixpoint flatten_list_Zexpr_helper (l : list (Zexpr * Zexpr))
   | [(i,d)] => (i,d)
   | (i,d)::l' =>
       let (i',d') := flatten_list_Zexpr_helper l' in
-      (ZPlus (ZTimes i d') i', ZTimes d d')
+      ((i * d' + i')%z, (d * d')%z)
   | _ => (ZLit 0%Z, ZLit 0%Z)
   end.
 
@@ -196,10 +201,10 @@ Ltac stringify_Sstmt s :=
       let ystr := stringify_Sstmt y in
       constr:((xstr ++ " - (" ++ ystr ++ ")")%string)
   | SLit ?r => match r with
-               | 0%R => constr:("0")
-               | 1%R => constr:("1")
-               | 2%R => constr:("2")
-               | 3%R => constr:("3")
+               | 0%Q => constr:("0")
+               | 1%Q => constr:("1")
+               | 2%Q => constr:("2")
+               | 3%Q => constr:("3")
                end
   end.
 
@@ -254,4 +259,3 @@ Ltac stringify_stmt s :=
       let str2 := stringify_stmt s2 in
       constr:((str1++str2)%list)
   end.
-

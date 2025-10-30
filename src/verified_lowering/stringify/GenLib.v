@@ -37,7 +37,7 @@ Ltac Llibfunc name context :=
                 | String _ ?s' => s'
                 | EmptyString => EmptyString
                 end in
-  let ast := R in
+    let ast := R in
     let _ := match goal with |- _ => intros end in
     let ast := constr:(lower ast
                          (fun i : list (Zexpr * Zexpr) => i) "output"
@@ -63,12 +63,12 @@ Ltac Llibfunc name context :=
   let progty := type of prog in
   let tystr := type_to_str progty in
   let funcname := name in
-  let progstr := stringify_stmt ast in  
+  let progstr := stringify_stmt ast in
   let progstr := eval simpl in progstr in
     let header := constr:([funcname++".h";
                            "#include <stdlib.h>";
                            "";
-                           "void "++funcname++"("++args++","++scalar++"*output);"]) in 
+                           "void "++funcname++"("++args++","++scalar++"*output);"]) in
     
     let func := constr:((funcname++".c")::
                           "#include <stdlib.h>"::
@@ -80,7 +80,7 @@ Ltac Llibfunc name context :=
 
     let ret' := constr:(app ("!!!"::header) ("!!!"::func)) in
     let ret := eval simpl in ret' in
-      ret. 
+      ret.
 
 Goal forall A B C (m1 m2 : list (list R)),
      (0 < A)%Z ->
@@ -90,7 +90,7 @@ Goal forall A B C (m1 m2 : list (list R)),
      consistent m2 (Z.to_nat B,(Z.to_nat C,tt)) ->
      matmul A B C m1 m2 = matmul_tiled (Z.to_nat A) (Z.to_nat B) (Z.to_nat C) m1 m2 4%Z.
 Proof.
-  intros.  
+  intros.
   let s := Llibfunc
              constr:("matmul")
              constr:(($0 $+ ("m1", [ZLit A;ZLit B])
