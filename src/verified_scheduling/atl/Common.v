@@ -23,7 +23,7 @@ From ATL Require Import ATL Tactics Div.
 Generalizable All Variables.
 
 Instance pointwise_eq_ext {A B : Type} `(sb : subrelation B RB Logic.eq)
-  : subrelation (pointwise_relation A RB) Logic.eq. 
+  : subrelation (pointwise_relation A RB) Logic.eq.
 Proof.
   intros f g Hfg. apply functional_extensionality. intro x; apply sb, (Hfg x).
 Qed.
@@ -33,15 +33,6 @@ Definition to_val {X} `{TensorElem X} (opt : option X) : X :=
   | None => null
   | Some v => v
   end.
-
-Lemma nth_map {X} `{TensorElem X} : forall i f v,
-    i < length v ->
-    @nth_error X (List.map f v) i = Some (f (to_val (nth_error v i))).
-Proof.
-  induction i; intros f v H0; destruct v; simpl in *;
-    try contra_crush; auto.
-  apply IHi. lia.
-Qed.
 
 (* Hole Establishing and Context Diving *)
 
@@ -97,12 +88,12 @@ Proof.
 Qed.
 Lemma tlet_id_split {X Y} `{TensorElem X} `{TensorElem Y} :
   forall (f : X -> X) (g : X -> X) s (x : X) (body : X -> Y),
-    consistent x s ->        
+    consistent x s ->
     (forall x', consistent x' s -> f (g x') = x') ->
     let_binding x body = let_binding (g x) (fun x' => body (f x')).
 Proof.
   intros.
-  unfold let_binding.  
+  unfold let_binding.
   rewrite H2; auto.
 Qed.
 
@@ -113,7 +104,7 @@ Lemma tlet_eq_body {X Y} :
 Proof.
   intros. unfold let_binding. auto.
 Qed.
-  
+
 Lemma bin_eq_l {X} `{TensorElem X} : forall a b c,
     a = b -> a <+> c = b <+> c.
 Proof.
@@ -179,7 +170,7 @@ Proof.
     replace (Z.of_nat i + m + 1)%Z with ((Z.of_nat (S i)) + m)%Z by
         (rewrite Nat2Z.inj_succ; lia).
     apply H0; lia.
-Qed.    
+Qed.
 
 Theorem sumr_eq_bound {X} `{TensorElem X} : forall n m f g,
     (forall i, m <= i -> i < n ->
@@ -191,10 +182,10 @@ Proof.
   destruct (0<=?n-m)%Z eqn:nm; unbool.
   apply sum_helper_eq_bound.
   intros. apply H0. lia.
-  zify. 
+  zify.
   lia.
   destruct (n-m)%Z. lia. zify. lia. reflexivity.
-Qed.    
+Qed.
 
 Theorem gen_helper_eq_bound {X} `{TensorElem X} : forall n m f g,
     (forall i, 0 <= i -> i < n ->
@@ -210,7 +201,7 @@ Proof.
     replace (Z.of_nat i + m + 1)%Z with ((Z.of_nat (S i)) + m)%Z by
         (rewrite Nat2Z.inj_succ; lia).
     apply H0; lia.
-Qed.    
+Qed.
 
 Hint Resolve sum_helper_eq_bound : crunch.
 
@@ -237,13 +228,13 @@ Theorem genr_eq_bound {X} `{TensorElem X} : forall N (f g : Z -> X) K,
   GEN [ K <= i < N ] f i = GEN [ K <= i < N ] g i.
 Proof.
   destruct N; intros; try reflexivity.
-  unfold gen, genr. 
+  unfold gen, genr.
   apply gen_helper_eq_bound; intros.
   apply H0. lia. zify. lia.
-  unfold gen, genr. 
+  unfold gen, genr.
   apply gen_helper_eq_bound; intros.
   apply H0. lia. zify. lia.
-  unfold gen, genr. 
+  unfold gen, genr.
   apply gen_helper_eq_bound; intros.
   apply H0. lia. zify. lia.
 Qed.
@@ -263,7 +254,7 @@ Hint Resolve gen_eq_bound : crunch.
 
 Lemma iverson_eq {X} `{TensorElem X} :
   forall p1 p2 e, p1 = p2 -> (|[ p1 ]| e) = (|[ p2 ]| e).
-Proof. 
+Proof.
   intros. subst. reflexivity.
 Qed.
 
@@ -382,14 +373,14 @@ Proof.
   induction (Z.to_nat (n-k)%Z); simpl; auto with crunch.
 Qed.
 
-Lemma get_neg_null : forall i (X: Set) (H: TensorElem X) x v,
+Lemma get_neg_null : forall i (X: Type) (H: TensorElem X) x v,
     (i < 0)%Z ->
     (x::v) _[ i ] = |[ false ]| x.
 Proof.
   intros; destruct i; contra_crush.
 Qed.
 
-Lemma get_neg_null_shape : forall i (X: Set) (H: TensorElem X)
+Lemma get_neg_null_shape : forall i (X: Type) (H: TensorElem X)
                                   (v : list X) s e n,
     (i < 0)%Z ->
     consistent v (n,s) ->
@@ -402,31 +393,7 @@ Proof.
   eapply mul_0_absorb; eauto.
 Qed.
 
-Lemma get_znlt_null : forall i (X : Set) (H: TensorElem X) (v : list X) x,
-    ~ (i < Z.of_nat (length (x::v)))%Z->
-    (x::v) _[ i ] = (|[ false ]| x).
-Proof.
-  intros. generalize dependent i.
-  induction v; destruct i; intros; try reflexivity; unfold get; simpl.
-  - simpl in H0. lia.
-  - posnat.
-    simpl in *.
-    destruct pn; reflexivity.
-  - simpl in H0. zify. lia.
-  - posnat. simpl.
-    simpl length in *.
-    destruct pn.
-    simpl. zify. lia.
-    simpl.
-    specialize (IHv (Z.of_nat (S pn))).
-    assert (~ (Z.of_nat (S pn) < Z.of_nat (S (length v)))%Z). zify. lia.
-    apply IHv in H1.
-    unfold get in H1. simpl in H1.
-    rewrite SuccNat2Pos.id_succ in H1. simpl in H1.
-    assumption.
-Qed.
-
-Lemma get_znlt_null_shape : forall i (X : Set) (H: TensorElem X)
+Lemma get_znlt_null_shape : forall i (X : Type) (H: TensorElem X)
                                    (v : list X) s e n,
     ~ (i < Z.of_nat (length v))%Z->
     consistent v (n,s) ->
@@ -487,10 +454,10 @@ Lemma nth_gen_helper_some {X} `{TensorElem X} :
   forall n i m (e0 : Z -> X),
     i < n ->
     nth_error (gen_helper n m e0) i = Some (e0 (m + Z.of_nat i)%Z).
-Proof. 
+Proof.
   induction n; intros i m e0 H0.
   - inversion H0.
-  - simpl. 
+  - simpl.
     destruct i; try reflexivity.
     simpl. rewrite Z.add_0_r. reflexivity.
     simpl. rewrite IHn by lia.
@@ -602,7 +569,7 @@ Qed.
 (*
 Lemma get_gen_some_ {X} `{TensorElem X} :
   forall (e0 : Z -> X) i n k,
-    (i < k)%Z ->    
+    (i < k)%Z ->
     k = n ->
     (0 <= i)%Z ->
     (GEN [ x < n ] e0 x) _[ i ] = e0 i.
@@ -613,7 +580,7 @@ Proof.
 Qed.
 *)
 Lemma get_gen_of_nat_some :
-  forall I (X : Set) (H : TensorElem X) (body : Z -> X) N,
+  forall I (X : Type) (H : TensorElem X) (body : Z -> X) N,
     (I < Z.of_nat N)%Z ->
     (0 <= I)%Z ->
     (GEN [ x < Z.of_nat N ] body x) _[ I ] = body I.
@@ -784,6 +751,13 @@ Proof.
   auto with crunch.
 Qed.
 
+Lemma nth_error_genr_Some {X} `{TensorElem X} i lo hi (f : _ -> X) :
+  i < Z.to_nat (hi - lo) ->
+  nth_error (genr lo hi f) i = Some (f (lo + Z.of_nat i)%Z).
+Proof.
+  cbv [genr]. intros. rewrite nth_gen_helper_some; auto.
+Qed.
+
 Lemma get_genr_indic_not {X} `{TensorElem X} :
   forall (I N m o : Z) (body : Z -> X),
     (m < N)%Z ->
@@ -802,14 +776,14 @@ Proof.
     assert (Z.to_nat I < Z.to_nat (N-m)%Z) by auto with crunch.
     apply
       (nth_gen_helper_indic_not (Z.to_nat I) (Z.to_nat (N-m)%Z) m o body) in H4.
-    rewrite H4.    
+    rewrite H4.
     destruct (Z.to_nat (N-m)) eqn:e.
     zify. lia.
     simpl.
     f_equal. f_equal. zify. lia. zify. lia.
   - contra_crush.
 Qed.
-    
+
 Lemma get_genr_indic : forall I N m body,
     (m < N)%Z ->
     (I < N - m)%Z ->
@@ -988,7 +962,7 @@ Proof.
   apply consistent_sum_helper.
   intros. apply H1; zify; lia.
 Qed.
-  
+
 Lemma consistent_sum {X} `{TensorElem X} :
   forall s n f,
     (0 < n)%Z ->
@@ -1074,11 +1048,11 @@ Lemma consistent_gen' {X} `{TensorElem X} : forall n m f s,
 Proof.
   unfold gen, genr.
   intros. rewrite Z.sub_0_r. rewrite H2.
-  apply consistent_gen_helper. zify. lia. 
+  apply consistent_gen_helper. zify. lia.
   intros. apply H1; zify; lia.
 Qed.
 
-Theorem consistent_let {X Y : Set} `{TensorElem Y} :
+Theorem consistent_let {X Y : Type} `{TensorElem Y} :
   forall (f : X -> Y) (e : X) s,
     consistent (f e) s ->
     consistent (let_binding e f) s.
@@ -1145,7 +1119,7 @@ Proof.
     simpl in IHn.
     rewrite <- IHn.
     rewrite mul_bin_distr. reflexivity.
-Qed.    
+Qed.
 
 Lemma mul_0_sum_helper {X} `{TensorElem X} : forall n (f : Z -> X),
     scalar_mul 0 (sum_helper n 0 f) =
@@ -1212,7 +1186,7 @@ Lemma sum_helper_bound_indic {X} `{TensorElem X} :
   forall n (m a : Z) (f : Z -> bool) (g : Z -> X) (t : shape),
    (forall x : Z, m <= x -> x < m + Z.of_nat (S n) -> consistent (g x) t)%Z ->
     consistent (g a) t ->
-    sum_helper (S n) m (fun k => |[ (k =? a) && f k ]| g k) 
+    sum_helper (S n) m (fun k => |[ (k =? a) && f k ]| g k)
     = (|[ (a <? m + Z.of_nat (S n)) && (m <=? a) && f a ]| g a).
 Proof.
   induction n; intros.
@@ -1506,7 +1480,7 @@ Proof.
       rewrite mul_bin_distr. auto.
     + inversion H12. lia.
 Qed.
-    
+
 Lemma get_sum_helper {X} `{TensorElem X} : forall n f I s m,
     (forall x, m <= x /\ x < m + Z.of_nat (S n) -> consistent (f x) s)%Z ->
     sum_helper (S n) m (fun i => f i _[I]) = (sum_helper (S n) m f) _[I].
@@ -1555,10 +1529,10 @@ Proof.
     2: { eapply H0. lia. lia. }
     repeat erewrite gen_length in *. repeat rewrite Nat2Z.id in *.
     2: { eapply H0. lia. lia. }
-    rewrite max_assoc. rewrite max_id.    
+    rewrite max_assoc. rewrite max_id.
     erewrite IHm. eauto.
     intros. eapply H0. lia. lia.
-Qed.    
+Qed.
 
 Theorem sum_helper_cons_split {X} `{TensorElem X} :
   forall m n f (g : Z -> list X) s k,
@@ -1575,7 +1549,7 @@ Proof.
     specialize (IHm n (inc f) (inc g) s k). simpl in IHm.
     rewrite IHm.
     rewrite tensor_add_step. reflexivity.
-    unfold tensor_add. erewrite gen_length. rewrite Nat2Z.id.    
+    unfold tensor_add. erewrite gen_length. rewrite Nat2Z.id.
     2: { intros. eapply H0. lia. lia. }
     assert (n <= n)%Z by lia.
     assert (n <= n+1)%Z by lia.
@@ -1592,7 +1566,7 @@ Theorem sum_helper_gen_helper_swap {X} `{TensorElem X} :
     0 < b ->
     (forall (x y : Z), (n <= x)%Z -> (x < n + Z.of_nat b)%Z ->
                        (m <= y)%Z -> (y < m + Z.of_nat a)%Z ->
-                   consistent (f y x) s) ->    
+                   consistent (f y x) s) ->
     gen_helper a m  (fun x => sum_helper b n (fun y => (f x y))) =
     sum_helper b n (fun y => gen_helper a m (fun x => (f x y))).
 Proof.
@@ -1623,9 +1597,9 @@ Proof.
         f_equal.
         pose proof get_bin_distr.
         specialize (H2 ([ f m (n+1+1)%Z])).
-        specialize H3 with (I:=0%Z). simpl in H3.        
+        specialize H3 with (I:=0%Z). simpl in H3.
         erewrite H3.
-        erewrite <- get_sum_helper. reflexivity.        
+        erewrite <- get_sum_helper. reflexivity.
         intros. econstructor. eapply H1; lia. econstructor. simpl.
         reflexivity. simpl. econstructor. eapply H1; lia.
         econstructor. reflexivity.
@@ -1842,7 +1816,7 @@ Proof.
         zify. lia.
         simpl in *. zify. lia. auto.
     + simpl in H1. lia.
-Qed.                               
+Qed.
 
 Hint Extern 5 => match goal with
                    |- context[ length (_ _[_]) ] => apply get_forall
@@ -1891,11 +1865,11 @@ Proof.
   - reflexivity.
 Qed.
 
-Fixpoint map2 {X Y Z : Set} (f : X -> Y -> Z) (l1 : list X) (l2 : list Y) :=
+Fixpoint map2 {X Y Z : Type} (f : X -> Y -> Z) (l1 : list X) (l2 : list Y) :=
   match l1,l2 with
   | x::xs, y::ys => f x y :: (map2 f xs ys)
   | _,_ => []
-  end.             
+  end.
 
 Lemma gen_helper_mul_distr : forall n f g,
     gen_helper n 0%Z (fun x => (f x * g x)%R) =
@@ -1914,8 +1888,8 @@ Lemma gen_mul_distr : forall n f g,
 Proof. intros. apply gen_helper_mul_distr. Qed.
 
 Lemma tensor_consistent_forall_consistent {X} `{TensorElem X} :
-  forall s (l : list X),
-    consistent l (length l,s) -> Forall (fun x => consistent x s) l.
+  forall s n (l : list X),
+    consistent l (n,s) -> Forall (fun x => consistent x s) l.
 Proof.
   intros.
   inversion H0. subst.
@@ -1928,7 +1902,7 @@ Lemma Forall_split {X} `{TensorElem X} : forall (l : list X) P Q,
   Forall P l /\ Forall Q l.
 Proof.
   split; induction l; intros; try split; try constructor.
-  - inversion H0. tauto. 
+  - inversion H0. tauto.
   - inversion H0. eapply Forall_impl with
                       (P:= (fun x : X => P x /\ Q x)).
     intros. tauto. auto.
@@ -2230,7 +2204,7 @@ Proof.
 Qed.
 
 Lemma flatten_trunc_eq {X} `{TensorElem X} : forall u v m n,
-    u = v -> 
+    u = v ->
     n = m ->
     flatten_trunc n u = flatten_trunc m v.
 Proof.
@@ -2276,7 +2250,7 @@ Proof.
   inversion H5. rewrite <- H18 in *. clear H18. subst.
   eapply consistent_get.
   eapply consistent_get. eauto.
-  
+
   simpl in *. inversion H14. inversion H5. rewrite <- H9. subst.
   simpl. f_equal.
   rewrite mul_comm. simpl.
@@ -2405,9 +2379,9 @@ Theorem consistent_truncr {X} `{TensorElem X} :
 Proof.
   intros. unfold truncr.
   apply consistent_gen.
-  erewrite consistent_length; eauto. 
+  erewrite consistent_length; eauto.
   intros. eapply consistent_get.
-  eauto. erewrite consistent_length; eauto. 
+  eauto. erewrite consistent_length; eauto.
 Qed.
 
 Theorem consistent_truncl {X} `{TensorElem X} :
@@ -2418,33 +2392,31 @@ Theorem consistent_truncl {X} `{TensorElem X} :
 Proof.
   intros. unfold truncl.
   apply consistent_gen.
-  erewrite consistent_length; eauto. 
+  erewrite consistent_length; eauto.
   intros. eapply consistent_get.
-  eauto. erewrite consistent_length; eauto. 
+  eauto. erewrite consistent_length; eauto.
 Qed.
 
 Theorem consistent_pad_l {X} `{TensorElem X} :
   forall (v : list X) n k s,
-    0 < k ->
     consistent v (n,s) ->
     consistent (pad_l k v) (k+n,s).
 Proof.
   intros. unfold pad_l.
-  apply consistent_gen. lia. 
+  apply consistent_gen. inversion H0. simpl. lia.
   intros. apply consistent_iverson. eapply consistent_get.
-  eauto. inversion H1. rewrite H7. lia.
+  eauto. inversion H0. subst. lia.
 Qed.
 
 Theorem consistent_pad_r {X} `{TensorElem X} :
   forall (v : list X) n k s,
-    0 < k ->
     consistent v (n,s) ->
-    consistent (pad_r k v) (k+n,s).
+    consistent (pad_r k v) (n+k,s).
 Proof.
   intros. unfold pad_r.
-  apply consistent_gen. lia. 
+  apply consistent_gen. inversion H0. subst. simpl. lia.
   intros. apply consistent_iverson. eapply consistent_get.
-  eauto. inversion H1. rewrite H7. lia.
+  eauto. inversion H0. subst. lia.
 Qed.
 
 Lemma guard_comp_to_eq : forall k l i i1,
@@ -2472,7 +2444,7 @@ Proof.
   rewrite Z.mul_comm.
   rewrite Z.add_sub_swap.
   rewrite <- Z.mul_sub_distr_r.
-  
+
   replace (0 <=? (i / zk - i1) * zk + r)%Z with
       (0 <=? (i / zk - i1))%Z.
   2:
@@ -2500,7 +2472,7 @@ Proof.
       ((i / zk - i1) <=?0)%Z.
   2:
     {
-    pose proof (Z.mod_pos_bound i zk). peel_hyp. 
+    pose proof (Z.mod_pos_bound i zk). peel_hyp.
     assert (r < zk)%Z.
     lia.
 
@@ -2543,18 +2515,15 @@ Proof.
 Qed.
 
 Theorem consistent_concat {X} `{TensorElem X} : forall (l1 l2 : list X) n m s k,
-    0 < n ->
-    0 < m ->
-    k = n + m ->
     consistent l1 (n,s) ->
     consistent l2 (m,s) ->
+    k = n + m ->
     consistent (l1 <++> l2) (k,s).
 Proof.
   intros.
   unfold concat.
-  inversion H3. inversion H4.
-  rewrite H10, H16.
-  apply consistent_gen. lia.
+  inversion H0. inversion H1. subst.
+  apply consistent_gen. simpl. lia.
   intros.
   eapply consistent_bin.
   eapply consistent_iverson. eapply consistent_get. subst. eauto.
@@ -2682,7 +2651,7 @@ Proof.
     rewrite true_iverson.
     unfold iverson.
     apply bin_mul_0_self_id.
-Qed.    
+Qed.
 
 Theorem gp_iverson {X} `{TensorElem X} :
   forall I p (e : list X),
@@ -2696,7 +2665,7 @@ Proof.
      + destruct e.
        simpl in ie. lia.
        simpl. auto.
-     + simpl in *. rewrite nth_map by (zify; lia).
+     + simpl in *. rewrite nth_error_map by (zify; lia).
        destruct e. simpl in *. lia.
        simpl.
        unfold to_val.
@@ -2705,7 +2674,7 @@ Proof.
        destruct (nth_error (x::e) (Pos.to_nat p0)). auto. contradiction.
      + contradiction.
   - destruct e.
-    + simpl. unfold get. simpl. 
+    + simpl. unfold get. simpl.
       destruct p.
       * repeat rewrite true_iverson.
         reflexivity.
@@ -2766,13 +2735,63 @@ Definition Truncr {X} `{TensorElem X} k l  :=
 Lemma Truncr_eq {X} `{TensorElem X} : forall k l1 l2,
     l1 = l2 ->
     Truncr k l1 = Truncr k l2.
-Proof. intros. subst. eauto. Qed.  
+Proof. intros. subst. eauto. Qed.
 
 Lemma truncr_Truncr {X} `{TensorElem X} :
   forall l n,
     truncr n l = Truncr (Z.of_nat n) l.
 Proof. intros. unfold Truncr. rewrite Nat2Z.id. eauto. Qed.
 
+Definition Truncl {X} `{TensorElem X} k l  :=
+  truncl (Z.to_nat k) l.
+
+Lemma Truncl_eq {X} `{TensorElem X} : forall k l1 l2,
+    l1 = l2 ->
+    Truncl k l1 = Truncl k l2.
+Proof. intros. subst. eauto. Qed.
+
+Lemma truncl_Truncl {X} `{TensorElem X} :
+  forall l n,
+    truncl n l = Truncl (Z.of_nat n) l.
+Proof. intros. unfold Truncl. rewrite Nat2Z.id. eauto. Qed.
+
+Definition Tile {X} `{TensorElem X} l k :=
+  tile l (Z.to_nat k).
+
+Lemma Tile_eq {X} `{TensorElem X} : forall k l1 l2,
+    l1 = l2 ->
+    Tile l1 k = Tile l2 k.
+Proof. intros. subst. eauto. Qed.
+
+Lemma tile_Tile {X} `{TensorElem X} :
+  forall l n,
+    tile l n = Tile l (Z.of_nat n).
+Proof. intros. unfold Tile. rewrite Nat2Z.id. eauto. Qed.
+
+Definition Padl {X} `{TensorElem X} k l :=
+  pad_l (Z.to_nat k) l.
+
+Lemma Padl_eq {X} `{TensorElem X} : forall k l1 l2,
+    l1 = l2 ->
+    Padl l1 k = Padl l2 k.
+Proof. intros. subst. eauto. Qed.
+
+Lemma pad_l_Padl {X} `{TensorElem X} :
+  forall n l,
+    pad_l n l = Padl (Z.of_nat n) l.
+Proof. intros. unfold Padl. rewrite Nat2Z.id. eauto. Qed.
+
+Definition Padr {X} `{TensorElem X} k l :=
+  pad_r (Z.to_nat k) l.
+
+Lemma Padr_eq {X} `{TensorElem X} : forall k l1 l2,
+    l1 = l2 ->
+    Padr l1 k = Padr l2 k.
+Proof. intros. subst. eauto. Qed.
+
+Lemma pad_r_Padr {X} `{TensorElem X} :
+  forall n l,
+    pad_r n l = Padr (Z.of_nat n) l.
+Proof. intros. unfold Padr. rewrite Nat2Z.id. eauto. Qed.
+
 Lemma minus_plus : forall n m : nat, n + m - n = m. Proof. lia. Qed.
-
-

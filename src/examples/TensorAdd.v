@@ -20,7 +20,7 @@ Definition add A B C D (m1 m2 : (list (list (list (list R))))) :=
       GEN [ l < D ]
       (m1 _[i;j;k;l] * m2 _[i;j;k;l])%R.
 
-Hint Unfold add : examples.  
+Hint Unfold add : examples.
 Hint Resolve Z.div_lt_upper_bound mul_add_lt : crunch.
 
 Lemma mul_add_lt : forall i j k A C,
@@ -35,23 +35,22 @@ Proof.
     rewrite Z.mod_small by lia. reflexivity.
   - inversion H2. subst.
     rewrite div_mod_eq by lia. reflexivity.
-Qed.      
+Qed.
 
 Section Add.
-  Variables (A B C D : nat) (m1 m2 : (list (list (list (list R))))).
+  Variables (A B C D : Z) (m1 m2 : (list (list (list (list R))))).
   Derive add_split SuchThat
          (0 < A ->
           0 < B ->
           0 < C ->
           0 < D ->
-          consistent m1 (A,(B,(C,(D,tt)))) ->
-          consistent m2 (A,(B,(C,(D,tt)))) ->
-          add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2 =
-            add_split) As matmultiled.
+          consistent m1 (Z.to_nat A,(Z.to_nat B,(Z.to_nat C,(Z.to_nat D,tt)))) ->
+          consistent m2 (Z.to_nat A,(Z.to_nat B,(Z.to_nat C,(Z.to_nat D,tt)))) ->
+          add A B C D m1 m2 = add_split)%Z As matmultiled.
   Proof.
     reschedule.
 
-    wrapid^ @tile_flatten_id around (GEN [ _ < (Z.of_nat A) ] _).
+    wrapid^ @tile_flatten_id around (GEN [ _ < A ] _).
 
     inline flatten.
     rw @consistent_length.
@@ -92,8 +91,14 @@ Section Add.
     rw @sum_bound_indic_no_f_guard.
 
     repeat rw Z.div_div.
+
+    rw tile_Tile.
+    Fail progress rw tile_Tile. rewrite tile_Tile.
+    Fail progress rw tile_Tile. rewrite tile_Tile.
+    do 3 rewrite Z2Nat.id by lia.
+
     done.
   Defined.
  End Add.
 
-Hint Unfold add add_split : examples.  
+Hint Unfold add add_split : examples.

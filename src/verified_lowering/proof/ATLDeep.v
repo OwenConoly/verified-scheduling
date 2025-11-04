@@ -1,6 +1,4 @@
 From Stdlib Require Import Arith.Arith.
-From Stdlib Require Import Arith.EqNat.
-From Stdlib Require Import Arith.PeanoNat. Import Nat.
 From Stdlib Require Import Bool.Bool.
 From Stdlib Require Import Reals.Reals. Import Rdefinitions. Import RIneq.
 From Stdlib Require Import ZArith.Zdiv.
@@ -124,20 +122,20 @@ Fixpoint sizeof (e : ATLexpr) : list Zexpr :=
     match sizeof e with
     | m :: rest => (m - n)%z :: rest
     | [] => []
-    end           
+    end
   | Padr n e =>
     match sizeof e with
     | m :: rest => (m + n)%z :: rest
     | [] => []
-    end         
+    end
   | Padl n e =>
     match sizeof e with
     | m :: rest => (m + n)%z :: rest
     | [] => []
-    end                  
+    end
   | Scalar s =>
     []
-  end.    
+  end.
 
 Definition flat_sizeof e :=
   match sizeof e with
@@ -179,11 +177,11 @@ Fixpoint lower
       let xlen := match sizeof x with
                   | n::_ => n
                   | _ => | 0 |%z
-                  end in 
+                  end in
       let ylen := match sizeof y with
                   | n::_ => n
                   | _ => | 0 |%z
-                  end in   
+                  end in
       Seq (lower x (fun l =>
                       f (match l with
                          | (v,d)::xs =>
@@ -209,7 +207,7 @@ Fixpoint lower
                         | (v,d)::(vi,di)::xs =>
                             ((v * di + vi)%z, (d * di)%z)::xs
                         | _ => l
-                        end)) p asn sh          
+                        end)) p asn sh
   | Truncr n e =>
       lower e (fun l => f (match l with
                         | (v,d)::xs =>
@@ -280,7 +278,7 @@ Inductive size_of v : ATLexpr -> list nat -> Prop :=
 | SizeOfPadl : forall k kz e m sh,
     eval_Zexpr v k kz ->
     size_of _ e (m :: sh) ->
-    size_of _ (Padl k e) (m + Z.to_nat kz :: sh)
+    size_of _ (Padl k e) (Z.to_nat kz + m :: sh)
 | SizeOfScalar : forall s,
     size_of _ (Scalar s) [].
 Local Hint Constructors eval_Zexpr eval_Bexpr eval_Sexpr size_of.
@@ -448,11 +446,11 @@ Inductive eval_expr :
     eval_Zexpr_Z v k = Some kz ->
     eval_expr v ec e (V l) ->
     eval_expr v ec (Truncr k e)
-              (V (List.rev (truncl_list (Z.to_nat kz) (List.rev l))))
+              (V (List.rev (skipn (Z.to_nat kz) (List.rev l))))
 | EvalTruncl : forall e v ec k kz l,
     eval_Zexpr_Z v k = Some kz ->
     eval_expr v ec e (V l) ->
-    eval_expr v ec (Truncl k e) (V (truncl_list (Z.to_nat kz) l))
+    eval_expr v ec (Truncl k e) (V (skipn (Z.to_nat kz) l))
 | EvalPadr : forall e v ec l s n k kz,
     eval_Zexpr_Z v k = Some kz ->
     size_of v e (n::s) ->
@@ -593,6 +591,14 @@ Proof.
   - f_equal; lia.
 Qed.
 
+(*not quite equivalent to the coqutil thing, but same idea*)
+Ltac destruct_one_match_hyp :=
+  match goal with
+  | H: context [match ?e with _ => _ end] |- _ =>
+      let E := fresh "E" in
+      destruct e eqn:E
+  end.
+
 Theorem dom_alloc_array_in_heap : forall h x l,
     l <> [] ->
     dom (alloc_array_in_heap l h x) = constant [x] \cup dom h.
@@ -610,7 +616,7 @@ Lemma length_eval_expr_gen : forall c v e l i lo hi,
       length l = Z.to_nat z.
 Proof.
   induct 1; intros.
-  - simpl in *. invert H2. rewrite H,H0 in *. invert H4. lia. 
+  - simpl in *. invert H2. rewrite H,H0 in *. invert H4. lia.
   - invert H6. rewrite H,H0 in *. invert H8.
     simpl.
     erewrite IHeval_expr2.
@@ -670,7 +676,7 @@ Lemma eq_eval_stmt_for :
 Proof.
   induct 1; intros.
   - rewrite H,H0 in *. invert H4. invert H5.
-    eapply EvalForStep; eauto.    
+    eapply EvalForStep; eauto.
     eapply H6. lia. eassumption.
     eapply IHeval_stmt2. reflexivity.
     simpl. rewrite H. reflexivity.
@@ -729,7 +735,7 @@ Proof.
         try lia; try discriminate; propositional.
       invert H1.
     + eapply EvalReduceV; eauto.
-      * unfold not in *. intros. apply H8.        
+      * unfold not in *. intros. apply H8.
         specialize (H0 []); simpl in *.
         invert H0. invs.
         rewrite H in *.
@@ -799,10 +805,148 @@ Proof.
     eapply result_has_shape_add_result. eassumption.
     2: { eapply IHn in H19. eassumption. eassumption. eassumption.
          simpl. rewrite H2. reflexivity.
-         eauto. lia. } 
+         eauto. lia. }
     eapply H. 3: eassumption.
     { eapply nonneg_bounds_includes; [|eassumption]. sets. }
     { eapply size_of_includes; [|eassumption]. sets. }
     eapply size_of_includes in H1; eauto.
     eq_size_of. apply result_has_shape_gen_pad.
-Qed.      
+Qed.
+
+Lemma invert_eval_gen v ctx i lo hi body r :
+  eval_expr v ctx (Gen i lo hi body) r ->
+  exists loz hiz rl,
+    r = V rl /\
+      length rl = Z.to_nat (hiz - loz) /\
+      eval_Zexpr_Z v lo = Some loz /\
+      eval_Zexpr_Z v hi = Some hiz /\
+      (forall i', (loz <= i' < hiz)%Z ->
+             (~ i \in dom v) /\
+               (~ contains_substring "?" i) /\
+               match nth_error rl (Z.to_nat (i' - loz)) with
+               | None => False
+               | Some r =>  eval_expr (v $+ (i, i')) ctx body r
+               end).
+Proof.
+  intros H. remember (Gen _ _ _ _) as e eqn:E. revert lo E.
+  induction H; intros lo_ H'; invert H'.
+  - exists loz, hiz, nil. simpl. intuition lia.
+  - clear IHeval_expr1.
+    specialize (IHeval_expr2 _ eq_refl).
+    destruct IHeval_expr2 as (loz_&hiz_&l_&Hl_&Hlen&Hloz&Hhiz&IH2).
+    rewrite H0 in Hhiz. invert Hhiz. invert Hl_.
+    simpl in Hloz. rewrite H in Hloz. invert Hloz.
+    eexists _, _, _. intuition eauto.
+    { simpl. lia. }
+    assert (Hor : (i' = loz \/ loz + 1 <= i')%Z) by lia.
+    destruct Hor as [Hle|Heq].
+    + subst. replace (Z.to_nat _) with O by lia. simpl. assumption.
+    + specialize (IH2 i' ltac:(lia)). destruct (Z.to_nat (i' - loz)) eqn:E. 1: lia.
+      simpl. destruct IH2 as (_&_&IH2). replace (Z.to_nat _) with n in IH2 by lia.
+      apply IH2.
+Qed.
+
+Lemma mk_eval_gen v ctx i lo hi body loz hiz rl :
+  eval_Zexpr_Z v lo = Some loz ->
+  eval_Zexpr_Z v hi = Some hiz ->
+  length rl = Z.to_nat (hiz - loz) ->
+  (forall i', (loz <= i' < hiz)%Z ->
+         (~ i \in dom v) /\
+           (~ contains_substring "?" i) /\
+           match nth_error rl (Z.to_nat (i' - loz)) with
+           | None => False
+           | Some r =>  eval_expr (v $+ (i, i')) ctx body r
+           end) ->
+  eval_expr v ctx (ATLDeep.Gen i lo hi body) (Result.V rl).
+Proof.
+  intros Hlo Hhi Hlen Hbody. revert lo loz Hlen Hlo Hbody.
+  induction rl; intros lo loz Hlen Hlo Hbody.
+  - eapply EvalGenBase; eauto. simpl in Hlen. lia.
+  - simpl in Hlen.
+    pose proof (Hbody loz ltac:(lia)) as Hbody0. invs'.
+    replace (loz - loz)%Z with 0%Z in * by lia. simpl in *. invs'.
+    econstructor; eauto; try lia. eapply IHrl; eauto.
+    2: { simpl. rewrite Hlo. reflexivity. }
+    { lia. }
+    intros i' Hi'. specialize (Hbody i' ltac:(lia)). invs'. intuition.
+    replace (Z.to_nat (i' - loz)) with (Datatypes.S (Z.to_nat (i' - (loz + 1)))) in * by lia.
+    simpl in H7. apply H7.
+Qed.
+
+Inductive fold_right_rel {A B : Type} (R : B -> A -> A -> Prop) : (A -> Prop) -> list B -> A -> Prop :=
+| frr_nil P0 a : P0 a -> fold_right_rel R P0 [] a
+| frr_cons P0 b l0 a a' :
+  fold_right_rel R P0 l0 a' ->
+  R b a' a ->
+  fold_right_rel R P0 (b :: l0) a
+.
+Hint Constructors fold_right_rel : core.
+
+Definition add_list_result sh :=
+  fold_right_rel add_result (eq (gen_pad sh)).
+
+Lemma invert_eval_sum v ctx i lo hi body r :
+  eval_expr v ctx (Sum i lo hi body) r ->
+  exists loz hiz summands sz,
+    size_of v body sz /\
+      length summands = Z.to_nat (hiz - loz) /\
+      eval_Zexpr_Z v lo = Some loz /\
+      eval_Zexpr_Z v hi = Some hiz /\
+      add_list_result sz summands r /\
+      (forall i', (loz <= i' < hiz)%Z ->
+             (~ i \in dom v) /\
+               (~ contains_substring "?" i) /\
+               match nth_error summands (Z.to_nat (i' - loz)) with
+               | None => False
+               | Some r =>  eval_expr (v $+ (i, i')) ctx body r
+               end).
+Proof.
+  intros H. remember (Sum _ _ _ _) as e eqn:E. revert lo E.
+  induction H; intros lo_ H'; invert H'.
+  2: { exists loz, hiz, nil, sz. simpl. intuition auto; try lia.
+       constructor. eauto. }
+  clear IHeval_expr1. specialize (IHeval_expr2 _ eq_refl).
+  destruct IHeval_expr2 as (loz'&hiz'&summands'&sz'&Hsz'&Hlen&Hloz'&Hhiz'&Hsummands'&IH).
+  simpl in Hloz'. rewrite H0 in Hhiz'. invert Hhiz'. rewrite H in Hloz'. invert Hloz'.
+  exists loz, hiz', (r :: summands'), sz'. intuition.
+  + simpl. lia.
+  + econstructor. 1: eassumption. assumption.
+  + clear Hsummands'.
+    assert (Hor : (i' = loz \/ loz + 1 <= i')%Z) by lia.
+    destruct Hor as [Hle|Heq].
+    -- subst. replace (Z.to_nat _) with O by lia. simpl. assumption.
+    --
+      specialize (IH i' ltac:(lia)). destruct IH as (_&_&IH).
+      replace (Z.to_nat (i' - loz)) with (Datatypes.S (Z.to_nat (i' - (loz + 1)))) by lia.
+      simpl. assumption.
+Qed.
+
+Lemma mk_eval_sum sz v ctx i lo hi body r loz hiz summands :
+  size_of v body sz ->
+  eval_Zexpr_Z v lo = Some loz ->
+  eval_Zexpr_Z v hi = Some hiz ->
+  add_list_result sz summands r ->
+  length summands = Z.to_nat (hiz - loz) ->
+  (forall i', (loz <= i' < hiz)%Z ->
+         (~ i \in dom v) /\
+           (~ contains_substring "?" i) /\
+           match nth_error summands (Z.to_nat (i' - loz)) with
+           | None => False
+           | Some r =>  eval_expr (v $+ (i, i')) ctx body r
+           end) ->
+  eval_expr v ctx (Sum i lo hi body) r.
+Proof.
+  intros Hsz Hlo Hhi Hsum Hlen Hbody. revert lo loz r Hlen Hlo Hsum Hbody.
+  induction summands; intros lo loz r Hlen Hlo Hsum Hbody.
+  - invert Hsum. eapply EvalSumBase; eauto. simpl in Hlen. lia.
+  - simpl in Hlen. invert Hsum.
+    pose proof (Hbody loz ltac:(lia)) as Hbody0. destruct Hbody0 as (?&?&?).
+    replace (loz - loz)%Z with 0%Z in * by lia. simpl in *.
+    econstructor; eauto; try lia. eapply IHsummands; eauto.
+    2: { simpl. rewrite Hlo. reflexivity. }
+    { lia. }
+    intros i' Hi'. specialize (Hbody i' ltac:(lia)).
+    destruct Hbody as (?&?&?). intuition.
+    replace (Z.to_nat (i' - loz)) with (Datatypes.S (Z.to_nat (i' - (loz + 1)))) in * by lia.
+    simpl in H6. apply H6.
+Qed.

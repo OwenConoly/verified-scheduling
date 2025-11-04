@@ -19,23 +19,23 @@ Definition matmul A B C (m1 m2 : (list (list R))) :=
       SUM [ k < B ]
       (m1 _[i;k] * m2 _[k;j])%R.
 
-Hint Unfold matmul : examples.  
+Hint Unfold matmul : examples.
 
 Section Tile.
-  Variables (A B C : nat) (m1 m2 : (list (list R))) (k : Z).
+  Variables (A B C : Z) (m1 m2 : (list (list R))) (k : Z).
   Derive matmul_tiled SuchThat
-         ((0 < k)%Z ->
+         (0 < k ->
           0 < A ->
           0 < B ->
           0 < C ->
-          consistent m1 (A,(B,tt)) ->
-          consistent m2 (B,(C,tt)) ->
-          matmul (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) m1 m2 =
-            matmul_tiled) As matmultiled.
+          consistent m1 (Z.to_nat A,(Z.to_nat B,tt)) ->
+          consistent m2 (Z.to_nat B,(Z.to_nat C,tt)) ->
+          matmul A B C m1 m2 =
+            matmul_tiled)%Z As matmultiled.
   Proof.
     reschedule.
 
-    wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < (Z.of_nat A) ] _)
+    wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < A ] _)
       with (Z.to_nat k).
 
     inline tile.
@@ -47,47 +47,57 @@ Section Tile.
     rw @consistent_length.
     rw @consistent_length.
     rw @get_gen_some.
-    rw^ @gp_gen_iverson.    
+    rw^ @gp_gen_iverson.
     rw @get_gen_some.
-    rewrite Z2Nat.id by lia.
-    
-    wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < (Z.of_nat C) ] _)
+
+    wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < C ] _)
       with (Z.to_nat k).
 
     inline tile.
     rw @get_gen_some.
-    rw^ @gp_gen_iverson.    
+    rw^ @gp_gen_iverson.
 
     rw @gp_double_iverson.
+
+    rw truncr_Truncr.
+    Fail progress rw truncr_Truncr. rewrite truncr_Truncr. (*??*)
+    rewrite Nat2Z.inj_sub.
+    2: { apply div_ceil_n_lower_bound. lia. }
+    rewrite Nat2Z.inj_sub.
+    2: { apply div_ceil_n_lower_bound. lia. }
+    do 2 rewrite Nat2Z.inj_mul.
+    do 2 rewrite <- of_nat_div_distr.
+    do 3 rewrite Z2Nat.id by lia.
+
     done.
   Defined.
 End Tile.
 
-Hint Unfold matmul matmul_tiled : examples.  
+Hint Unfold matmul matmul_tiled : examples.
 
 Hint Resolve floor_lt_ceil Z.div_pos : crunch.
 
 Section Tile.
-  Variables (A B C : nat) (m1 m2 : (list (list R))) (k : Z).
+  Variables (A B C : Z) (m1 m2 : (list (list R))) (k : Z).
   Derive matmul_tiled_split SuchThat
-         ((0 < k)%Z ->
+         (0 < k ->
           0 < A ->
           0 < B ->
           0 < C ->
-          consistent m1 (A,(B,tt)) ->
-          consistent m2 (B,(C,tt)) ->
-          matmul (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) m1 m2 =
-            matmul_tiled_split) As matmultiledsplit.
+          consistent m1 (Z.to_nat A,(Z.to_nat B,tt)) ->
+          consistent m2 (Z.to_nat B,(Z.to_nat C,tt)) ->
+          matmul A B C m1 m2 =
+            matmul_tiled_split)%Z As matmultiledsplit.
   Proof.
     reschedule.
 
-    wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < (Z.of_nat A) ] _)
+    wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < A ] _)
       with (Z.to_nat k).
 
     inline tile.
     rw @get_gen_some.
 
-    rw^ @split_gen at (Z.of_nat A / k )%Z.
+    rw^ @split_gen at (A / k )%Z.
 
     simpl_guard.
     wrapid^ @transpose_transpose_id around (GEN [ _ < k ] _).
@@ -96,23 +106,31 @@ Section Tile.
     rw @consistent_length.
     rw @consistent_length.
     rw @get_gen_some.
-    rw^ @gp_gen_iverson.    
+    rw^ @gp_gen_iverson.
     rw @get_gen_some.
-    rewrite Z2Nat.id by lia.
 
-    wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < (Z.of_nat C) ] _)
+    wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < C ] _)
       with (Z.to_nat k).
 
     inline tile.
     rw @get_gen_some.
-    rw^ @gp_gen_iverson.    
+    rw^ @gp_gen_iverson.
 
-    rw^ @split_gen upto (Z.of_nat C // k)%Z at (Z.of_nat C / k )%Z.
+    rw^ @split_gen upto (C // k)%Z at (C / k )%Z.
     simpl_guard.
+
+    rw truncr_Truncr.
+    Fail progress rw truncr_Truncr. rewrite truncr_Truncr. (*??*)
+    rewrite Nat2Z.inj_sub.
+    2: { apply div_ceil_n_lower_bound. lia. }
+    rewrite Nat2Z.inj_sub.
+    2: { apply div_ceil_n_lower_bound. lia. }
+    do 2 rewrite Nat2Z.inj_mul.
+    do 2 rewrite <- of_nat_div_distr.
+    do 3 rewrite Z2Nat.id by lia.
 
     done.
   Defined.
 End Tile.
 
-Hint Unfold matmul_tiled_split : examples.  
-
+Hint Unfold matmul_tiled_split : examples.
