@@ -33,7 +33,7 @@ Module Type S.
   Axiom lookup_transform : forall A B (m : fmap A B) (f : A -> A) a b,
         a = f b ->
         lookup (transform m f) b = lookup m a.
-  
+
   Axiom lookup_empty : forall A B k, empty A B $? k = None.
 
   Axiom includes_lookup : forall A B (m m' : fmap A B) k v,
@@ -129,7 +129,7 @@ Module Type S.
 
   Axiom dom_remove : forall A B (m : fmap A B) k,
       dom (m $- k) = dom m \setminus constant (k::nil).
-  
+
   Axiom lookup_restrict_true : forall A B (P : A -> Prop) (m : fmap A B) k,
     P k
     -> lookup (restrict P m) k = lookup m k.
@@ -176,7 +176,7 @@ Module Type S.
   Axiom includes_intro : forall K V (m1 m2 : fmap K V),
       (forall k v, m1 $? k = Some v -> m2 $? k = Some v)
       -> m1 $<= m2.
-  
+
   Axiom lookup_Some_dom : forall K V (m : fmap K V) k v,
       m $? k = Some v
       -> k \in dom m.
@@ -318,7 +318,7 @@ Module M : S.
     forall k v, m1 k = Some v -> m2 k = Some v.
   Definition transform A B (m : fmap A B) (f : A -> A) :=
     fun k => m (f k).
-             
+
   Definition dom A B (m : fmap A B) : set A := fun x => m x <> None.
 
   Theorem fmap_ext : forall A B (m1 m2 : fmap A B),
@@ -334,7 +334,7 @@ Module M : S.
   Proof.
     intros. unfold transform. subst. unfold lookup. reflexivity.
   Qed.
-  
+
   Theorem lookup_empty : forall A B (k : A), lookup (empty B) k = None.
   Proof.
     auto.
@@ -588,7 +588,7 @@ Module M : S.
   Proof.
     auto.
   Qed.
-  
+
   Lemma lookup_Some_dom : forall K V (m : fmap K V) k v,
       lookup m k = Some v
       -> k \in dom m.
@@ -765,5 +765,4 @@ Module M : S.
     Qed.
   End splitting.
 End M.
-
 Export M.

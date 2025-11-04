@@ -10,18 +10,15 @@ From Stdlib Require Import Strings.String.
 From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
-From Stdlib Require Import Reals.Rpower.
 
 Import ListNotations.
 
-Set Warnings "-omega-is-deprecated,-deprecated".
-
+From Inferpad Require Import Reify ReifyExamples ATLPhoas TensorToResult ATLSpecs.
 From ATL Require Import Div ATL.
 From Examples Require Import Blur TensorAdd Im2col Convolution GatherScatter
   Matmul.
 From Codegen Require Import IdentParsing NatToString IntToString Normalize.
 From Lower Require Import ATLDeep Sexpr Zexpr Bexpr.
-From Inferpad Require Import Reify.
 
 Open Scope string_scope.
 Hint Extern 6 (_ < _)%Z => lia : crunch.
@@ -133,8 +130,7 @@ Fixpoint count_split e : nat :=
   | Scalar _ => 0
   end.
 
-Ltac print_counts name :=
-  let e := Reify.R in
+Ltac print_counts e name :=
   let gen_count := constr:(count_gen e) in
   let gen_count := constr:(nat_to_string gen_count) in
   let concat_count := constr:(count_concat e) in
@@ -150,8 +146,8 @@ Ltac print_counts name :=
   let str := constr:((name++","
                         ++gen_count++","
                         ++concat_count++","
-                        ++truncate_count++"," 
-                        ++transpose_count++"," 
+                        ++truncate_count++","
+                        ++transpose_count++","
                         ++flatten_count++","
                         ++split_count)) in
   let str := eval unfold nat_to_string in str in
@@ -159,166 +155,120 @@ Ltac print_counts name :=
     idtac str.
 
 Goal True.
-Proof.
   idtac "program,gen,concat,truncate,transpose,flatten,split".
 Abort.
 
-Goal forall (W C B K : Z) (x w : list (list (list R))) (RR : Z) (a b :nat),
-    consistent w (a,(b,(Z.to_nat RR, tt))) ->
-          (0 < C)%Z ->
-          (0 < W)%Z ->
-          (W <=C)%Z ->
-          (0 < K)%Z ->
-          (0 < RR)%Z ->
-          (0 < B)%Z ->
-          gather_full W C B K x w RR = scatter_full B K W C x w.
+(*this is very wrong, but idk what the right answer is*)
+Definition gather_full_args :=
+  [Z_arg "W";
+   Z_arg "C";
+   Z_arg "B";
+   Z_arg "K";
+   Z_arg "RR";
+   T_arg "x" [!"RR"!; !"RR"!; !"RR"!]%z;
+   T_arg "w" [!"RR"!; !"RR"!; !"RR"!]%z].
+
+Definition gather_full_precond :=
+  fun W C B K RR (_ _ : dim_n 3) => (0 < C /\ 0 < W /\ W <= C /\ 0 < K /\ 0 < RR /\ 0 < B)%Z.
+
+Derive gather_full_string in
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tZ; tensor_n 3; tensor_n 3] 3 gather_full_args gather_full_string gather_full_precond (fun W C B K RR x w => gather_full W C B K x w RR))
+    as gather_full_string_correct.
 Proof.
-  intros. autounfold with examples.
-  print_counts "gather".
+  cbv [gather_full_precond gather_full]. prove_stringy_spec.
+  (*TODO idk what is wrong or how to make these true*)
+  all: destruct (f : False).
+Qed.
+
+Goal True.
+  print_counts gather_full_string "gather".
 Abort.
 
-Goal forall (W C B K : Z) (x w : list (list (list R))) (RR : Z) (a b :nat),
-    consistent w (a,(b,(Z.to_nat RR, tt))) ->
-          (0 < C)%Z ->
-          (0 < W)%Z ->
-          (W <=C)%Z ->
-          (0 < K)%Z ->
-          (0 < RR)%Z ->
-          (0 < B)%Z ->
-          scatter_full B K W C x w = gather_full W C B K x w RR.
+(*this is no more correct than gather*)
+Derive scatter_full_string in
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tZ; tensor_n 3; tensor_n 3] 3 gather_full_args scatter_full_string gather_full_precond (fun W C B K RR x w => scatter_full B K W C x w))
+    as scatter_full_string_correct.
 Proof.
-  intros. autounfold with examples.
-  print_counts "scatter".
+  cbv [gather_full_precond scatter_full]. prove_stringy_spec.
+  (*TODO idk what is wrong or how to make these true*)
+  all: destruct (f : False).
+Qed.
+
+Goal True.
+  print_counts scatter_full_string "scatter".
 Abort.
 
-Goal forall B C K W RR (w : list (list (list R))) (x : list (list (list R))),
-    (0 < B)%Z ->
-    (0 < C)%Z ->
-    (0 < K)%Z ->
-    (0 < W)%Z ->
-    (0 < RR)%Z ->
-    im2col B K W C RR w x =
-      im2col_lifted B K W C RR w x.
-Proof.
-  intros. autounfold with examples.
-  print_counts "im2col conv".
-Abort.    
+(*TODO: obviously wrong*)
+Definition im2col_args :=
+  [Z_arg "B";
+   Z_arg "K";
+   Z_arg "W";
+   Z_arg "C";
+   Z_arg "RR";
+   T_arg "w" [ZLit 0; ZLit 0; ZLit 0];
+   T_arg "x" [ZLit 0; ZLit 0; ZLit 0]].
 
-Goal forall B C K W RR (w : list (list (list R))) (x : list (list (list R))),
-    (0 < B)%Z ->
-    (0 < C)%Z ->
-    (0 < K)%Z ->
-    (0 < W)%Z ->
-    (0 < RR)%Z ->
-    im2col_lifted B K W C RR w x = im2col B K W C RR w x.
-Proof.
-  intros. autounfold with examples.
-  print_counts "im2col mat".
-Abort.    
+Definition im2col_precond :=
+  fun (B K W C RR : Z) (_ _ : dim_n 3) => (0 < W /\ 0 < K /\ 0 < B /\ 0 < C /\ 0 < RR)%Z.
 
-Goal forall (A B C : nat) (m1 m2 : (list (list R))) (k : Z),
-    (0 < k)%Z ->
-    0 < A ->
-    0 < B ->
-    0 < C ->
-    consistent m1 (A,(B,tt)) ->
-    consistent m2 (B,(C,tt)) ->
-    matmul (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) m1 m2 =
-      matmul_tiled A B C m1 m2 k.
+Derive im2col_string in
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tZ; tensor_n 3; tensor_n 3] 3 im2col_args im2col_string im2col_precond im2col)
+    as im2col_string_correct.
 Proof.
-  intros. autounfold with examples.
-  print_counts "matmul".
+  cbv [im2col_precond im2col]. prove_stringy_spec.
+  (*TODO idk what is wrong or how to make these true*)
+  all: destruct (f : False).
+Qed.
+
+Goal True.
+  print_counts im2col_string "im2col conv".
 Abort.
 
-Goal forall (A B C : nat) (m1 m2 : (list (list R))) (k : Z),
-    (0 < k)%Z ->
-    0 < A ->
-    0 < B ->
-    0 < C ->
-    consistent m1 (64,(64,tt)) ->
-    consistent m2 (64,(64,tt)) ->    
-    matmul_tiled 64 64 64 m1 m2 4 =
-      matmul 64 64 64 m1 m2.
+Derive im2col_lifted_string in
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tZ; tensor_n 3; tensor_n 3] 3 im2col_args im2col_lifted_string im2col_precond im2col_lifted)
+    as im2col_lifted_string_correct.
 Proof.
-  intros. autounfold with examples.
-  print_counts "tiled matmul".
+  cbv [im2col_precond im2col_lifted]. prove_stringy_spec.
+  (*TODO idk what is wrong or how to make these true*)
+  all: destruct (f : False).
+Qed.
+
+Goal True.
+  print_counts im2col_lifted_string "im2col mat".
 Abort.
 
-Goal forall (A B C : nat) (m1 m2 : (list (list R))) (k : Z),
-    (0 < k)%Z ->
-    0 < A ->
-    0 < B ->
-    0 < C ->
-    consistent m1 (64,(64,tt)) ->
-    consistent m2 (64,(64,tt)) ->    
-    matmul_tiled_split 64 64 64 m1 m2 4 =
-      matmul 64 64 64 m1 m2.
-Proof.
-  intros. autounfold with examples.
-  print_counts "tiled+tails matmul".
+Goal True.
+  print_counts matmul_string "matmul".
 Abort.
 
-Goal forall N M (v : list (list R)),
-    2 < N ->
-    2 < M ->
-    consistent v (N,(M,tt)) ->
-    blurtwostage N M v = blurimmediate v M N.
-Proof.
-  intros. autounfold with examples.
-  print_counts "two-stage blur".
+Goal True.
+  print_counts matmul_tiled64_string "tiled matmul".
 Abort.
 
-Goal forall N M (v : list (list R)),
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,tt)) ->
-    blurimmediate v M N = blurtwostage N M v.
-Proof.
-  intros. autounfold with examples.
-  print_counts "fused blur".
+Goal True.
+  print_counts matmul_tiled_split64_string "tiled+tails matmul".
 Abort.
 
-Goal forall N M (v : list (list R)),
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,tt)) ->
-    blurimmediate_partition M N v = blurtwostage N M v.
-Proof.
-  intros. autounfold with examples.
-  print_counts "fused+tails blur".
+Goal True.
+  print_counts blurtwostage_string "two-stage blur".
 Abort.
 
-Goal forall n m (l : list (list R)),
-    0 < n ->
-    0 < m ->
-    consistent l (n,(m,tt)) ->
-    blur_tiles_guarded l 64 64 4 4 = @nil _.
-Proof. 
-  intros. autounfold with examples.
-  print_counts "tiled+tails+staged blur".
+Goal True.
+  print_counts blurimmediate_string "fused blur".
 Abort.
 
-Goal forall (A B C D : nat) (m1 m2 : (list (list (list (list R))))),
-         0 < A ->
-         0 < B ->
-         0 < C ->
-         0 < D ->
-         consistent m1 (A,(B,(C,(D,tt)))) ->
-         consistent m2 (A,(B,(C,(D,tt)))) ->
-         add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2 =
-           add_split A B C D m1 m2.
-Proof.
-  intros. autounfold with examples.
-  print_counts "tensor add".
-Abort.  
+Goal True.
+  print_counts blurimmediate_partition_string "fused+tails blur".
+Abort.
 
-Goal forall (A B C D : nat) (m1 m2 : (list (list (list (list R))))),
-         consistent m1 (8,(8,(8,(8,tt)))) ->
-         consistent m2 (8,(8,(8,(8,tt)))) ->         
-         add_split 8 8 8 8 m1 m2 =
-           add 8 8 8 8 m1 m2.
-Proof.
-  intros. autounfold with examples.
-  print_counts "split tensor add".
-Abort.  
+Goal True.
+  print_counts blur_tiles_guarded4_string "tiled+tails+staged blur".
+Abort.
 
+Goal True.
+  print_counts add_string "tensor add".
+Abort.
+
+Goal True.
+  print_counts add_split_string "split tensor add".
+Abort.

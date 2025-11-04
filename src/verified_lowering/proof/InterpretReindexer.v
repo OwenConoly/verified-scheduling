@@ -41,7 +41,7 @@ Lemma flatten_index_to_function_alt : forall sh args,
       index_to_function_alt (combine (map ZLit args) (map ZLit sh)) [] [].
 Proof.
   induction sh; intros; cases args; auto.
-  simpl. simpl in H. 
+  simpl. simpl in H.
   unfold index_to_function_alt. simpl.
   rewrite map_fst_combine by (repeat rewrite length_map; simpl; lia).
   rewrite map_snd_combine by (repeat rewrite length_map; simpl; lia).
@@ -73,7 +73,7 @@ Proof.
     eapply not_In_empty_map2_cons in H; propositional.
     unfold interpret_reindexer.
     unfold shape_to_vars.
-    simpl length. unfold nat_range. simpl nat_range_rec.
+    simpl length. unfold nat_range. simpl seq.
     rewrite map_cons.
     rewrite shape_to_index_cons.
     rewrite index_to_function_alt_vars_cons; eauto with reindexers.
@@ -94,7 +94,7 @@ Proof.
     eapply length_mesh_grid_indices_Z in H. simpl in *. lia.
     eapply no_dup_var_generation.
     eauto with reindexers.
-Qed.    
+Qed.
 
 Lemma constant_interpret_reindexer_id_flatten : forall sh v,
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
@@ -159,7 +159,7 @@ Proof.
     intros. simpl in *. lia. lia.
   - auto.
 Qed.
-    
+
 Lemma vars_of_shift_top_dim_reindexer : forall reindexer l,
     ((forall l : list (Zexpr * Zexpr),
          vars_of_reindexer (reindexer l) =
@@ -196,20 +196,13 @@ Definition index_to_partial_function
                               | None => 0%Z
                               end) evaled_list_index))
   else None.
-Print shape_to_vars.
-Print shape_to_index.
-Print partially_eval_Z_tup.
-Print partially_eval_Zexpr.
-Print index_to_partial_function.
 
 Definition partial_interpret_reindexer
            (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr))
            (sh : list Z) (v : valuation) : list Z -> option Z :=
   let vars := shape_to_vars sh in
   let result_index := shape_to_index sh vars in
-  (*[(?, d1), (??, d2), ...]*)
   let full_index := reindexer result_index in
-  (*why would v have these ?? strings in its domain??*)
   let evaled_index := map (partially_eval_Z_tup v) full_index in
   index_to_partial_function evaled_index vars.
 
@@ -247,8 +240,8 @@ Lemma index_to_partial_function_vars_cons :
     ~ var \in dom v ->
               index_to_partial_function
       (map (partially_eval_Z_tup v)
-           (reindexer l)) (var::vars) (k :: x) = 
-      index_to_partial_function      
+           (reindexer l)) (var::vars) (k :: x) =
+      index_to_partial_function
         (map (partially_eval_Z_tup v)
              (map (fun e => (subst_var_in_Z_tup var k e))
                   (reindexer l))) vars x.
@@ -308,7 +301,7 @@ Proof.
   - repeat decomp_index.
     unfold partial_interpret_reindexer.
     unfold shape_to_vars.
-    simpl length. unfold nat_range. simpl nat_range_rec.
+    simpl length. unfold nat_range. simpl seq.
     rewrite map_cons.
     rewrite shape_to_index_cons.
     rewrite index_to_partial_function_vars_cons; eauto with reindexers.
@@ -327,7 +320,7 @@ Proof.
     reflexivity.
     erewrite <- in_mesh_grid_cons__. propositional.
 
-    rewrite length_map. rewrite length_nat_range_rec.    
+    rewrite length_map. rewrite length_nat_range_rec.
     eapply length_mesh_grid_indices_Z. auto.
     eapply no_dup_var_generation.
     eauto with reindexers.
@@ -346,7 +339,7 @@ Proof.
   intros.
   apply sets_equal.
   propositional; eapply In_iff_in; rewrite <- In_iff_in;
-    eapply In_iff_in in H0. 
+    eapply In_iff_in in H0.
   - rewrite <- in_extract_Some in H0.
     rewrite in_map_iff in *. invs.
     rewrite partial_interpret_reindexer_id_flatten in *; auto.
@@ -355,7 +348,7 @@ Proof.
     rewrite in_map_iff in *. invs.
     eexists.
     rewrite partial_interpret_reindexer_id_flatten in *; auto.
-Qed.  
+Qed.
 
 Lemma constant_partial_interpret_reindexer_id_flatten_filter:
   forall (v : fmap var Z) r,
@@ -377,7 +370,7 @@ Proof.
   intros.
   apply sets_equal.
   propositional; eapply In_iff_in; rewrite <- In_iff_in;
-    eapply In_iff_in in H0. 
+    eapply In_iff_in in H0.
   - rewrite <- in_extract_Some in H0.
     rewrite in_map_iff in *. invs.
     rewrite partial_interpret_reindexer_id_flatten in *; auto.
@@ -388,7 +381,7 @@ Proof.
     eexists.
     rewrite partial_interpret_reindexer_id_flatten in *; auto.
     decomp_index. propositional.
-Qed.  
+Qed.
 
 Lemma partial_interpret_reindexer_vars_None :
   forall reindexer sh v args,
@@ -397,7 +390,7 @@ Lemma partial_interpret_reindexer_vars_None :
 Proof.
   unfold partial_interpret_reindexer. unfold index_to_partial_function.
   intros. unfold shape_to_vars.
-  rewrite length_map. unfold nat_range. rewrite length_nat_range_rec.  
+  rewrite length_map. unfold nat_range. rewrite length_nat_range_rec.
   eapply Nat.eqb_neq in H. rewrite H. auto.
 Qed.
 

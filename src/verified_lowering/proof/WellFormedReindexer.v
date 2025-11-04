@@ -608,9 +608,8 @@ Proof.
          rewrite H2 in H5. discriminate.
          eapply filter_In. split; eauto.
          repeat decomp_goal_index. split. lia. eauto. rewrite <- H10.
-         erewrite <- result_lookup_Z_truncl. 2: lia.
-         rewrite truncl_list_skipn. rewrite skipn_app.
-         rewrite skipn_all2.
+         erewrite <- result_lookup_Z_truncl by lia.
+         rewrite skipn_app. rewrite skipn_all2.
          2: { erewrite result_has_shape_length by eauto. lia. }
          erewrite result_has_shape_length by eauto. rewrite sub_diag.
          simpl. reflexivity.
@@ -650,13 +649,12 @@ Proof.
     eexists. rewrite Nat2Z.id in H4. rewrite H4. split. auto. eapply filter_In.
     split. repeat decomp_goal_index.
     split. lia. eauto. rewrite <- H8.
-    erewrite <- result_lookup_Z_truncl.
-    rewrite truncl_list_skipn. rewrite skipn_app.
-    rewrite skipn_all2.
+    erewrite <- result_lookup_Z_truncl by lia.
+    rewrite skipn_app. rewrite skipn_all2.
     2: { erewrite result_has_shape_length by eauto. lia. }
     erewrite result_has_shape_length by eauto. rewrite sub_diag.
     simpl. reflexivity.
-    lia. invs.
+    invs.
     erewrite result_has_shape_result_shape_Z in * by eauto. eauto.
   - rewrite dom_add in *. sets.
 Qed.
@@ -757,9 +755,8 @@ Proof.
          eapply filter_In. split; eauto.
          repeat decomp_goal_index. split. lia. eauto. rewrite <- H7.
          rewrite <- (Z2Nat.id dim1z) by lia.
-         erewrite <- result_lookup_Z_truncl. 2: lia.
-         rewrite truncl_list_skipn. rewrite skipn_app.
-         rewrite skipn_all2.
+         erewrite <- result_lookup_Z_truncl by lia.
+         rewrite skipn_app. rewrite skipn_all2.
          2: { erewrite result_has_shape_length by eauto. lia. }
          erewrite result_has_shape_length by eauto. rewrite sub_diag.
          simpl. reflexivity.
@@ -798,12 +795,11 @@ Proof.
     split. repeat decomp_goal_index.
     split. lia. eauto. rewrite <- H5.
     rewrite <- (Z2Nat.id dim1z) by lia.
-    erewrite <- result_lookup_Z_truncl.
-    rewrite truncl_list_skipn. rewrite skipn_app.
-    rewrite skipn_all2.
+    erewrite <- result_lookup_Z_truncl by lia.
+    rewrite skipn_app. rewrite skipn_all2.
     2: { erewrite result_has_shape_length by eauto. lia. }
     erewrite result_has_shape_length by eauto. rewrite sub_diag.
-    simpl. reflexivity. lia.
+    simpl. reflexivity.
   - rewrite dom_add in *. sets.
 Qed.
 
@@ -1159,7 +1155,7 @@ partial_injective
               (result_shape_Z
                  (V
                     (rev
-                       (truncl_list (Z.to_nat kz)
+                       (skipn (Z.to_nat kz)
                           (repeat (gen_pad l0) (Z.to_nat kz) ++ 
                            rev x))))) v)
            (filter
@@ -1169,14 +1165,14 @@ partial_injective
                     (result_lookup_Z_option x0
                        (V
                           (rev
-                             (truncl_list (Z.to_nat kz)
+                             (skipn (Z.to_nat kz)
                                 (repeat (gen_pad l0) (Z.to_nat kz) ++ 
                                  rev x)))))))
               (mesh_grid
                  (result_shape_Z
                     (V
                        (rev
-                          (truncl_list (Z.to_nat kz)
+                          (skipn (Z.to_nat kz)
                              (repeat (gen_pad l0) (Z.to_nat kz) ++ 
                               rev x))))))) ->
 (forall l1 l2 : list (Zexpr * Zexpr),
@@ -1259,13 +1255,13 @@ Proof.
     + pose proof Hinj.
       rewrite @truncl_list_app in *.
       2: { rewrite repeat_length; lia. }
-      rewrite @truncl_list_skipn in *. rewrite @skipn_all2 in H5.
+      rewrite @skipn_all2 in H5.
       2: { rewrite repeat_length. lia. }
       simpl in *. rewrite @rev_involutive in *.
       eauto. rewrite repeat_length. lia.
     + rewrite @truncl_list_app in *.
       2: { rewrite repeat_length; lia. }
-      rewrite @truncl_list_skipn in *. rewrite @skipn_all2 in Hinj.
+      rewrite @skipn_all2 in Hinj.
       2: { rewrite repeat_length. lia. }
       simpl in *. rewrite @rev_involutive in *.
       erewrite result_has_shape_result_shape_Z in Hinj.
@@ -1649,8 +1645,7 @@ Proof.
          repeat decomp_goal_index. split. lia. eauto. rewrite <- H7.
          rewrite <- (Z2Nat.id dim1z) by lia.
          erewrite <- result_lookup_Z_truncl. 2: lia.
-         rewrite truncl_list_skipn. rewrite skipn_app.
-         rewrite skipn_all2.
+         rewrite skipn_app. rewrite skipn_all2.
          2: { erewrite result_has_shape_length by eauto. lia. }
          erewrite result_has_shape_length by eauto. rewrite sub_diag.
          simpl. reflexivity.
@@ -1686,8 +1681,7 @@ Proof.
     split. lia. eauto. rewrite <- H5.
     rewrite <- (Z2Nat.id dim1z) by lia.
     erewrite <- result_lookup_Z_truncl.
-    rewrite truncl_list_skipn. rewrite skipn_app.
-    rewrite skipn_all2.
+    rewrite skipn_app. rewrite skipn_all2.
     2: { erewrite result_has_shape_length by eauto. lia. }
     erewrite result_has_shape_length by eauto. rewrite sub_diag.
     simpl. reflexivity.
@@ -2138,7 +2132,7 @@ Lemma well_formed_reindexer_truncr :
       reindexer v
       (V
          (rev
-            (truncl_list (Z.to_nat kz)
+            (skipn (Z.to_nat kz)
                (rev (x ++ gen_pad_list (Z.to_nat kz :: l0)))))) st h o a ->
     result_has_shape
       (V (x ++ gen_pad_list (Z.to_nat kz :: l0))) (m :: l0) ->    
@@ -2211,31 +2205,25 @@ Proof.
   - eapply nondestructivity_trunc_r; eauto.
     rewrite rev_app_distr in Hinj.
     simpl in *. rewrite rev_repeat in Hinj.
-    rewrite truncl_list_skipn in Hinj.
     replace (repeat (gen_pad l0) (Z.to_nat kz))
       with (gen_pad_list (Z.to_nat kz :: l0))
       in Hinj.
     2: { simpl. eauto. }
-    rewrite <- truncl_list_skipn in Hinj.
     erewrite truncl_list_gen_pad_id in Hinj.
     rewrite rev_involutive in Hinj.
     simpl in *. 
-    rewrite truncl_list_skipn.
     replace (repeat (gen_pad l0) (Z.to_nat kz))
       with (gen_pad_list (Z.to_nat kz :: l0)).
     2: { simpl. eauto. }
-    rewrite <- truncl_list_skipn.
     erewrite truncl_list_gen_pad_id.
     rewrite rev_involutive.
     eauto.
     rewrite rev_app_distr in Hnondstr.
     simpl in *. rewrite rev_repeat in Hnondstr.
-    rewrite truncl_list_skipn in Hnondstr.
     replace (repeat (gen_pad l0) (Z.to_nat kz))
       with (gen_pad_list (Z.to_nat kz :: l0))
     in Hnondstr.
     2: { simpl. eauto. }
-    rewrite <- truncl_list_skipn in Hnondstr.
     erewrite truncl_list_gen_pad_id in Hnondstr.
     rewrite rev_involutive in Hnondstr.
     eauto.

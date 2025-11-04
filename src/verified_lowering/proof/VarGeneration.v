@@ -87,7 +87,7 @@ Lemma not_In_var_generation : forall n k k',
     (k <= k') ->
     ~ In (String.concat "" (repeat "?" k))
       (map (fun k0 => String.concat "" (repeat "?" (k0 + 1)))
-           (nat_range_rec n k')).
+           (seq k' n)).
 Proof.
   induct n; intros.
   - simpl. propositional.
@@ -102,7 +102,7 @@ Qed.
 Lemma no_dup_var_generation : forall n k,
     no_dup
       (map (fun k => String.concat "" (repeat "?" (k + 1)))
-           (nat_range_rec n k)).
+           (seq k n)).
 Proof.
   induct n; intros.
   - simpl. econstructor.
@@ -132,7 +132,7 @@ Lemma not_In_var_map : forall len n,
     1 <= n ->
     ~ In "?"
       (map (fun k : nat => String.concat "" (repeat "?" (k + 1)))
-           (nat_range_rec len n)).
+           (seq n len)).
 Proof.
   intros.
   replace "?" with (String.concat "" (repeat "?" (0+1))) by reflexivity.
@@ -143,7 +143,7 @@ Lemma not_In_var_map2 : forall len n,
     2 <= n ->
     ~ In "??"
       (map (fun k : nat => String.concat "" (repeat "?" (k + 1)))
-           (nat_range_rec len n)).
+           (seq n len)).
 Proof.
   intros.
   replace "??" with (String.concat "" (repeat "?" (1+1))) by reflexivity.
@@ -202,7 +202,7 @@ Lemma forall_map_not_in_index {X} :
   vars_of_reindexer index \subseteq dom v ->
   Forall (fun var : var => ~ var \in vars_of_reindexer index)
          (map (fun k : nat => String.concat "" (repeat "?" (k + 1)))
-              (nat_range_rec (Datatypes.length sh) k)).  
+              (seq k (Datatypes.length sh))).  
 Proof.
   propositional.
   eapply Forall_map.
@@ -228,7 +228,7 @@ Lemma forall_map_not_in_dom {X} :
   (forall var : var, contains_substring "?" var -> var \in dom v -> False) ->
     Forall (fun var : var => ~ var \in dom v)
            (map (fun k : nat => String.concat "" (repeat "?" (k + 1)))
-                (nat_range_rec (Datatypes.length sh) k)).
+                (seq k (Datatypes.length sh))).
 Proof.
   propositional.
   eapply Forall_map. eapply Forall_forall. intros.
@@ -287,11 +287,11 @@ Lemma map_partially_eval_Z_tup_combine : forall sh v k,
         (combine
            (map ZVar
                 (map (fun k => String.concat "" (repeat "?" (k + 1)))
-                     (nat_range_rec (length sh) k))) (map ZLit sh)) =
+                     (seq k (length sh)))) (map ZLit sh)) =
       combine
         (map ZVar
              (map (fun k => String.concat "" (repeat "?" (k + 1)))
-                  (nat_range_rec (length sh) k))) (map ZLit sh).
+                  (seq k (length sh)))) (map ZLit sh).
 Proof.
   induct sh; intros; auto.
   simpl. rewrite IHsh; auto.
@@ -334,4 +334,3 @@ Proof.
   unfold result_shape_Z. simpl. intros.
   cases l; unfold shape_to_vars, shape_to_index; simpl; inversion 1.
 Qed.
-
