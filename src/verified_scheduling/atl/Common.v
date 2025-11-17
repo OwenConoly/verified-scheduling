@@ -382,14 +382,14 @@ Proof.
   induction (Z.to_nat (n-k)%Z); simpl; auto with crunch.
 Qed.
 
-Lemma get_neg_null : forall i (X: Set) (H: TensorElem X) x v,
+Lemma get_neg_null : forall i (X: Type) (H: TensorElem X) x v,
     (i < 0)%Z ->
     (x::v) _[ i ] = |[ false ]| x.
 Proof.
   intros; destruct i; contra_crush.
 Qed.
 
-Lemma get_neg_null_shape : forall i (X: Set) (H: TensorElem X)
+Lemma get_neg_null_shape : forall i (X: Type) (H: TensorElem X)
                                   (v : list X) s e n,
     (i < 0)%Z ->
     consistent v (n,s) ->
@@ -402,7 +402,7 @@ Proof.
   eapply mul_0_absorb; eauto.
 Qed.
 
-Lemma get_znlt_null : forall i (X : Set) (H: TensorElem X) (v : list X) x,
+Lemma get_znlt_null : forall i (X : Type) (H: TensorElem X) (v : list X) x,
     ~ (i < Z.of_nat (length (x::v)))%Z->
     (x::v) _[ i ] = (|[ false ]| x).
 Proof.
@@ -426,7 +426,7 @@ Proof.
     assumption.
 Qed.
 
-Lemma get_znlt_null_shape : forall i (X : Set) (H: TensorElem X)
+Lemma get_znlt_null_shape : forall i (X : Type) (H: TensorElem X)
                                    (v : list X) s e n,
     ~ (i < Z.of_nat (length v))%Z->
     consistent v (n,s) ->
