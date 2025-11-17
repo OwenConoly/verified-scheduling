@@ -11,7 +11,6 @@ From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import micromega.Zify.
 From Stdlib Require Import Lists.List.
-From coqutil Require Import Datatypes.HList.
 
 Import ListNotations.
 
@@ -30,6 +29,7 @@ Set Default Proof Mode "Classic".
 
 Inductive type :=
 | tZ
+| tB
 | tensor_n (n : nat).
 
 Fixpoint dim_n n :=
@@ -41,6 +41,7 @@ Fixpoint dim_n n :=
 Definition interp_type t : Type :=
   match t with
   | tZ => Z
+  | tB => bool
   | tensor_n n => dim_n n
   end.
 
@@ -56,13 +57,14 @@ Definition interp_Zbop o x y :=
   | ZMod => (x mod y)
   end%Z.
 
-Print Z.
 Inductive pZexpr { var } :=
 | ZBop : Zbop -> pZexpr -> pZexpr -> pZexpr
 | ZVar : var -> pZexpr
 | ZZ0 : pZexpr
 | ZZpos : positive -> pZexpr
-| ZZneg : positive -> pZexpr.
+| ZZneg : positive -> pZexpr
+| ZZ_of_nat : nat -> pZexpr
+| ZZopp : pZexpr -> pZexpr.
 Arguments pZexpr : clear implicits.
 
 Fixpoint interp_pZexpr (e : pZexpr Z) : Z :=
@@ -72,6 +74,8 @@ Fixpoint interp_pZexpr (e : pZexpr Z) : Z :=
   | ZZ0 => 0
   | ZZpos p => Zpos p
   | ZZneg p => Zneg p
+  | ZZ_of_nat n => Z.of_nat n
+  | ZZopp x => - interp_pZexpr x
   end.
 
 Variant Bbop := Lt | Le | Eq.
@@ -84,14 +88,14 @@ Definition interp_Bbop o x y :=
   end%Z.
 
 Inductive pBexpr { var } :=
-| And : pBexpr -> pBexpr -> pBexpr
+| BAnd : pBexpr -> pBexpr -> pBexpr
 | BBop : Bbop -> pZexpr var -> pZexpr var -> pBexpr.
 Arguments pBexpr : clear implicits.
 
 Fixpoint interp_pBexpr (e : pBexpr Z) : bool :=
   match e with
   | BBop o x y => interp_Bbop o (interp_pZexpr x) (interp_pZexpr y)
-  | And x y => interp_pBexpr x && interp_pBexpr y
+  | BAnd x y => interp_pBexpr x && interp_pBexpr y
   end.
 
 Fixpoint to_result n (x : dim_n n) : result :=
@@ -101,8 +105,7 @@ Fixpoint to_result n (x : dim_n n) : result :=
   end x.
 
 Variant Sbop := Mul | Add | Div | Sub.
-Ltac first_Sbop f :=
-  first [ f Mul | f Add | f Div | f Sub ].
+
 Definition interp_Sbop o x y :=
   match o with
   | Mul => x * y
@@ -142,21 +145,15 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 | Flatten {n} : pATLexpr (S (S n)) -> pATLexpr (S n)
 | Split {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S (S n))
 | Transpose {n} : pATLexpr (S (S n)) -> pATLexpr (S (S n))
-| Truncr {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
-| Truncl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
+| Truncr {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
+| Truncl {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
 | Padr {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
 | Padl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
 | Get {n} : pATLexpr n -> list (pZexpr (var tZ)) -> pATLexpr O
 | SBop : Sbop -> pATLexpr O -> pATLexpr O -> pATLexpr O
-| Lit : R -> pATLexpr O.
+| SIZR : pZexpr (var tZ) -> pATLexpr O
+.
 Arguments pATLexpr : clear implicits.
-
-(* Fixpoint interp_pSexpr (e : pSexpr interp_type) : R := *)
-(*   match e with *)
-(*   | SBop o x y => interp_Sbop o (interp_pSexpr x) (interp_pSexpr y) *)
-(*   | Get v idxs => gget v (map interp_pZexpr idxs) *)
-(*   | Lit x => x *)
-(*   end. *)
 
 Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_n n) :=
   match e with
@@ -170,33 +167,35 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   | Flatten x => Common.flatten (interp_pATLexpr x)
   | Split k x => tile (interp_pATLexpr x) (Z.to_nat (interp_pZexpr k))
   | Transpose x => transpose (interp_pATLexpr x)
-  | Truncr k x => truncr (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
-  | Truncl k x => truncl (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
+  | Truncr k x => truncr k (interp_pATLexpr x)
+  | Truncl k x => truncl k (interp_pATLexpr x)
   | Padl k x => pad_l (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
   | Padr k x => pad_r (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
   | Get x idxs => gget (interp_pATLexpr x) (map interp_pZexpr idxs)
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
-  | Lit x => x
+  | SIZR x => IZR (interp_pZexpr x)
   end.
-
-Definition matmul' (A B C : interp_type tZ) (m1 m2 : interp_type (tensor_n 2)) :=
-  GEN [ i < A ]
-    GEN [ j < C ]
-    SUM [ k < B ]
-    (m1 _[ i; k] * m2 _[ k; j])%R.
 
 Definition pExpr_type var (t : type) : Type :=
   match t with
   | tZ => pZexpr (var tZ)
+  | tB => pBexpr (var tZ)
   | tensor_n n => pATLexpr var n
   end.  
 
 Definition pair_to_reify (f : (type -> Type) -> Type) : Type :=
   f interp_type * (forall var, f (pExpr_type var)).
 
-(*get some type-checking*)
+Print pATLexpr.
 Definition gen_n n := @genr (dim_n n) _.
 Definition sum_n n := @sumr (dim_n n) _.
+Definition iverson_n n := @iverson (dim_n n) _.
+Definition flatten_n n := @Common.flatten (dim_n n) _.
+Definition truncr_n n := @truncr (dim_n n) _.
+Definition transpose_n n := @transpose (dim_n n) _.
+Definition concat_n n := @concat (dim_n n) _.
+(*i guess we only reify bin_n O*)
+Definition bin_n n := @bin (dim_n n) _.
 
 (*surely these notations are already available somewhere?*)
 (*surely this notation is stupid enough that it's not being used for naything else*)
@@ -204,8 +203,7 @@ Notation "[> <]" := tt (format "[> <]").
 Notation "[> x <]" := (x, tt).
 Notation "[> x ; y ; .. ; z <]" := ((x, (y, .. (z, tt) ..))).
 
-Check [> 5; 6; 7; 7; 7; 7; 8 <].
-
+Check [> 5; 6; 7; 7; 7; 7; 8 <]. Print Flatten. Print Sbop.
 Definition pairs_to_reify :=
   [>
      (Z0, fun var => ZZ0)
@@ -214,13 +212,51 @@ Definition pairs_to_reify :=
      : pair_to_reify (fun var => positive -> var tZ);
    (Zneg, fun var => ZZneg)
      : pair_to_reify (fun var => positive -> var tZ);
+   (Z.opp, fun var => ZZopp)
+     : pair_to_reify (fun var => var tZ -> var tZ);
+   (IZR, fun var => SIZR)
+     : pair_to_reify (fun var => var tZ -> var (tensor_n O));
    (gen_n, fun var => (fun n lo hi body => @Gen var n lo hi (fun x => body (@ZVar (var tZ) x))))
      : pair_to_reify (fun var => forall n, var tZ -> var tZ -> (var tZ -> var (tensor_n n)) -> var (tensor_n (S n)));
    (sum_n, fun var => (fun n lo hi body => @Sum var n lo hi (fun x => body (@ZVar (var tZ) x))))
      : pair_to_reify (fun var => forall n, var tZ -> var tZ -> (var tZ -> var (tensor_n n)) -> var (tensor_n n));
-   (@gget, fun var => (@Get var))
+   (@gget, fun var => @Get var)
      : pair_to_reify (fun var => forall n, var (tensor_n n) -> list (var tZ) -> var (tensor_n O));
+   (iverson_n, fun var => @Guard var)
+     : pair_to_reify (fun var => forall n, var tB -> var (tensor_n n) -> var (tensor_n n));
+   (flatten_n, fun var => @Flatten var)
+     : pair_to_reify (fun var => forall n, var (tensor_n (S (S n))) -> var (tensor_n (S n)));
+   (truncr_n, fun var => @Truncr var)
+     : pair_to_reify (fun var => forall n, nat -> var (tensor_n (S n)) -> var (tensor_n (S n)));
+   (transpose_n, fun var => @Transpose var)
+     : pair_to_reify (fun var => forall n, var (tensor_n (S (S n))) -> var (tensor_n (S (S n))));
+   (concat_n, fun var => @Concat var)
+     : pair_to_reify (fun var => forall n, var (tensor_n (S n)) -> var (tensor_n (S n)) -> var (tensor_n (S n)));
+   (Z.of_nat, fun var => ZZ_of_nat)
+     : pair_to_reify (fun var => nat -> var tZ);
+   (Z.add, fun var => ZBop ZPlus)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tZ);
+   (Z.sub, fun var => ZBop ZMinus)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tZ);
+   (Z.mul, fun var => ZBop ZTimes)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tZ);
+   (Z.div, fun var => ZBop ZDivf)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tZ);
+   (div_ceil, fun var => ZBop ZDivc)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tZ);
+   (Z.modulo, fun var => ZBop ZMod)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tZ);
+   (Z.ltb, fun var => BBop Lt)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tB);
+   (Z.leb, fun var => BBop Le)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tB);
+   (Z.eqb, fun var => BBop Eq)
+     : pair_to_reify (fun var => var tZ -> var tZ -> var tB);
+   (andb, fun var => BAnd)
+     : pair_to_reify (fun var => var tB -> var tB -> var tB);
    (Rmult, fun var => @SBop var Mul)
+     : pair_to_reify (fun var => var (tensor_n O) -> var (tensor_n O) -> var (tensor_n O));
+   (Rplus, fun var => SBop Add)
      : pair_to_reify (fun var => var (tensor_n O) -> var (tensor_n O) -> var (tensor_n O))
        <].
 Class TupleMap_fst T := { tuplemap_fst_Type : Type; tuplemap_fst : T -> tuplemap_fst_Type }.
@@ -243,12 +279,17 @@ Definition deeps :=
 Definition app_deeps (var : type -> Type) :=
   ltac:(let y := eval simpl in (tuplemap_app var deeps) in exact y).
 
-Class Tuple_apps U V T := { tuple_apps_type : Type ; tuple_apps : tuple_apps_type -> V -> T -> U }.
-Instance Tuple_apps_nil U V : Tuple_apps U V unit := { tuple_apps := fun f _ _ => f }.
-Instance Tuple_apps_cons U V B C {X : Tuple_apps U V C} : Tuple_apps U V ((V -> B) * C) := { tuple_apps := fun f var '(b, c) => tuple_apps (f (b var)) var c }.
-Check app_deeps.
-Definition apply_to_all {U : Type} (f : _ -> U) (var : type -> Type) :=
-  tuple_apps f var deeps.
+Class Tuple_apps T U := { tuple_apps_type : Type ; tuple_apps : tuple_apps_type -> T -> U }.
+Instance Tuple_apps_nil U : Tuple_apps unit U := { tuple_apps := fun f _ => f }.
+Instance Tuple_apps_cons T U B {X : Tuple_apps T U} : Tuple_apps (B * T) U := { tuple_apps := fun f '(b, c) => tuple_apps (f b) c }.
+
+Definition apply_to_all' {U : Type} (var : type -> Type) f : U :=
+  tuple_apps f (app_deeps var).
+
+Definition apply_to_all {U : Type} (var : type -> Type) f : U :=
+  ltac:(let y := eval cbv [apply_to_all' app_deeps tuple_apps] in (@apply_to_all' U var f) in
+          let y := eval simpl in y in
+            exact y).
 
 (*this relies on interp_type not being unfolded in type of l*)
 Ltac print_shallows' l t :=
@@ -270,9 +311,13 @@ Goal True. print_shallows. Abort.
 Ltac pattern_shallows x :=
   pattern interp_type
     (*copy-paste result of "print_shallows" on following lines*)
+    (*TODO is there a less dumb way to do this?  Ltac metaprogramming?*)
+
 ,( 0%Z : (interp_type tZ) )
 ,( Z.pos : (positive -> interp_type tZ) )
 ,( Z.neg : (positive -> interp_type tZ) )
+,( Z.opp : (interp_type tZ -> interp_type tZ) )
+,( IZR : (interp_type tZ -> interp_type (tensor_n 0)) )
 ,( gen_n :
 (forall n : nat,
  interp_type tZ ->
@@ -289,9 +334,38 @@ Ltac pattern_shallows x :=
 (forall n : nat,
  interp_type (tensor_n n) -> list (interp_type tZ) -> interp_type (tensor_n 0))
 )
+,( iverson_n :
+(forall n : nat, interp_type tB -> interp_type (tensor_n n) -> interp_type (tensor_n n))
+)
+,( flatten_n :
+(forall n : nat, interp_type (tensor_n (S (S n))) -> interp_type (tensor_n (S n))) )
+,( truncr_n :
+(forall n : nat, nat -> interp_type (tensor_n (S n)) -> interp_type (tensor_n (S n))) )
+,( transpose_n :
+(forall n : nat, interp_type (tensor_n (S (S n))) -> interp_type (tensor_n (S (S n))))
+)
+,( concat_n :
+(forall n : nat,
+ interp_type (tensor_n (S n)) ->
+ interp_type (tensor_n (S n)) -> interp_type (tensor_n (S n)))
+)
+,( Z.of_nat : (nat -> interp_type tZ) )
+,( Z.add : (interp_type tZ -> interp_type tZ -> interp_type tZ) )
+,( Z.sub : (interp_type tZ -> interp_type tZ -> interp_type tZ) )
+,( Z.mul : (interp_type tZ -> interp_type tZ -> interp_type tZ) )
+,( Z.div : (interp_type tZ -> interp_type tZ -> interp_type tZ) )
+,( div_ceil : (interp_type tZ -> interp_type tZ -> interp_type tZ) )
+,( Z.modulo : (interp_type tZ -> interp_type tZ -> interp_type tZ) )
+,( Z.ltb : (interp_type tZ -> interp_type tZ -> interp_type tB) )
+,( Z.leb : (interp_type tZ -> interp_type tZ -> interp_type tB) )
+,( Z.eqb : (interp_type tZ -> interp_type tZ -> interp_type tB) )
+,( andb : (interp_type tB -> interp_type tB -> interp_type tB) )
 ,( Rmult :
 (interp_type (tensor_n 0) -> interp_type (tensor_n 0) -> interp_type (tensor_n 0)) )
-            in x.
+,( Rplus :
+(interp_type (tensor_n 0) -> interp_type (tensor_n 0) -> interp_type (tensor_n 0)) )
+
+    in x.
 
 Ltac get_fun x :=
   lazymatch x with
@@ -310,253 +384,191 @@ Ltac make_types_reifiable :=
   change Z with (interp_type tZ) in *;
   cbv [gen sum] in *;
   repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n) in *;
-  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n) in *.
+  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n) in *;
+  repeat change (@iverson (interp_type (tensor_n ?n)) _) with (iverson_n n) in *;
+  repeat change (@Common.flatten (interp_type (tensor_n ?n)) _) with (flatten_n n) in *;
+  repeat change (@truncr (interp_type (tensor_n ?n)) _) with (truncr_n n) in *;
+  repeat change (@transpose (interp_type (tensor_n ?n)) _) with (transpose_n n) in *;
+  repeat change (@concat (interp_type (tensor_n ?n)) _) with (concat_n n) in *;
+  change (@bin (interp_type (tensor_n O)) _) with Rplus in *.
 
-Ltac apply_to_all f var l :=
-  lazymatch l with
-  | ?a :: ?l => apply_to_all constr:(f (a var)) l
-  | [] => f
+Ltac Reify x name :=
+  set (y := x);
+  make_types_reifiable;
+  pattern_shallows y;
+  let rx :=
+    lazymatch goal with
+    | y := ?y' |- _ => get_fun y'
+    end in
+  set (z := rx);
+  let w := constr:(fun var => apply_to_all var (z (pExpr_type var))) in
+  let w := eval cbv [apply_to_all z] in w in set (name := w);
+                                        subst y; subst z; simpl.
+
+Ltac Reify_lhs name :=
+  lazymatch goal with
+  | |- ?x = _ => Reify x name
   end.
-
-Ltac map f l :=
-  lazymatch l with
-  | ?a :: ?l => 
-
-Ltac apply_to_deeps f var :=
-  let l := eval cbv[deeps] in deeps in
-  apply_to_all f var l.
 
 Goal matmul = matmul.
   cbv [matmul].
-  make_types_reifiable.
-  
-  match goal with
-  | |- ?x = _ => set (y := x); pattern_shallows y
-  end.
-
-  let rx :=
-    match goal with
-    | y := ?y' |- _ => get_fun y'
-    end in
-  set (z := rx).
-
-  let l := eval cbv[deeps] in deeps in idtac l.
-  let w := constr:(fun var : type -> Type => z (pExpr_type var)) in
-  let w := constr:(fun var => ltac:(let x := apply_to_deeps constr:(z (pExpr_type var)) constr:(var) in exact x)) in idtac w.
-  
-  let __ := type of z in
-  let w := constr:(fun var => apply_to_deeps z var).
-    constr:(fun var : type -> Type =>
-              z
-                (pExpr_type var)
-                ZZ0
-                ZZpos
-                ZZneg
-                (fun n lo hi body => @Gen var n lo hi (fun x => body (@ZVar (var tZ) x)))
-                (@Get var)
-                (@SBop var Mul)) in
-  let y := eval simpl in y in
-    idtac y. Print ZZ0. Check interp_type. 
+  Reify_lhs reified_matmul.
 Abort.
-   .
-    hlist (polymorphic_list.cons (pair_to_reify' (fun var => var tZ)) polymorphic_list.nil) := [(Z0, fun var => ZZ0)].
-  Print hlist. Check polymorphic_list.cons.
-  
 
-  
-  
-  
-  
-  
-ltac:(let y := eval cbv[pair_to_reify] in (pair_to_reify (fun var => var tZ)) in
-            exact y) := (Z0, fun _ => ZZ0).
-
-  Check x.
-  Ltac 
-  
-  Definition fst
-  
-  Definition idents_vals :=
-    [(Z0, ZZ0),
-      (
-
-  Ltac Reify x :=
-  let rx := lazymatch (eval pattern interp_type, genr, (@sum R RTensorElem) in x) with
-            | ?rx _ _ _ => rx end in
-  let __ := type of rx in (* propagate universe constraints, c.f., https://github.com/coq/coq/issues/5996 *)
-  constr:(fun var : type -> Type => rx var).
-
-
-
-Goal forall (A B C D : nat) (m1 m2 : (list (list (list (list R))))),
-         0 < A ->
-         0 < B ->
-         0 < C ->
-         0 < D ->
-         consistent m1 (A,(B,(C,(D,tt)))) ->
-         consistent m2 (A,(B,(C,(D,tt)))) ->
-         add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2 =
-           add_split A B C D m1 m2.
+Goal forall (A B C D : nat),
+    (fun m1 m2 => add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2) =
+      (fun m1 m2 => add_split A B C D m1 m2).
 Proof.
-  let ast := R in idtac ast.
+  intros. cbv [add].
+  Reify_lhs reified_add.
 Abort.  
 
-Goal forall A B C k (m1 m2 : list (list R)),
-    (0 < k)%Z ->
-     (0 < A)%Z ->
-     (0 < B)%Z ->
-     (0 < C)%Z ->
-     consistent m1 (Z.to_nat A,(Z.to_nat B,tt)) ->
-     consistent m2 (Z.to_nat B,(Z.to_nat C,tt)) ->
-     matmul A B C m1 m2 = matmul_tiled (Z.to_nat A) (Z.to_nat B) (Z.to_nat C) m1 m2 4%Z.
+Goal
+    (fun A B C m1 m2 => matmul A B C m1 m2) = (fun A B C m1 m2 => matmul_tiled (Z.to_nat A) (Z.to_nat B) (Z.to_nat C) m1 m2 4%Z).
 Proof.
-  let ast := R in idtac.
+  intros. cbv [matmul].
+  Reify_lhs reified_matmul.
 Abort.
 
-Goal forall (m1 m2 : list (list R)),
-     consistent m1 (64,(64,tt)) ->
-     consistent m2 (64,(64,tt)) ->
-     matmul_tiled 64 64 64 m1 m2 4%Z = matmul 64 64 64 m1 m2.
+Goal (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4%Z) = (fun m1 m2 => matmul 64 64 64 m1 m2).
 Proof.
-  let ast := R in idtac. 
+  intros. cbv [matmul_tiled].
+  (*Z's are not allowed to be used as constants;
+    in particular, they cannot be used to define nats*)
+  cbn [Z.to_nat].
+ Reify_lhs reified_matmul_tiled.
 Abort.
 
-Goal forall (m1 m2 : list (list R)),
-     consistent m1 (50,(70,tt)) ->
-     consistent m2 (70,(30,tt)) ->
-     matmul_tiled_split 50 70 30 m1 m2 4%Z = matmul 50 70 30 m1 m2.
+Goal (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4%Z) = (fun m1 m2 => matmul 50 70 30 m1 m2).
 Proof.
-  let ast := R in idtac.
+  cbv [matmul_tiled_split].
+  cbn [Z.to_nat].
+  Reify_lhs reified_matmul_tiled_split.
 Abort.
 
-Goal forall (c : (list R)) (n m : Z),
-    (0 < n)%Z ->
-    (-m+1 < n)%Z ->
-    consistent c (Z.to_nat n,tt) ->
-    conv4 c n m = conv1 c n m.
+Goal
+    (fun c n m => conv4 c n m) = (fun c n m => conv1 c n m).
 Proof.
-  let ast := R in idtac.
+  cbv [conv4].
+  cbn [Z.to_nat].
+  Reify_lhs reified_conv4.
 Abort.
 
-Goal forall (c : (list R)) (n m : Z),
-    (0 < n)%Z ->
-    (-m+1 < n)%Z ->
-    consistent c (Z.to_nat n,tt) ->
-    conv1 c n m = conv4 c n m.
+Goal (fun c n m => conv1 c n m) = (fun c n m => conv4 c n m).
 Proof.
-  let ast := R in idtac.
+  cbv [conv1].
+  cbn [Z.to_nat].
+  Reify_lhs reified_conv1.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    consistent l (n,(m,tt)) ->
-    transpose (
-        (GEN [ j < 1 ]
-            GEN [ i < Z.of_nat n ]
-            l _[i;j])
-          <++>          
-          (GEN [ 1 <= j < Z.of_nat m ]
-            (GEN [ i < 1 ]
-                 l _[i;j])
-            <++>
-            (GEN [ 1 <= i < Z.of_nat n - 1]
-                 l _[i;j])
-            <++>
-            (GEN [ Z.of_nat n - 1 <= i < Z.of_nat n ]
-                 l _[i;j])
-          )
-        )
- = @nil _.
+Goal forall n m,
+    (fun l : list (list R) => transpose (
+                               (GEN [ j < 1 ]
+                                  GEN [ i < Z.of_nat n ]
+                                  l _[i;j])
+                                 <++>
+                                 (GEN [ 1 <= j < Z.of_nat m ]
+                                    (GEN [ i < 1 ]
+                                       l _[i;j])
+                                    <++>
+                                    (GEN [ 1 <= i < Z.of_nat n - 1]
+                                       l _[i;j])
+                                    <++>
+                                    (GEN [ Z.of_nat n - 1 <= i < Z.of_nat n ]
+                                       l _[i;j])
+                                 )
+    ))
+    = (fun l => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  Reify_lhs foo.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    consistent l (n,(m,tt)) ->
-    transpose (
-        (GEN [ j < 1 ]
-            GEN [ i < Z.of_nat n ]
-            l _[i;j])
-          <++>          
-          (GEN [ 1 <= j < Z.of_nat m ]
-               GEN [ i < Z.of_nat n ]
-            l _[i;j])
-          )
- = @nil _.
+Goal forall n m,
+    (fun l : list (list R) => transpose (
+                               (GEN [ j < 1 ]
+                                  GEN [ i < Z.of_nat n ]
+                                  l _[i;j])
+                                 <++>          
+                                 (GEN [ 1 <= j < Z.of_nat m ]
+                                    GEN [ i < Z.of_nat n ]
+                                    l _[i;j])
+    ))
+    = (fun _ => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  Reify_lhs foo.
 Abort.
 
-Goal forall n m (v : list (list R)),
-    0 < n ->
-    0 < m ->
-    consistent v (n,(m,tt)) ->
-    transpose (
-        (GEN [ j < 1 ]
-           (GEN [ i < 1 ]
-                 v _[i;j])
-            <++>
-            (GEN [ 1 <= i < Z.of_nat n ]
-                 v _[i;j])             
-            )
-          <++>          
-          (GEN [ 1 <= j < Z.of_nat m ]
-               GEN [ i < Z.of_nat n ]
-               v _[i;j]
-          )
-        )
- = @nil _.
+Goal forall n m,
+    (fun v : list (list R) => transpose (
+                               (GEN [ j < 1 ]
+                                  (GEN [ i < 1 ]
+                                     v _[i;j])
+                                  <++>
+                                  (GEN [ 1 <= i < Z.of_nat n ]
+                                     v _[i;j])             
+                               )
+                                 <++>          
+                                 (GEN [ 1 <= j < Z.of_nat m ]
+                                    GEN [ i < Z.of_nat n ]
+                                    v _[i;j]
+                                 )
+                             ))
+    = (fun _ => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  Reify_lhs foo.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    consistent l (n,(m,tt)) ->
-    transpose (
-        GEN [ j < Z.of_nat m ]
-            (GEN [ i < 1 ]
-            l _[i;j])
-            <++>
-            (GEN [ 1 <= i < Z.of_nat n ]
-            l _[i;j]))
- = @nil _.
+Goal forall n m,
+    (fun l : list (list R) => transpose (
+               GEN [ j < Z.of_nat m ]
+                 (GEN [ i < 1 ]
+                    l _[i;j])
+                 <++>
+                 (GEN [ 1 <= i < Z.of_nat n ]
+                    l _[i;j])))
+    = (fun _ => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  Reify_lhs foo.
 Abort.
 
-Goal forall n m (l : (list R)),
-    consistent l (n*m,tt) ->
-    Common.flatten (
-        Common.transpose
-          (
-            (GEN [ i < 1 ]
-             (GEN [ j < Z.of_nat n ]
-                  l _[j * Z.of_nat m + i]))
-              <++>
-            (GEN [ 1 <= i < Z.of_nat m ]
-             (GEN [ j < Z.of_nat n ]
-                 l _[j * Z.of_nat m + i]))              
-      ))
-
- = @nil _.
+Goal forall n m,
+    (fun l : list R =>
+       Common.flatten (
+           Common.transpose
+             (
+               (GEN [ i < 1 ]
+                  (GEN [ j < Z.of_nat n ]
+                     l _[j * Z.of_nat m + i]))
+                 <++>
+                 (GEN [ 1 <= i < Z.of_nat m ]
+                    (GEN [ j < Z.of_nat n ]
+                       l _[j * Z.of_nat m + i]))              
+    )))
+      
+    = (fun _ => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  Reify_lhs foo.
 Abort.
 
-Goal forall N M (v : list (list R)),
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,tt)) ->
-    blurimmediate v M N = blurtwostage N M v.
+Goal forall N M,
+    (fun v : list (list R) => blurimmediate v M N) = (fun v => blurtwostage N M v).
 Proof.
-  let ast := R in idtac.
+  intros.
+  cbv [blurimmediate]. Search bin. Print bin.
+  Reify_lhs foo.
 Abort.
  
-Goal forall N M (v : list (list R)),
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,tt)) ->
-    blurtwostage N M v = blurimmediate v M N.
+Goal forall N M,
+    (fun v : list (list R) => blurtwostage N M v) = (fun v => blurimmediate v M N).
 Proof.
+  intros.
+  cbv [blurtwostage].
+  Reify_lhs foo.
   let ast := R in idtac.
 Abort.
 

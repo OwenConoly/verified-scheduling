@@ -72,7 +72,7 @@ Definition blurtwostage {X} `{TensorElem X}
 Hint Unfold blurtwostage : examples.
 
 Section two_to_part.
-  Variables (X : Set) (H : TensorElem X) (N M : nat)
+  Variables (X : Type) (H : TensorElem X) (N M : nat)
             (v : list (list X)) (s : @shape X _).
   Derive blurtwostage_partition SuchThat
          (2 < M ->
@@ -293,7 +293,7 @@ Proof.
 Qed.
 
 Section total_tiled.
-  Variables (X : Set) (H : TensorElem X)
+  Variables (X : Type) (H : TensorElem X)
             (v : list (list X)) (s : @shape X _) (n m n_k m_k : nat).
   Derive blur_tiles_guarded SuchThat
       (2 < n ->
@@ -956,7 +956,7 @@ End total_tiled.
 Hint Unfold blur_tiles_guarded : examples.
 
 Section fuse_twostage.
-  Variables (X : Set) (H : TensorElem X)
+  Variables (X : Type) (H : TensorElem X)
             (v : list (list X)) (m n k : nat) (s : @shape X _).
   Derive blurimmediate SuchThat
          (0 < k -> 0 < m -> 0 < n -> consistent v (n,(m,s)) ->
