@@ -37,7 +37,7 @@ Fixpoint dim_n n :=
   | Datatypes.S n' => list (dim_n n')
   end.
 
-Definition interp_type t : Type :=
+Definition interp_type t : Set :=
   match t with
   | tZ => Z
   | tensor_n n => dim_n n
@@ -121,17 +121,18 @@ Existing Instance dim_n_TensorElem.
 
 Goal forall n m , S n - S m = n - m. reflexivity. (*hooray*) Abort.
 
-Fixpoint interp_Get {n} (v : dim_n n) (idxs : list (pZexpr Z)) :=
+Fixpoint gget {n} (v : dim_n n) (idxs : list Z) :=
   match n, idxs return dim_n n -> R with
-  | Datatypes.S n', idx :: idxs' =>
-      fun v => interp_Get (get v (interp_pZexpr idx)) idxs'
+  | S n', idx :: idxs' =>
+      fun v => gget (get v idx) idxs'
+  | O, _ => fun v => v
   | _, _ => fun v => 0%R
   end v.
 
 Fixpoint interp_pSexpr (e : pSexpr interp_type) : R :=
   match e with
   | SBop o x y => interp_Sbop o (interp_pSexpr x) (interp_pSexpr y)
-  | Get v idxs => interp_Get v idxs
+  | Get v idxs => gget v (map interp_pZexpr idxs)
   | Lit x => x
   end.
 
@@ -173,6 +174,40 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : dim_n n :=
   | Padr k x => pad_r (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
   | Scalar x => interp_pSexpr x
   end.
+
+Definition matmul' (A B C : interp_type tZ) (m1 m2 : interp_type (tensor_n 2)) :=
+  GEN [ i < A ]
+    GEN [ j < C ]
+    SUM [ k < B ]
+    (m1 _[ i; k] * m2 _[ k; j])%R.
+
+Ltac Reify x :=
+  let rx := lazymatch (eval pattern interp_type, genr, (@sum R RTensorElem) in x) with
+            | ?rx _ _ _ => rx end in
+  let __ := type of rx in (* propagate universe constraints, c.f., https://github.com/coq/coq/issues/5996 *)
+  constr:(fun var : type -> Type => rx var).
+
+Goal matmul = matmul.
+  cbv [matmul]. Print sumr. Set Printing All. Print gen. Print genr. Print gen_helper.
+  Print interp_type.
+  change R with (interp_type (tensor_n O)).
+  repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n))). 
+  change RTensorElem with (dim_n_TensorElem O).
+  repeat change (@TensorTensorElem _ (dim_n_TensorElem ?n)) with
+    (dim_n_TensorElem (S n)).
+  repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]).
+  repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs)).
+  change Z with (interp_type tZ). Check @gen. About dim_n.
+  Definition gen_n n := @gen (dim_n n) _.
+  Definition sum_n n := @sum (dim_n n) _.
+  repeat change (@gen (interp_type (tensor_n ?n)) _) with (gen_n n).
+  repeat change (@sum (interp_type (tensor_n ?n)) _) with (sum_n n).
+  Check @gget. Check sum_n.
+  pattern interp_type,
+    (gen_n : forall n, interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n (S n))),
+    (sum_n : forall n, interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n n)),
+    (@gget : forall n, interp_type (tensor_n n) -> list (interp_type tZ) -> interp_type (tensor_n O)),
+    (Rmult : interp_type (tensor_n O) -> interp_type (tensor_n O) -> interp_type (tensor_n O)).
 
 Goal forall (A B C D : nat) (m1 m2 : (list (list (list (list R))))),
          0 < A ->
