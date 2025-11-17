@@ -55,17 +55,22 @@ Definition interp_Zbop o x y :=
   | ZMod => (x mod y)
   end%Z.
 
+Print Z.
 Inductive pZexpr { var } :=
 | ZBop : Zbop -> pZexpr -> pZexpr -> pZexpr
-| ZLit : Z -> pZexpr
-| ZVar : var -> pZexpr.
+| ZVar : var -> pZexpr
+| ZZ0 : pZexpr
+| ZZpos : positive -> pZexpr
+| ZZneg : positive -> pZexpr.
 Arguments pZexpr : clear implicits.
 
 Fixpoint interp_pZexpr (e : pZexpr Z) : Z :=
   match e with
   | ZBop o x y => interp_Zbop o (interp_pZexpr x) (interp_pZexpr y)
-  | ZLit x => x
   | ZVar x => x
+  | ZZ0 => 0
+  | ZZpos p => Zpos p
+  | ZZneg p => Zneg p
   end.
 
 Variant Bbop := Lt | Le | Eq.
@@ -105,12 +110,6 @@ Definition interp_Sbop o x y :=
   | Sub => x - y
   end%R.
 
-Inductive pSexpr { var : type -> Type } : Type :=
-| Get {n} : var (tensor_n n) -> list (pZexpr (var tZ)) -> pSexpr
-| SBop : Sbop -> pSexpr -> pSexpr -> pSexpr
-| Lit : R -> pSexpr.
-Arguments pSexpr : clear implicits.
-
 Fixpoint dim_n_TensorElem n : TensorElem (dim_n n) :=
   match n return TensorElem (dim_n n) with
   | Datatypes.S n => @TensorTensorElem _ (dim_n_TensorElem n)
@@ -129,13 +128,6 @@ Fixpoint gget {n} (v : dim_n n) (idxs : list Z) :=
   | _, _ => fun v => 0%R
   end v.
 
-Fixpoint interp_pSexpr (e : pSexpr interp_type) : R :=
-  match e with
-  | SBop o x y => interp_Sbop o (interp_pSexpr x) (interp_pSexpr y)
-  | Get v idxs => gget v (map interp_pZexpr idxs)
-  | Lit x => x
-  end.
-
 (*the dependent types aren't too tricky here, but i could imagine it getting bad (?)...
   possibly, the more principled thing to do would be to make interp_pATLexpr output a
   result instead?  that seems gross but idk.
@@ -153,8 +145,17 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 | Truncl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
 | Padr {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
 | Padl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
-| Scalar : pSexpr var -> pATLexpr O.
+| Get {n} : pATLexpr n -> list (pZexpr (var tZ)) -> pATLexpr O
+| SBop : Sbop -> pATLexpr O -> pATLexpr O -> pATLexpr O
+| Lit : R -> pATLexpr O.
 Arguments pATLexpr : clear implicits.
+
+(* Fixpoint interp_pSexpr (e : pSexpr interp_type) : R := *)
+(*   match e with *)
+(*   | SBop o x y => interp_Sbop o (interp_pSexpr x) (interp_pSexpr y) *)
+(*   | Get v idxs => gget v (map interp_pZexpr idxs) *)
+(*   | Lit x => x *)
+(*   end. *)
 
 Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : dim_n n :=
   match e with
@@ -172,7 +173,9 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : dim_n n :=
   | Truncl k x => truncl (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
   | Padl k x => pad_l (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
   | Padr k x => pad_r (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
-  | Scalar x => interp_pSexpr x
+  | Get x idxs => gget (interp_pATLexpr x) (map interp_pZexpr idxs)
+  | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
+  | Lit x => x
   end.
 
 Definition matmul' (A B C : interp_type tZ) (m1 m2 : interp_type (tensor_n 2)) :=
@@ -180,12 +183,6 @@ Definition matmul' (A B C : interp_type tZ) (m1 m2 : interp_type (tensor_n 2)) :
     GEN [ j < C ]
     SUM [ k < B ]
     (m1 _[ i; k] * m2 _[ k; j])%R.
-
-Ltac Reify x :=
-  let rx := lazymatch (eval pattern interp_type, genr, (@sum R RTensorElem) in x) with
-            | ?rx _ _ _ => rx end in
-  let __ := type of rx in (* propagate universe constraints, c.f., https://github.com/coq/coq/issues/5996 *)
-  constr:(fun var : type -> Type => rx var).
 
 Goal matmul = matmul.
   cbv [matmul]. Print sumr. Set Printing All. Print gen. Print genr. Print gen_helper.
@@ -198,17 +195,54 @@ Goal matmul = matmul.
   repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]).
   repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs)).
   change Z with (interp_type tZ). Check @gen. About dim_n.
-  Definition gen_n n := @gen (dim_n n) _.
-  Definition sum_n n := @sum (dim_n n) _.
-  repeat change (@gen (interp_type (tensor_n ?n)) _) with (gen_n n).
-  repeat change (@sum (interp_type (tensor_n ?n)) _) with (sum_n n).
+  cbv [gen sum].
+  Definition gen_n n := @genr (dim_n n) _.
+  Definition sum_n n := @sumr (dim_n n) _.
+  repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n).
+  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n).
   
   Check @gget. Check sum_n.
-  pattern interp_type,
-    (gen_n : forall n, interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n (S n))),
-    (sum_n : forall n, interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n n)),
+  pattern
+    interp_type,
+    (Z0 : interp_type tZ),
+    (Zpos : positive -> interp_type tZ),
+    (Zneg : positive -> interp_type tZ),
+    (gen_n : forall n, interp_type tZ -> interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n (S n))),
+    (sum_n : forall n, interp_type tZ -> interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n n)),
     (@gget : forall n, interp_type (tensor_n n) -> list (interp_type tZ) -> interp_type (tensor_n O)),
     (Rmult : interp_type (tensor_n O) -> interp_type (tensor_n O) -> interp_type (tensor_n O)).
+  Check @Gen. Check @Get.
+  Definition pExpr_type var (t : type) : Type :=
+    match t with
+    | tZ => pZexpr (var tZ)
+    | tensor_n n => pATLexpr var n
+    end.  
+  Check @Gen. Check Var. Print Get.
+  Unset Printing All.
+  let y :=
+    let rx := lazymatch goal with
+              | |- ?rx _ _ _ _ _ _ _ _ => rx end in
+    let __ := type of rx in
+    constr:(fun var : type -> Type =>
+              rx
+                (pExpr_type var)
+                ZZ0
+                ZZpos
+                ZZneg
+                (fun n lo hi body => @Gen var n lo hi (fun x => body (@ZVar (var tZ) x)))
+                (fun n lo hi body => @Sum var n lo hi (fun x => body (@ZVar (var tZ) x)))
+                (@Get var)
+                (@SBop var Mul)) in
+  let y := eval simpl in y in
+  idtac y.
+
+  Ltac Reify x :=
+  let rx := lazymatch (eval pattern interp_type, genr, (@sum R RTensorElem) in x) with
+            | ?rx _ _ _ => rx end in
+  let __ := type of rx in (* propagate universe constraints, c.f., https://github.com/coq/coq/issues/5996 *)
+  constr:(fun var : type -> Type => rx var).
+
+
 
 Goal forall (A B C D : nat) (m1 m2 : (list (list (list (list R))))),
          0 < A ->
