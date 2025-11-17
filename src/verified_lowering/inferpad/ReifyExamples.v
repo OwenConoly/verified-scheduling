@@ -37,7 +37,7 @@ Fixpoint dim_n n :=
   | Datatypes.S n' => list (dim_n n')
   end.
 
-Definition interp_type t : Set :=
+Definition interp_type t : Type :=
   match t with
   | tZ => Z
   | tensor_n n => dim_n n
@@ -189,7 +189,7 @@ Ltac Reify x :=
 
 Goal matmul = matmul.
   cbv [matmul]. Print sumr. Set Printing All. Print gen. Print genr. Print gen_helper.
-  Print interp_type.
+  Print interp_type. About TensorTensorElem.
   change R with (interp_type (tensor_n O)).
   repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n))). 
   change RTensorElem with (dim_n_TensorElem O).
@@ -202,6 +202,7 @@ Goal matmul = matmul.
   Definition sum_n n := @sum (dim_n n) _.
   repeat change (@gen (interp_type (tensor_n ?n)) _) with (gen_n n).
   repeat change (@sum (interp_type (tensor_n ?n)) _) with (sum_n n).
+  
   Check @gget. Check sum_n.
   pattern interp_type,
     (gen_n : forall n, interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n (S n))),

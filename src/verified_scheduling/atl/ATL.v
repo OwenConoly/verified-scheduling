@@ -13,7 +13,7 @@ Import ListNotations.
 
 Set Warnings "-deprecate-hint-without-locality,-deprecated".
 
-Class TensorElem (A : Set) :=
+Class TensorElem (A : Type) :=
   { null : A;
     bin : A -> A -> A;
     shape : Set;
@@ -434,7 +434,7 @@ Proof.
   - lia.
 Qed.
 
-Lemma get_znlt_null : forall i (X : Set) (H: TensorElem X) (v : list X) x,
+Lemma get_znlt_null : forall i (X : Type) (H: TensorElem X) (v : list X) x,
     ~ (i < Z.of_nat (length (x::v)))%Z->
     (x::v) _[ i ] = (|[ false ]| x).
 Proof.
