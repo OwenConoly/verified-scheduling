@@ -11,6 +11,7 @@ From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import micromega.Zify.
 From Stdlib Require Import Lists.List.
+From coqutil Require Import Datatypes.HList.
 
 Import ListNotations.
 
@@ -157,7 +158,7 @@ Arguments pATLexpr : clear implicits.
 (*   | Lit x => x *)
 (*   end. *)
 
-Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : dim_n n :=
+Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_n n) :=
   match e with
   | Gen lo hi body =>
       genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr (body x))
@@ -184,57 +185,200 @@ Definition matmul' (A B C : interp_type tZ) (m1 m2 : interp_type (tensor_n 2)) :
     SUM [ k < B ]
     (m1 _[ i; k] * m2 _[ k; j])%R.
 
-Goal matmul = matmul.
-  cbv [matmul]. Print sumr. Set Printing All. Print gen. Print genr. Print gen_helper.
-  Print interp_type. About TensorTensorElem.
-  change R with (interp_type (tensor_n O)).
-  repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n))). 
-  change RTensorElem with (dim_n_TensorElem O).
+Definition pExpr_type var (t : type) : Type :=
+  match t with
+  | tZ => pZexpr (var tZ)
+  | tensor_n n => pATLexpr var n
+  end.  
+
+Definition pair_to_reify (f : (type -> Type) -> Type) : Type :=
+  f interp_type * (forall var, f (pExpr_type var)).
+
+(*get some type-checking*)
+Definition gen_n n := @genr (dim_n n) _.
+Definition sum_n n := @sumr (dim_n n) _.
+
+(*surely these notations are already available somewhere?*)
+(*surely this notation is stupid enough that it's not being used for naything else*)
+Notation "[> <]" := tt (format "[> <]").
+Notation "[> x <]" := (x, tt).
+Notation "[> x ; y ; .. ; z <]" := ((x, (y, .. (z, tt) ..))).
+
+Check [> 5; 6; 7; 7; 7; 7; 8 <].
+
+Definition pairs_to_reify :=
+  [>
+     (Z0, fun var => ZZ0)
+    : pair_to_reify (fun var => var tZ);
+   (Zpos, fun var => ZZpos)
+     : pair_to_reify (fun var => positive -> var tZ);
+   (Zneg, fun var => ZZneg)
+     : pair_to_reify (fun var => positive -> var tZ);
+   (gen_n, fun var => (fun n lo hi body => @Gen var n lo hi (fun x => body (@ZVar (var tZ) x))))
+     : pair_to_reify (fun var => forall n, var tZ -> var tZ -> (var tZ -> var (tensor_n n)) -> var (tensor_n (S n)));
+   (sum_n, fun var => (fun n lo hi body => @Sum var n lo hi (fun x => body (@ZVar (var tZ) x))))
+     : pair_to_reify (fun var => forall n, var tZ -> var tZ -> (var tZ -> var (tensor_n n)) -> var (tensor_n n));
+   (@gget, fun var => (@Get var))
+     : pair_to_reify (fun var => forall n, var (tensor_n n) -> list (var tZ) -> var (tensor_n O));
+   (Rmult, fun var => @SBop var Mul)
+     : pair_to_reify (fun var => var (tensor_n O) -> var (tensor_n O) -> var (tensor_n O))
+       <].
+Class TupleMap_fst T := { tuplemap_fst_Type : Type; tuplemap_fst : T -> tuplemap_fst_Type }.
+Instance TupleMap_fst_nil : TupleMap_fst unit := { tuplemap_fst := fun x => x }.
+Instance TupleMap_fst_cons (A B C : Type) (f : TupleMap_fst C) : TupleMap_fst ((A * B) * C) := { tuplemap_fst := fun '((a, b), c) => (a, tuplemap_fst c) }.
+
+Class TupleMap_snd T := { tuplemap_snd_Type : Type; tuplemap_snd : T -> tuplemap_snd_Type }.
+Instance TupleMap_snd_nil : TupleMap_snd unit := { tuplemap_snd := fun x => x }.
+Instance TupleMap_snd_cons (A B C : Type) (f : TupleMap_snd C) : TupleMap_snd ((A * B) * C) := { tuplemap_snd := fun '((a, b), c) => (b, tuplemap_snd c) }.
+
+Class TupleMap_app U T := { tuplemap_app_Type : U -> Type; tuplemap_app : forall U, T -> tuplemap_app_Type U }.
+Instance TupleMap_app_nil U : TupleMap_app U unit := { tuplemap_app := fun _ x => x }.
+Instance TupleMap_app_cons U B C {X: TupleMap_app U C} : TupleMap_app U ((forall U, B U) * C) := { tuplemap_app := fun u '(a, c) => (a u, tuplemap_app u c) }.
+
+Definition shallows :=
+  ltac:(let y := eval cbn -[interp_type] in (tuplemap_fst pairs_to_reify) in exact y).
+Definition deeps :=
+  ltac:(let y := eval simpl in (tuplemap_snd pairs_to_reify) in exact y).
+
+Definition app_deeps (var : type -> Type) :=
+  ltac:(let y := eval simpl in (tuplemap_app var deeps) in exact y).
+
+Class Tuple_apps U V T := { tuple_apps_type : Type ; tuple_apps : tuple_apps_type -> V -> T -> U }.
+Instance Tuple_apps_nil U V : Tuple_apps U V unit := { tuple_apps := fun f _ _ => f }.
+Instance Tuple_apps_cons U V B C {X : Tuple_apps U V C} : Tuple_apps U V ((V -> B) * C) := { tuple_apps := fun f var '(b, c) => tuple_apps (f (b var)) var c }.
+Check app_deeps.
+Definition apply_to_all {U : Type} (f : _ -> U) (var : type -> Type) :=
+  tuple_apps f var deeps.
+
+(*this relies on interp_type not being unfolded in type of l*)
+Ltac print_shallows' l t :=
+  lazymatch l with
+  | tt => idtac
+  | (?a, ?l) =>
+      lazymatch t with
+      | (?A * ?t)%type =>
+          idtac ",(" a ":" A ")"; print_shallows' l t
+      end
+  end.
+Ltac print_shallows :=
+  match type of shallows with
+  | ?t => let l := eval cbv [shallows] in shallows in
+           print_shallows' l t
+  end.
+Goal True. print_shallows. Abort.
+
+Ltac pattern_shallows x :=
+  pattern interp_type
+    (*copy-paste result of "print_shallows" on following lines*)
+,( 0%Z : (interp_type tZ) )
+,( Z.pos : (positive -> interp_type tZ) )
+,( Z.neg : (positive -> interp_type tZ) )
+,( gen_n :
+(forall n : nat,
+ interp_type tZ ->
+ interp_type tZ ->
+ (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n (S n)))
+)
+,( sum_n :
+(forall n : nat,
+ interp_type tZ ->
+ interp_type tZ ->
+ (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n n))
+)
+,( @gget :
+(forall n : nat,
+ interp_type (tensor_n n) -> list (interp_type tZ) -> interp_type (tensor_n 0))
+)
+,( Rmult :
+(interp_type (tensor_n 0) -> interp_type (tensor_n 0) -> interp_type (tensor_n 0)) )
+            in x.
+
+Ltac get_fun x :=
+  lazymatch x with
+  | ?f _ => get_fun f
+  | _ => x
+  end.
+
+Ltac make_types_reifiable :=
+  change R with (interp_type (tensor_n O)) in *;
+  repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n))) in *;
+  change RTensorElem with (dim_n_TensorElem O) in *;
   repeat change (@TensorTensorElem _ (dim_n_TensorElem ?n)) with
-    (dim_n_TensorElem (S n)).
-  repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]).
-  repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs)).
-  change Z with (interp_type tZ). Check @gen. About dim_n.
-  cbv [gen sum].
-  Definition gen_n n := @genr (dim_n n) _.
-  Definition sum_n n := @sumr (dim_n n) _.
-  repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n).
-  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n).
+    (dim_n_TensorElem (S n)) in *;
+  repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]) in *;
+  repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs)) in *;
+  change Z with (interp_type tZ) in *;
+  cbv [gen sum] in *;
+  repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n) in *;
+  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n) in *.
+
+Ltac apply_to_all f var l :=
+  lazymatch l with
+  | ?a :: ?l => apply_to_all constr:(f (a var)) l
+  | [] => f
+  end.
+
+Ltac map f l :=
+  lazymatch l with
+  | ?a :: ?l => 
+
+Ltac apply_to_deeps f var :=
+  let l := eval cbv[deeps] in deeps in
+  apply_to_all f var l.
+
+Goal matmul = matmul.
+  cbv [matmul].
+  make_types_reifiable.
   
-  Check @gget. Check sum_n.
-  pattern
-    interp_type,
-    (Z0 : interp_type tZ),
-    (Zpos : positive -> interp_type tZ),
-    (Zneg : positive -> interp_type tZ),
-    (gen_n : forall n, interp_type tZ -> interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n (S n))),
-    (sum_n : forall n, interp_type tZ -> interp_type tZ -> (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n n)),
-    (@gget : forall n, interp_type (tensor_n n) -> list (interp_type tZ) -> interp_type (tensor_n O)),
-    (Rmult : interp_type (tensor_n O) -> interp_type (tensor_n O) -> interp_type (tensor_n O)).
-  Check @Gen. Check @Get.
-  Definition pExpr_type var (t : type) : Type :=
-    match t with
-    | tZ => pZexpr (var tZ)
-    | tensor_n n => pATLexpr var n
-    end.  
-  Check @Gen. Check Var. Print Get.
-  Unset Printing All.
-  let y :=
-    let rx := lazymatch goal with
-              | |- ?rx _ _ _ _ _ _ _ _ => rx end in
-    let __ := type of rx in
+  match goal with
+  | |- ?x = _ => set (y := x); pattern_shallows y
+  end.
+
+  let rx :=
+    match goal with
+    | y := ?y' |- _ => get_fun y'
+    end in
+  set (z := rx).
+
+  let l := eval cbv[deeps] in deeps in idtac l.
+  let w := constr:(fun var : type -> Type => z (pExpr_type var)) in
+  let w := constr:(fun var => ltac:(let x := apply_to_deeps constr:(z (pExpr_type var)) constr:(var) in exact x)) in idtac w.
+  
+  let __ := type of z in
+  let w := constr:(fun var => apply_to_deeps z var).
     constr:(fun var : type -> Type =>
-              rx
+              z
                 (pExpr_type var)
                 ZZ0
                 ZZpos
                 ZZneg
                 (fun n lo hi body => @Gen var n lo hi (fun x => body (@ZVar (var tZ) x)))
-                (fun n lo hi body => @Sum var n lo hi (fun x => body (@ZVar (var tZ) x)))
                 (@Get var)
                 (@SBop var Mul)) in
   let y := eval simpl in y in
-  idtac y.
+    idtac y. Print ZZ0. Check interp_type. 
+Abort.
+   .
+    hlist (polymorphic_list.cons (pair_to_reify' (fun var => var tZ)) polymorphic_list.nil) := [(Z0, fun var => ZZ0)].
+  Print hlist. Check polymorphic_list.cons.
+  
+
+  
+  
+  
+  
+  
+ltac:(let y := eval cbv[pair_to_reify] in (pair_to_reify (fun var => var tZ)) in
+            exact y) := (Z0, fun _ => ZZ0).
+
+  Check x.
+  Ltac 
+  
+  Definition fst
+  
+  Definition idents_vals :=
+    [(Z0, ZZ0),
+      (
 
   Ltac Reify x :=
   let rx := lazymatch (eval pattern interp_type, genr, (@sum R RTensorElem) in x) with
