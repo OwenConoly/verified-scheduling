@@ -4,7 +4,6 @@ From Stdlib Require Import ZArith.BinInt.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import micromega.Zify.
 From Stdlib Require Import Lists.List.
-From Stdlib Require Import Vectors.Vector.
 From Stdlib Require Import Logic.FunctionalExtensionality.
 Import ListNotations.
 
