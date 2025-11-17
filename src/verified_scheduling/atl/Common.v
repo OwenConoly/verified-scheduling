@@ -613,7 +613,7 @@ Proof.
 Qed.
 *)
 Lemma get_gen_of_nat_some :
-  forall I (X : Set) (H : TensorElem X) (body : Z -> X) N,
+  forall I (X : Type) (H : TensorElem X) (body : Z -> X) N,
     (I < Z.of_nat N)%Z ->
     (0 <= I)%Z ->
     (GEN [ x < Z.of_nat N ] body x) _[ I ] = body I.
@@ -1078,7 +1078,7 @@ Proof.
   intros. apply H1; zify; lia.
 Qed.
 
-Theorem consistent_let {X Y : Set} `{TensorElem Y} :
+Theorem consistent_let {X Y : Type} `{TensorElem Y} :
   forall (f : X -> Y) (e : X) s,
     consistent (f e) s ->
     consistent (let_binding e f) s.
@@ -1891,7 +1891,7 @@ Proof.
   - reflexivity.
 Qed.
 
-Fixpoint map2 {X Y Z : Set} (f : X -> Y -> Z) (l1 : list X) (l2 : list Y) :=
+Fixpoint map2 {X Y Z : Type} (f : X -> Y -> Z) (l1 : list X) (l2 : list Y) :=
   match l1,l2 with
   | x::xs, y::ys => f x y :: (map2 f xs ys)
   | _,_ => []

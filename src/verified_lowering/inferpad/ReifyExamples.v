@@ -373,28 +373,35 @@ Ltac get_fun x :=
   | _ => x
   end.
 
+(*assumes that the reification target appears in the goal*)
 Ltac make_types_reifiable :=
-  change R with (interp_type (tensor_n O)) in *;
-  repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n))) in *;
-  change RTensorElem with (dim_n_TensorElem O) in *;
+  change R with (interp_type (tensor_n O));
+  repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n)));
+  change RTensorElem with (dim_n_TensorElem O);
   repeat change (@TensorTensorElem _ (dim_n_TensorElem ?n)) with
-    (dim_n_TensorElem (S n)) in *;
-  repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]) in *;
-  repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs)) in *;
-  change Z with (interp_type tZ) in *;
-  cbv [gen sum] in *;
-  repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n) in *;
-  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n) in *;
-  repeat change (@iverson (interp_type (tensor_n ?n)) _) with (iverson_n n) in *;
-  repeat change (@Common.flatten (interp_type (tensor_n ?n)) _) with (flatten_n n) in *;
-  repeat change (@truncr (interp_type (tensor_n ?n)) _) with (truncr_n n) in *;
-  repeat change (@transpose (interp_type (tensor_n ?n)) _) with (transpose_n n) in *;
-  repeat change (@concat (interp_type (tensor_n ?n)) _) with (concat_n n) in *;
-  change (@bin (interp_type (tensor_n O)) _) with Rplus in *.
+    (dim_n_TensorElem (S n));
+  repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]);
+  repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs));
+  change Z with (interp_type tZ);
+  cbv [gen sum Common.Truncr];
+  (*Z's are not allowed to be used as constants;
+    in particular, they cannot be used to define nats*)
+  (*the following is OK, because things inside Z.to_nat must *always* be constants*)
+  repeat match goal with
+    | |- context[(Z.to_nat ?x)] =>
+        let k := fresh "k" in set (k := Z.to_nat x)
+    end;
+  repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n);
+  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n);
+  repeat change (@iverson (interp_type (tensor_n ?n)) _) with (iverson_n n);
+  repeat change (@Common.flatten (interp_type (tensor_n ?n)) _) with (flatten_n n);
+  repeat change (@truncr (interp_type (tensor_n ?n)) _) with (truncr_n n);
+  repeat change (@transpose (interp_type (tensor_n ?n)) _) with (transpose_n n);
+  repeat change (@concat (interp_type (tensor_n ?n)) _) with (concat_n n);
+  change (@bin (interp_type (tensor_n O)) _) with Rplus.
 
 Ltac Reify x name :=
   set (y := x);
-  make_types_reifiable;
   pattern_shallows y;
   let rx :=
     lazymatch goal with
@@ -406,6 +413,7 @@ Ltac Reify x name :=
                                         subst y; subst z; simpl.
 
 Ltac Reify_lhs name :=
+  make_types_reifiable;
   lazymatch goal with
   | |- ?x = _ => Reify x name
   end.
@@ -433,16 +441,13 @@ Abort.
 Goal (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4%Z) = (fun m1 m2 => matmul 64 64 64 m1 m2).
 Proof.
   intros. cbv [matmul_tiled].
-  (*Z's are not allowed to be used as constants;
-    in particular, they cannot be used to define nats*)
-  cbn [Z.to_nat].
- Reify_lhs reified_matmul_tiled.
+  make_types_reifiable.
+  Reify_lhs reified_matmul_tiled.
 Abort.
 
 Goal (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4%Z) = (fun m1 m2 => matmul 50 70 30 m1 m2).
 Proof.
   cbv [matmul_tiled_split].
-  cbn [Z.to_nat].
   Reify_lhs reified_matmul_tiled_split.
 Abort.
 
@@ -450,33 +455,32 @@ Goal
     (fun c n m => conv4 c n m) = (fun c n m => conv1 c n m).
 Proof.
   cbv [conv4].
-  cbn [Z.to_nat].
   Reify_lhs reified_conv4.
 Abort.
 
 Goal (fun c n m => conv1 c n m) = (fun c n m => conv4 c n m).
 Proof.
   cbv [conv1].
-  cbn [Z.to_nat].
   Reify_lhs reified_conv1.
 Abort.
 
 Goal forall n m,
-    (fun l : list (list R) => transpose (
-                               (GEN [ j < 1 ]
-                                  GEN [ i < Z.of_nat n ]
-                                  l _[i;j])
-                                 <++>
-                                 (GEN [ 1 <= j < Z.of_nat m ]
-                                    (GEN [ i < 1 ]
-                                       l _[i;j])
-                                    <++>
-                                    (GEN [ 1 <= i < Z.of_nat n - 1]
-                                       l _[i;j])
-                                    <++>
-                                    (GEN [ Z.of_nat n - 1 <= i < Z.of_nat n ]
-                                       l _[i;j])
-                                 )
+    (fun l : list (list R) =>
+       transpose (
+           (GEN [ j < 1 ]
+              GEN [ i < Z.of_nat n ]
+              l _[i;j])
+             <++>
+             (GEN [ 1 <= j < Z.of_nat m ]
+                (GEN [ i < 1 ]
+                   l _[i;j])
+                <++>
+                (GEN [ 1 <= i < Z.of_nat n - 1]
+                   l _[i;j])
+                <++>
+                (GEN [ Z.of_nat n - 1 <= i < Z.of_nat n ]
+                   l _[i;j])
+             )
     ))
     = (fun l => nil).
 Proof.
@@ -485,14 +489,15 @@ Proof.
 Abort.
 
 Goal forall n m,
-    (fun l : list (list R) => transpose (
-                               (GEN [ j < 1 ]
-                                  GEN [ i < Z.of_nat n ]
-                                  l _[i;j])
-                                 <++>          
-                                 (GEN [ 1 <= j < Z.of_nat m ]
-                                    GEN [ i < Z.of_nat n ]
-                                    l _[i;j])
+    (fun l : list (list R) =>
+       transpose (
+           (GEN [ j < 1 ]
+              GEN [ i < Z.of_nat n ]
+              l _[i;j])
+             <++>          
+             (GEN [ 1 <= j < Z.of_nat m ]
+                GEN [ i < Z.of_nat n ]
+                l _[i;j])
     ))
     = (fun _ => nil).
 Proof.
@@ -501,20 +506,21 @@ Proof.
 Abort.
 
 Goal forall n m,
-    (fun v : list (list R) => transpose (
-                               (GEN [ j < 1 ]
-                                  (GEN [ i < 1 ]
-                                     v _[i;j])
-                                  <++>
-                                  (GEN [ 1 <= i < Z.of_nat n ]
-                                     v _[i;j])             
-                               )
-                                 <++>          
-                                 (GEN [ 1 <= j < Z.of_nat m ]
-                                    GEN [ i < Z.of_nat n ]
-                                    v _[i;j]
-                                 )
-                             ))
+    (fun v : list (list R) =>
+       transpose (
+           (GEN [ j < 1 ]
+              (GEN [ i < 1 ]
+                 v _[i;j])
+              <++>
+              (GEN [ 1 <= i < Z.of_nat n ]
+                 v _[i;j])             
+           )
+             <++>          
+             (GEN [ 1 <= j < Z.of_nat m ]
+                GEN [ i < Z.of_nat n ]
+                v _[i;j]
+             )
+    ))
     = (fun _ => nil).
 Proof.
   intros.
@@ -559,7 +565,7 @@ Goal forall N M,
     (fun v : list (list R) => blurimmediate v M N) = (fun v => blurtwostage N M v).
 Proof.
   intros.
-  cbv [blurimmediate]. Search bin. Print bin.
+  cbv [blurimmediate].
   Reify_lhs foo.
 Abort.
  
@@ -569,96 +575,69 @@ Proof.
   intros.
   cbv [blurtwostage].
   Reify_lhs foo.
-  let ast := R in idtac.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    0 < n ->
-    0 < m ->
-    consistent l (n,(m,tt)) ->
-    blur_tiles_guarded l n m 4 4
-    = @nil _.
+Goal forall n m,
+    (fun l : list (list R) => blur_tiles_guarded l n m 4 4)
+    = (fun _ => nil).
 Proof.
   intros. autounfold with examples.
-  
-  let ast := R in idtac.
+  Reify_lhs foo.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    0 < n ->
-    0 < m ->
-    consistent l (n,(m,tt)) ->
-    fusion_no_boundary n m l 
-    = @nil _.
+Goal forall n m,
+    (fun l : list (list R) => fusion_no_boundary n m l) = (fun _ => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  cbv [fusion_no_boundary].
+  Reify_lhs foo.
 Abort.
 
-Goal forall W R0 (x w : list R),    
-    consistent w (Z.to_nat R0, tt) ->
-    consistent x (Z.to_nat R0, tt) ->
-    (0 < W)%Z ->
-    (Z.of_nat (length x) < W)%Z ->
-    gather W x w = @nil _.
+Goal (fun W x w => gather W x w) = (fun _ _ _ => nil).
 Proof.
-  let ast := R in idtac.
+  cbv [gather].
+  Reify_lhs foo.
 Abort.      
 
-Goal forall W R0 (x w : list R),    
-    consistent w (Z.to_nat R0, tt) ->
-    consistent x (Z.to_nat R0, tt) ->
-    (0 < W)%Z ->
-    (Z.of_nat (length x) < W)%Z ->
-    scatter W x w = @nil _.
+Goal (fun W x w => scatter W x w) = (fun _ _ _ => nil).
 Proof.
-  let ast := R in idtac.
+  cbv [scatter].
+  Reify_lhs foo.
 Abort.
 
-Goal forall A B K W RR (w : list (list R)) (x : list R),
-    (0 < K)%Z ->
-    (0 < W)%Z ->
-    (0 < RR)%Z ->    
-    consistent w (A,(B,tt))->
-    consistent x (Z.to_nat K,tt) ->
-    im2colminilifted K W RR w x = im2colmini K W RR w x.
+Goal (fun K W RR (w : list (list R)) (x : list R) => im2colminilifted K W RR w x) = (fun K W RR w x => im2colmini K W RR w x).
 Proof.
-  let ast := R in idtac.
+  cbv [im2colminilifted].
+  Reify_lhs foo.
 Abort.      
 
-Goal forall A B K W RR (w : list (list R)) (x : list R),
-    (0 < K)%Z ->
-    (0 < W)%Z ->
-    (0 < RR)%Z ->    
-    consistent w (A,(B,tt))->
-    consistent x (Z.to_nat K,tt) ->
-    im2colminilifted K W RR w x = im2colmini K W RR w x.
+(*why is this the same thing*)
+Goal (fun K W RR (w : list (list R)) (x : list R) => im2colminilifted K W RR w x) = (fun K W RR w x => im2colmini K W RR w x).
 Proof.
-  let ast := R in idtac.
+  cbv [im2colminilifted].
+  Reify_lhs foo.
 Abort.
 
-Goal forall n m (v : list (list R)),
-    2 < n ->
-    2 < m ->
-    consistent v (n,(m,tt)) ->
-    blurimmediate_partition n m v = @nil _.
+Goal forall n m,
+    (fun v : list (list R) => blurimmediate_partition n m v) = (fun _ => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  cbv [blurimmediate_partition].
+  Reify_lhs foo.
 Abort.
 
-Goal forall n m (v : list (list R)),
-    2 < n ->
-    2 < m ->
-    consistent v (n,(m,tt)) ->
-    blurimmediate_isolate n m v = @nil _.
+Goal forall n m,
+    (fun v : list (list R) => blurimmediate_isolate n m v) = (fun _ => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  cbv [blurimmediate_isolate].
+  Reify_lhs foo.
 Abort.
 
-Goal forall N M (v : list (list R)),
-    2 < N ->
-    2 < M ->
-    consistent v (N,(M,tt)) ->
-    blurtwostage_partition N M v = @nil _.
+Goal forall N M,
+    (fun v : list (list R) => blurtwostage_partition N M v) = (fun _ => nil).
 Proof.
-  let ast := R in idtac.
+  intros.
+  cbv [blurtwostage_partition].
+  Reify_lhs foo.
 Abort.
