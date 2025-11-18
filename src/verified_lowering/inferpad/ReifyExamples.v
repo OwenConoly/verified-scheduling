@@ -29,6 +29,87 @@ Goal matmul = matmul.
   Reify_lhs reified_matmul.
 Abort.
 
+Definition pATLExpr n := forall var, pATLexpr var n.
+
+Ltac app_args e :=
+  lazymatch e with
+  | ?f ?x => let xs := app_args f in constr:((x, xs))
+  | _ => constr:(tt)
+  end.
+
+Ltac remove_last l :=
+  lazymatch l with
+  | (?x, (?y, ?zs)) => constr:((x, ltac:(let r := remove_last (y, zs) in exact r)))
+  | (?x, tt) => tt
+  end.
+
+Ltac tl l :=
+  lazymatch l with
+  | (_, ?xs) => xs
+  end.
+
+Ltac for_each tac l :=
+  lazymatch l with
+  | (?x, ?xs) => tac x; for_each tac xs
+  | tt => idtac
+  end.
+
+Ltac pattern_in x arg :=
+  pattern arg in x;
+  match goal with
+  | x := ?x' |- _ =>
+           lazymatch x' with
+           | ?f _ =>
+               subst x; set (x := f)
+           end
+  end.
+
+Ltac pattern_all_in x args :=
+  let pix := pattern_in x in
+  for_each pix args.
+Derive (reified_add : forall var, _ -> _ -> _ -> _ -> var (tensor_n 4) -> var (tensor_n 4) -> pATLexpr var 4) in
+  (forall A B C D m1 m2,
+      interp_pATLexpr (reified_add interp_type A B C D m1 m2) =
+        add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2)
+    as reified_add_correct.
+Proof.
+  intros.
+  cbv [add].
+  match goal with
+  | |- interp_pATLexpr ?R = ?S =>
+      set (x := S);
+      let y := app_args R in
+      let y := remove_last y in
+      pattern_all_in x y;
+      subst x
+  end.
+  match goal with
+  | |- _ = ?x' =>
+      let f := get_fun x' in
+      set (x := f);
+      make_types_reifiable_in x;
+      let x := eval cbv[x] in x in
+        Reify x foo
+  end.
+  subst reified_add. Unshelve.
+  2: { set (foo := fun (var : type -> Type) (n n0 n1 n2 : nat) (i i0 : pExpr_type var (tensor_n 4)) =>
+    Reify.Gen ZZ0 (ZZ_of_nat n)
+      (fun x : var tZ =>
+       Reify.Gen ZZ0 (ZZ_of_nat n1)
+         (fun x0 : var tZ =>
+          Reify.Gen ZZ0 (ZZ_of_nat n0)
+            (fun x1 : var tZ =>
+             Reify.Gen ZZ0 (ZZ_of_nat n2)
+               (fun x2 : var tZ =>
+                SBop Reify.Mul
+                  (Reify.Get i
+                     [Reify.ZVar x; Reify.ZVar x0; Reify.ZVar x1; Reify.ZVar x2])
+                  (Reify.Get i0
+                     [Reify.ZVar x; Reify.ZVar x0; Reify.ZVar x1; Reify.ZVar x2])))))).
+       exact (fun var A B C D m1 m2 => foo var A B C D (Reify.Var m1) (Reify.Var m2)). }
+  simpl. subst x. simpl. reflexivity.
+Qed.
+  
 Goal forall (A B C D : nat),
     (fun m1 m2 => add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2) =
       (fun m1 m2 => add_split A B C D m1 m2).
