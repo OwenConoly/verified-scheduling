@@ -17,7 +17,8 @@ Set Warnings "-omega-is-deprecated,-deprecated".
 
 From Codegen Require Import IdentParsing NatToString IntToString Normalize CodeGen.
 From Lower Require Import ATLDeep Sexpr Zexpr Bexpr.
-From ATL Require Import ATL Common CommonTactics Div Map.
+From ATL Require Import FrapWithoutSets ATL Common CommonTactics Div Map Sets Var.
+About In. (*why :( *)
 
 Open Scope string_scope.
 
@@ -98,7 +99,7 @@ Fixpoint stringvar_Z (e : pZexpr nat) : Zexpr :=
   | ZVar x => Zexpr.ZVar (nat_to_string x)
   | ZZ0 => ZLit 0
   | ZZpos p => ZLit (Zpos p)
-  | ZZneg p => ZLit (Zpos p)
+  | ZZneg p => ZLit (Zneg p)
   | ZZ_of_nat n => ZLit (Z.of_nat n)
   | ZZopp x => Zexpr.ZMinus (ZLit 0) (stringvar_Z x)
   end.
@@ -224,7 +225,7 @@ Inductive wf_Zexpr (ctx : list ctx_elt2) : pZexpr (var1 tZ) -> pZexpr (var2 tZ) 
   wf_Zexpr _ y1 y2 ->
   wf_Zexpr _ (ZBop o x1 y1) (ZBop o x2 y2)
 | wf_ZVar v1 v2 :
-  In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
+  List.In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
   wf_Zexpr _ (ZVar v1) (ZVar v2)
 | wf_ZZ0 :
   wf_Zexpr _ ZZ0 ZZ0
@@ -296,7 +297,7 @@ Inductive wf_ATLexpr : list ctx_elt2 -> forall n, pATLexpr var1 n -> pATLexpr va
   wf_ATLexpr ctx (S n) x1 x2 ->
   wf_ATLexpr ctx _ (Padr k x1) (Padr k x2)
 | wf_Var ctx n v1 v2 :
-  In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
+  List.In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
   wf_ATLexpr ctx n (Var v1) (Var v2)
 | wf_Get ctx n x1 x2 idxs1 idxs2 :
   wf_ATLexpr ctx n x1 x2 ->
@@ -569,8 +570,88 @@ Fixpoint ec_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type)) : expr_context
   | nil => $0
   end.
 
-Lemma stringvar_ATLexpr_correct sh ctx n e_nat e_shal name name' e_string :
-  wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
-  stringvar_ATLexpr name e_nat = Some (name', e_string) ->
-  eval_expr sh (valuation_of ctx) (ec_of ctx) e_string (to_result _ (interp_pATLexpr e_shal)).
+Lemma mk_eval_gen v ctx i lo hi body loz hiz rl :
+  eval_Zexpr_Z v lo = Some loz ->
+  eval_Zexpr_Z v hi = Some hiz ->
+  length rl = Z.to_nat (hiz - loz) ->
+  (forall i', (loz <= i' < hiz)%Z ->
+         (~ i \in dom v) /\
+           (~ contains_substring "?" i) /\
+           match nth_error rl (Z.to_nat (i' - loz)) with
+           | None => False
+           | Some r =>  eval_expr (v $+ (i, i')) ctx body r
+           end) ->
+  eval_expr v ctx (ATLDeep.Gen i lo hi body) (Result.V rl).
 Proof.
+  intros Hlo Hhi Hlen Hbody. revert lo loz Hlen Hlo Hbody.
+  induction rl; intros lo loz Hlen Hlo Hbody.
+  - eapply EvalGenBase; eauto. simpl in Hlen. lia.
+  - simpl in Hlen.
+    pose proof (Hbody loz ltac:(lia)) as Hbody0. invs'.
+    replace (loz - loz)%Z with 0%Z in * by lia. simpl in *. invs'.
+    econstructor; eauto; try lia. eapply IHrl; eauto.
+    2: { simpl. rewrite Hlo. reflexivity. }
+    { lia. }
+    intros i' Hi'. specialize (Hbody i' ltac:(lia)). invs'. intuition.
+    replace (Z.to_nat (i' - loz)) with (S (Z.to_nat (i' - (loz + 1)))) in * by lia.
+    simpl in H7. apply H7.
+Qed.
+
+Lemma nat_to_string_injective x y :
+  nat_to_string x = nat_to_string y ->
+  x = y.
+Proof. Admitted.
+
+(* as usual, i miss coqutil.  map.of_list.. *)
+Lemma valuation_of_correct ctx x y :
+  NoDup (@map _ nat (fun elt => elt.(ctx_elt_p1 _ _)) ctx) ->
+  List.In {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} ctx ->
+  valuation_of ctx $? (nat_to_string x) = Some y.
+Proof.
+  induction ctx.
+  - simpl. intros. contradiction.
+  - simpl. intros H1 H2. destruct H2 as [H2|H2]; subst.
+    + rewrite lookup_add_eq; reflexivity.
+    + invert H1. specialize (IHctx ltac:(eassumption) ltac:(eassumption)).
+      destruct a. destruct ctx_elt_t1; auto. rewrite lookup_add_ne; auto.
+      intro H'. apply nat_to_string_injective in H'. subst.
+      match goal with |H: ~_ |- _ => apply H end. apply in_map_iff. eexists.
+      split; [|eassumption]. reflexivity.
+Qed.
+
+Lemma stringvar_Z_correct ctx e_nat e_shal :
+  NoDup (@map _ nat (fun elt => elt.(ctx_elt_p1 _ _)) ctx) ->
+  wf_Zexpr (fun _ => nat) interp_type ctx e_nat e_shal ->
+  eval_Zexpr (valuation_of ctx) (stringvar_Z e_nat) (interp_pZexpr e_shal).
+Proof.
+  intros H. induction 1; simpl; eauto.
+  - destruct o; simpl; eauto.
+  - constructor. apply valuation_of_correct; auto.
+  - eenough (- _ = _)%Z as ->; [eauto|]. lia.
+Qed.
+
+Lemma stringvar_ATLexpr_correct ctx n e_nat e_shal name name' e_string :
+  wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
+  @map _ nat (fun elt => elt.(ctx_elt_p1 _ _)) ctx = rev (seq O name) ->
+  stringvar_ATLexpr name e_nat = Some (name', e_string) ->
+  eval_expr (valuation_of ctx) (ec_of ctx) e_string (to_result _ (interp_pATLexpr e_shal)).
+Proof.
+  intros H. revert name name' e_string. induction H; cbn -[to_result] in *; intros;
+    repeat match goal with
+      | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
+          let E := fresh "E" in
+          destruct (stringvar_ATLexpr name e) as [(?&?)|] eqn:E
+      end;
+    invs'.
+  - simpl. eapply mk_eval_gen.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto. admit.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto. admit.
+    + rewrite length_map. Search length genr. rewrite genr_length. reflexivity.
+    + intros i' Hi'. rewrite nth_error_map. rewrite nth_error_genr_Some by lia.
+      simpl. replace (_ + _)%Z with i' by lia. split.
+      { admit. }
+      split.
+      { admit. }
+      eapply H2; [|eassumption]. Search seq S. rewrite seq_S. rewrite rev_app_distr.
+      simpl. f_equal. assumption.
+  - 
