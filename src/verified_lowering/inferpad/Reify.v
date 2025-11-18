@@ -533,34 +533,34 @@ Ltac get_fun x :=
   end.
 
 (*assumes that the reification target appears in the goal*)
-Ltac make_types_reifiable :=
-  change R with (interp_type (tensor_n O));
-  repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n)));
-  change RTensorElem with (dim_n_TensorElem O);
+Ltac make_types_reifiable_in x :=
+  change R with (interp_type (tensor_n O)) in x;
+  repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n))) in x;
+  change RTensorElem with (dim_n_TensorElem O) in x;
   repeat change (@TensorTensorElem _ (dim_n_TensorElem ?n)) with
-    (dim_n_TensorElem (S n));
-  repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]);
-  repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs));
-  change Z with (interp_type tZ);
-  cbv [gen sum Common.Truncr];
+    (dim_n_TensorElem (S n)) in x;
+  repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]) in x;
+  repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs)) in x;
+  change Z with (interp_type tZ) in x;
+  cbv [gen sum Common.Truncr] in x;
   (*Z's are not allowed to be used as constants;
     in particular, they cannot be used to define nats*)
   (*the following is OK, because things inside Z.to_nat must *always* be constants*)
   repeat match goal with
-    | |- context[(Z.to_nat ?x)] =>
-        let k := fresh "k" in set (k := Z.to_nat x)
+    | x := context[(Z.to_nat ?y)] |- _ =>
+        let k := fresh "k" in set (k := Z.to_nat y)
     end;
-  repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n);
-  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n);
-  repeat change (@iverson (interp_type (tensor_n ?n)) _) with (iverson_n n);
-  repeat change (@Common.flatten (interp_type (tensor_n ?n)) _) with (flatten_n n);
-  repeat change (@truncr (interp_type (tensor_n ?n)) _) with (truncr_n n);
-  repeat change (@truncl (interp_type (tensor_n ?n)) _) with (truncl_n n);
-  repeat change (@transpose (interp_type (tensor_n ?n)) _) with (transpose_n n);
-  repeat change (@concat (interp_type (tensor_n ?n)) _) with (concat_n n);
-  repeat change (@tile (interp_type (tensor_n ?n)) _) with (tile_n n);
-  repeat change (@let_binding (interp_type (tensor_n ?n)) (interp_type (tensor_n ?m))) with (let_nm n m);
-  change (@bin (interp_type (tensor_n O)) _) with Rplus.
+  repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n) in x;
+  repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n) in x;
+  repeat change (@iverson (interp_type (tensor_n ?n)) _) with (iverson_n n) in x;
+  repeat change (@Common.flatten (interp_type (tensor_n ?n)) _) with (flatten_n n) in x;
+  repeat change (@truncr (interp_type (tensor_n ?n)) _) with (truncr_n n) in x;
+  repeat change (@truncl (interp_type (tensor_n ?n)) _) with (truncl_n n) in x;
+  repeat change (@transpose (interp_type (tensor_n ?n)) _) with (transpose_n n) in x;
+  repeat change (@concat (interp_type (tensor_n ?n)) _) with (concat_n n) in x;
+  repeat change (@tile (interp_type (tensor_n ?n)) _) with (tile_n n) in x;
+  repeat change (@let_binding (interp_type (tensor_n ?n)) (interp_type (tensor_n ?m))) with (let_nm n m) in x;
+  change (@bin (interp_type (tensor_n O)) _) with Rplus in x.
 
 Ltac Reify x name :=
   set (y := x);
@@ -575,22 +575,28 @@ Ltac Reify x name :=
                                         subst y; subst z; simpl.
 
 Ltac Reify_lhs name :=
-  make_types_reifiable;
   lazymatch goal with
-  | |- ?x = _ => Reify x name
+  | |- ?x = _ =>
+      set (y := x);
+      make_types_reifiable_in y;
+      subst y
+  end;
+  lazymatch goal with
+  | |- ?x = _ =>
+      Reify x name
   end.
 
-Ltac R :=
-  let foo := fresh "foo" in
-  let _ := match goal with
-             _ =>
-               intros;
-               autounfold with examples;
-               Reify_lhs foo
-           end in
-      let x := eval cbv [foo] in foo in
-        let y := eval simpl in x in
-          y.
+(* Ltac R := *)
+(*   let foo := fresh "foo" in *)
+(*   let _ := match goal with *)
+(*              _ => *)
+(*                intros; *)
+(*                autounfold with examples; *)
+(*                Reify_lhs foo *)
+(*            end in *)
+(*       let x := eval cbv [foo] in foo in *)
+(*         let y := eval simpl in x in *)
+(*           y. *)
 
            
            
