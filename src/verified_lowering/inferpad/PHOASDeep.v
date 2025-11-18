@@ -17,7 +17,7 @@ Set Warnings "-omega-is-deprecated,-deprecated".
 
 From Codegen Require Import IdentParsing NatToString IntToString Normalize CodeGen.
 From Lower Require Import ATLDeep Sexpr Zexpr Bexpr.
-From ATL Require Import ATL Common CommonTactics Div.
+From ATL Require Import ATL Common CommonTactics Div Map.
 
 Open Scope string_scope.
 
@@ -551,8 +551,26 @@ Some (name',
 end.
 
 Check stringvar_ATLexpr. Check wf_ATLexpr. Print eval_expr.
-Fixpoint 
-Lemma stringvar_ATLexpr_correct ctx n (e : pATLExpr n) :
-  wf_ATLexpr interp_type (fun _ => nat) ctx n (e interp_type) (e (fun _ => nat)) ->
-  eval_expr 
+Print eval_expr.
+Check ctx_elt2. Check fold_right. Print ctx_elt2. Check add.
+Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type)) : valuation :=
+  match ctx with
+  | {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
+      valuation_of ctx' $+ (nat_to_string x, y)
+  | _ :: ctx' => valuation_of ctx'
+  | nil => $0
+  end.
+
+Fixpoint ec_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type)) : expr_context :=
+  match ctx with
+  | {| ctx_elt_t := tensor_n n; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
+      ec_of ctx' $+ (nat_to_string x, to_result _ y)
+  | _ :: ctx' => ec_of ctx'
+  | nil => $0
+  end.
+
+Lemma stringvar_ATLexpr_correct sh ctx n e_nat e_shal name name' e_string :
+  wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
+  stringvar_ATLexpr name e_nat = Some (name', e_string) ->
+  eval_expr sh (valuation_of ctx) (ec_of ctx) e_string (to_result _ (interp_pATLexpr e_shal)).
 Proof.
