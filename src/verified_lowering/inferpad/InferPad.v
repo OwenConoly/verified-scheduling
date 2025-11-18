@@ -581,203 +581,179 @@ end with infer_truncr left right offset :=
             arith ]
       end.
 
-Goal forall v, Common.truncl 3 (GEN [ i < 10 ] (|[ 1 <? i ]| v _[i+4])) = [].
+Goal (fun v : list R => Common.truncl 3 (GEN [ i < 10 ] (|[ 1 <? i ]| v _[i+4]))) = (fun _ => []).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. Fail infer_pad 0%Z 0%Z.
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. Fail infer_pad 0%Z 0%Z. *)
 Abort. 
 
-Goal forall v, Common.truncl 3 (GEN [ i < 10 ] (v _[i])) = [].
+Goal (fun v : list R => Common.truncl 3 (GEN [ i < 10 ] (v _[i]))) = (fun _ => []).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. Fail infer_pad 0%Z 0%Z.
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. Fail infer_pad 0%Z 0%Z. *)
 Abort.
 
-Goal forall n m (v : list (list R)),
-    2 < n ->
-    2 < m ->
-    consistent v (n,(m,tt)) ->
-    blurimmediate_partition n m v = @nil _.
+Goal forall n m,
+    (fun v : list (list R) => blurimmediate_partition n m v) = (fun _ => nil).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  intros.
+  cbv [blurimmediate_partition].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
 
-Goal forall (A B C D : nat) (m1 m2 : (list (list (list (list R))))),
-         consistent m1 (8,(8,(8,(8,tt)))) ->
-         consistent m2 (8,(8,(8,(8,tt)))) ->         
-         add_split 8 8 8 8 m1 m2 =
-           add 8 8 8 8 m1 m2.
+Goal (fun m1 m2 : list (list (list (list R))) => add_split 8 8 8 8 m1 m2) =
+       (fun m1 m2 => add 8 8 8 8 m1 m2).
 Proof.
-  autounfold.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  cbv [add_split].
+  Reify_lhs foo.
+  (* autounfold. *)
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.  
 
-Goal forall B C K W RR (w : list (list (list R))) (x : list (list (list R))),
-    (0 < B)%Z ->
-    (0 < C)%Z ->
-    (0 < K)%Z ->
-    (0 < W)%Z ->
-    (0 < RR)%Z ->
-    im2col B K W C RR w x =
-      im2col_lifted B K W C RR w x.
+Goal (fun B C K W RR (w x : list (list (list R))) => im2col B K W C RR w x) =
+      (fun B C K W RR w x => im2col_lifted B K W C RR w x).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  cbv [im2col].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.    
 
-Goal forall B C K W RR (w : list (list (list R))) (x : list (list (list R))),
-    (0 < B)%Z ->
-    (0 < C)%Z ->
-    (0 < K)%Z ->
-    (0 < W)%Z ->
-    (0 < RR)%Z ->
-    im2col_lifted B K W C RR w x = im2col B K W C RR w x.
+Goal (fun B C K W RR (w x : list (list (list R))) => im2col_lifted B K W C RR w x) =
+       (fun B C K W RR w x => im2col B K W C RR w x).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  cbv [im2col_lifted].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.    
 
-Goal forall (W C B K : Z) (x w : list (list (list R))) (RR : Z) (a b :nat),
-    consistent w (a,(b,(Z.to_nat RR, tt))) ->
-          (0 < C)%Z ->
-          (0 < W)%Z ->
-          (W <=C)%Z ->
-          (0 < K)%Z ->
-          (0 < RR)%Z ->
-          (0 < B)%Z ->
-          scatter_full B K W C x w = gather_full W C B K x w RR.
+Goal (fun W C B K (x w : list (list (list R))) RR => scatter_full B K W C x w) =
+       (fun W C B K x w RR => gather_full W C B K x w RR).
 Proof.
-  intros. unfold scatter_full.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  cbv [scatter_full].
+  Reify_lhs foo.
+  (* intros. unfold scatter_full. *)
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
 
-Goal forall (W C B K : Z) (x w : list (list (list R))) (RR : Z) (a b :nat),
-    consistent w (a,(b,(Z.to_nat RR, tt))) ->
-          (0 < C)%Z ->
-          (0 < W)%Z ->
-          (W <=C)%Z ->
-          (0 < K)%Z ->
-          (0 < RR)%Z ->
-          (0 < B)%Z ->
-          gather_full W C B K x w RR = scatter_full B K W C x w.
+Goal (fun W C B K (x w : list (list (list R))) RR => gather_full W C B K x w RR) =
+      (fun W C B K x w RR => scatter_full B K W C x w).
 Proof.
-  intros. unfold gather_full.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  cbv [gather_full].
+  Reify_lhs foo.
+  (* intros. unfold gather_full. *)
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
   
-Goal forall (A B C : nat) (m1 m2 : (list (list R))) (k : Z),
-    (0 < k)%Z ->
-    0 < A ->
-    0 < B ->
-    0 < C ->
-    consistent m1 (64,(64,tt)) ->
-    consistent m2 (64,(64,tt)) ->    
-    matmul_tiled_split 64 64 64 m1 m2 4 =
-      matmul 64 64 64 m1 m2.
+Goal (fun m1 m2 : list (list R) => matmul_tiled_split 64 64 64 m1 m2 4) =
+       (fun m1 m2 => matmul 64 64 64 m1 m2).
 Proof.
-  autounfold with examples.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  cbv [matmul_tiled_split].
+  Reify_lhs foo.
+  (* autounfold with examples. *)
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
 
-Goal forall n m (l : list (list R)),
-    0 < n ->
-    0 < m ->
-    consistent l (n,(m,tt)) ->
-    blur_tiles_guarded l 64 64 4 4 = @nil _.
+Goal (fun l : list (list R) => blur_tiles_guarded l 64 64 4 4) = (fun _ => nil).
 Proof.
-  autounfold. unfold blur_tiles_guarded.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. (* Takes ~10m to run *) }
+  cbv [blur_tiles_guarded].
+  Reify_lhs foo.
+  Print foo.
+  (* autounfold. unfold blur_tiles_guarded. *)
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. (* Takes ~10m to run *) } *)
 Abort.
 
-Goal forall n m (v : list (list R)),
-    2 < n ->
-    2 < m ->
-    consistent v (n,(m,tt)) ->
-    blurimmediate_isolate n m v = @nil _.
+Goal forall n m,
+    (fun v : list (list R) => blurimmediate_isolate n m v) = (fun _ => nil).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_concat 0%Z 0%Z. }
+  intros.
+  cbv [blurimmediate_isolate].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_concat 0%Z 0%Z. } *)
 Abort.
 
-Goal forall N M (v : list (list R)),
-    2 < N ->
-    2 < M ->
-    consistent v (N,(M,tt)) ->
-    blurtwostage_partition N M v = @nil _.
+Goal forall N M,
+    (fun v : list (list R) => blurtwostage_partition N M v) = (fun _ => nil).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  intros.
+  cbv [blurtwostage_partition].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
 
-Goal forall v, Common.truncl 3 (GEN [ i < 10 ] (|[ 2 <? i ]| v _[i+4])) = [].
+Goal (fun v : list R => Common.truncl 3 (GEN [ i < 10 ] (|[ 2 <? i ]| v _[i+4]))) = (fun _ => []).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
 
-Goal forall N M (v : list (list R)),
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,tt)) ->
-    blurimmediate v M N = blurtwostage N M v.
+Goal forall N M,
+    (fun v : list (list R) => blurimmediate v M N) = (fun v => blurtwostage N M v).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  intros.
+  cbv [blurimmediate].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
  
-Goal forall N M (v : list (list R)),
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,tt)) ->
-    blurtwostage N M v = blurimmediate v M N.
+Goal forall N M,
+    (fun v : list (list R) => blurtwostage N M v) = (fun v => blurimmediate v M N).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  intros.
+  cbv [blurtwostage].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
 
-Goal forall n m (l : list (list R)),
-    1 < n ->
-    1 < m ->
-    consistent l (n,(m,tt)) ->
-    fusion_no_boundary n m l 
-    = @nil _.
+Goal forall n m,
+    (fun l : list (list R) => fusion_no_boundary n m l) 
+    = (fun _ => nil).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  intros.
+  cbv [fusion_no_boundary].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.
 
-Goal forall W R0 (x w : list R),    
-    consistent w (Z.to_nat R0, tt) ->
-    consistent x (Z.to_nat R0, tt) ->
-    (0 < W)%Z ->
-    (Z.of_nat (length x) < W)%Z ->
-    GatherScatter.gather W x w = @nil _.
+Goal (fun W x w => GatherScatter.gather W x w) = (fun _ _ _ => nil).
 Proof.
-  let ast := R in
-  assert (exists pad, has_pad $0 $0 ast pad).
-  { eexists. infer_pad 0%Z 0%Z. }
+  cbv [gather].
+  Reify_lhs foo.
+  (* let ast := R in *)
+  (* assert (exists pad, has_pad $0 $0 ast pad). *)
+  (* { eexists. infer_pad 0%Z 0%Z. } *)
 Abort.      
 
 Goal forall W R0 (x w : list R),    
