@@ -64,6 +64,45 @@ Inductive pZexpr { var } :=
 | ZZopp : pZexpr -> pZexpr.
 Arguments pZexpr : clear implicits.
 
+Print Zexpr.
+Definition stringvar_Zbop o :=
+  match o with
+  | ZPlus => Zexpr.ZPlus
+  | ZMinus => Zexpr.ZMinus
+  | ZTimes => Zexpr.ZTimes
+  | ZDivf => Zexpr.ZDivf
+  | ZDivc => Zexpr.ZDivc
+  | ZMod => Zexpr.ZMod
+  end.
+
+(*supposed to be injective*)
+Definition nat_to_string (n : nat) : string. Admitted.
+
+Fixpoint stringvar_ZLit (e : pZexpr nat) : option Z :=
+  match e with
+  | ZBop o x y => match stringvar_ZLit x, stringvar_ZLit y with
+                 | Some x', Some y' => Some (interp_Zbop o x' y')
+                 | _, _ => None
+                 end
+  | ZVar _ => None
+  | ZZ0 => Some 0%Z
+  | ZZpos p => Some (Zpos p)
+  | ZZneg p => Some (Zneg p)
+  | ZZ_of_nat n => Some (Z.of_nat n)
+  | ZZopp x => option_map Z.opp (stringvar_ZLit x)
+  end.
+
+Fixpoint stringvar_Z (e : pZexpr nat) : Zexpr :=
+  match e with
+  | ZBop o x y => (stringvar_Zbop o) (stringvar_Z x) (stringvar_Z y)
+  | ZVar x => Zexpr.ZVar (nat_to_string x)
+  | ZZ0 => ZLit 0
+  | ZZpos p => ZLit (Zpos p)
+  | ZZneg p => ZLit (Zpos p)
+  | ZZ_of_nat n => ZLit (Z.of_nat n)
+  | ZZopp x => Zexpr.ZMinus (ZLit 0) (stringvar_Z x)
+  end.
+
 Fixpoint interp_pZexpr (e : pZexpr Z) : Z :=
   match e with
   | ZBop o x y => interp_Zbop o (interp_pZexpr x) (interp_pZexpr y)
@@ -84,10 +123,23 @@ Definition interp_Bbop o x y :=
   | BEq => (x =? y)
   end%Z.
 
+Definition stringvar_Bbop o :=
+  match o with
+  | BLt => Bexpr.Lt
+  | BLe => Bexpr.Le
+  | BEq => Bexpr.Eq
+  end.
+
 Inductive pBexpr { var } :=
 | BAnd : pBexpr -> pBexpr -> pBexpr
 | BBop : Bbop -> pZexpr var -> pZexpr var -> pBexpr.
 Arguments pBexpr : clear implicits.
+
+Fixpoint stringvar_B (e : pBexpr nat) : Bexpr :=
+  match e with
+  | BAnd x y => Bexpr.And (stringvar_B x) (stringvar_B y)
+  | BBop o x y => (stringvar_Bbop o) (stringvar_Z x) (stringvar_Z y)
+  end.                                                 
 
 Fixpoint interp_pBexpr (e : pBexpr Z) : bool :=
   match e with
@@ -110,6 +162,14 @@ Definition interp_Sbop o x y :=
   | Div => x * y
   | Sub => x - y
   end%R.
+
+Definition stringvar_Sbop o :=
+  match o with
+  | Mul => Sexpr.Mul
+  | Add => Sexpr.Add
+  | Div => Sexpr.Div
+  | Sub => Sexpr.Sub
+  end.
 
 Fixpoint dim_n_TensorElem n : TensorElem (dim_n n) :=
   match n return TensorElem (dim_n n) with
@@ -137,15 +197,16 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 | Gen {n} : pZexpr (var tZ) -> pZexpr (var tZ) -> (var tZ -> pATLexpr n) -> pATLexpr (S n)
 | Sum {n} : pZexpr (var tZ) -> pZexpr (var tZ) -> (var tZ -> pATLexpr n) -> pATLexpr n
 | Guard {n} : pBexpr (var tZ) -> pATLexpr n -> pATLexpr n
-| Lbind {n m} : pATLexpr m -> (var (tensor_n m) -> pATLexpr n) -> pATLexpr n
+| Lbind {n m} : pATLexpr n -> (var (tensor_n n) -> pATLexpr m) -> pATLexpr m
 | Concat {n} : pATLexpr (S n) -> pATLexpr (S n) -> pATLexpr (S n)
 | Flatten {n} : pATLexpr (S (S n)) -> pATLexpr (S n)
 | Split {n} : nat -> pATLexpr (S n) -> pATLexpr (S (S n))
 | Transpose {n} : pATLexpr (S (S n)) -> pATLexpr (S (S n))
 | Truncr {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
 | Truncl {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
-| Padr {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
-| Padl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
+| Padr {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
+| Padl {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
+| Var {n} : var (tensor_n n) -> pATLexpr n
 | Get {n} : pATLexpr n -> list (pZexpr (var tZ)) -> pATLexpr O
 | SBop : Sbop -> pATLexpr O -> pATLexpr O -> pATLexpr O
 | SIZR : pZexpr (var tZ) -> pATLexpr O
@@ -166,24 +227,105 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   | Transpose x => transpose (interp_pATLexpr x)
   | Truncr k x => truncr k (interp_pATLexpr x)
   | Truncl k x => truncl k (interp_pATLexpr x)
-  | Padl k x => pad_l (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
-  | Padr k x => pad_r (Z.to_nat (interp_pZexpr k)) (interp_pATLexpr x)
+  | Padl k x => pad_l k (interp_pATLexpr x)
+  | Padr k x => pad_r k (interp_pATLexpr x)
+  | Var x => x
   | Get x idxs => gget (interp_pATLexpr x) (map interp_pZexpr idxs)
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
   | SIZR x => IZR (interp_pZexpr x)
   end.
+
+(*yes, I'm using the same name generation for Z and tensor, even though they
+ don't need to be distinct*)
+Local Notation "[[ x , y ]] <- a ; f" := (match a with Some (x, y) => f | None => None end)
+                                           (right associativity, at level 70).
+
+Fixpoint stringvar_S {n} (e : pATLexpr (fun _ => nat) n) : option Sexpr :=
+  match e with
+  | SBop o x y =>
+      match stringvar_S x, stringvar_S y with
+      | Some x', Some y' => Some (stringvar_Sbop o x' y')
+      | _, _ => None
+      end
+  | SIZR x => option_map Sexpr.Lit (option_map IZR (stringvar_ZLit x))
+  | Get x idxs =>
+      match x with
+      | Var y => Some (Sexpr.Get (nat_to_string y) (map stringvar_Z idxs))
+      | _ => None
+      end
+  | _ => None
+  end.
+
+Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => nat) n) : option (nat * ATLexpr) :=
+  match e with
+  | Gen lo hi body =>
+      [[name', body']] <- stringvar_ATLexpr (S name) (body name);
+Some (name',
+    ATLDeep.Gen (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
+| Sum lo hi body =>
+    [[name', body']] <- stringvar_ATLexpr (S name) (body name);
+Some (name',
+    ATLDeep.Sum (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
+| Guard b e1 =>
+    [[name', body']] <- stringvar_ATLexpr name e1;
+Some (name',
+    ATLDeep.Guard (stringvar_B b) body')
+| Lbind x f =>
+    [[name', x']] <- stringvar_ATLexpr (S name) x;
+[[name'', fx']] <- stringvar_ATLexpr name' (f name);
+Some (name'',
+    ATLDeep.Lbind (nat_to_string name) x' fx')
+| Concat e1 e2 =>
+    [[name', e1']] <- stringvar_ATLexpr name e1;
+[[name'', e2']] <- stringvar_ATLexpr name' e2;
+Some (name'',
+    ATLDeep.Concat e1' e2')
+| Flatten e1 =>
+    [[name', e1']] <- stringvar_ATLexpr name e1;
+Some (name',
+    ATLDeep.Flatten e1')
+| Split k e1 =>
+    [[name', e1']] <- stringvar_ATLexpr name e1;
+Some (name',
+    ATLDeep.Split (Zexpr.ZLit (Z.of_nat k)) e1')
+| Transpose e1 =>
+    [[name', e1']] <- stringvar_ATLexpr name e1;
+Some (name',
+    ATLDeep.Transpose e1')
+| Truncr k e1 =>
+    [[name', e1']] <- stringvar_ATLexpr name e1;
+Some (name',
+    ATLDeep.Truncr (Zexpr.ZLit (Z.of_nat k)) e1')
+| Truncl k e1 =>
+    [[name', e1']] <- stringvar_ATLexpr name e1;
+Some (name',
+    ATLDeep.Truncl (Zexpr.ZLit (Z.of_nat k)) e1')
+| Padl k e1 =>
+    [[name', e1']] <- stringvar_ATLexpr name e1;
+Some (name',
+    ATLDeep.Padl (Zexpr.ZLit (Z.of_nat k)) e1')
+| Padr k e1 =>
+    [[name', e1']] <- stringvar_ATLexpr name e1;
+Some (name',
+    ATLDeep.Padr (Zexpr.ZLit (Z.of_nat k)) e1')
+| Get _ _ | SBop _ _ _ | SIZR _ =>
+                           match stringvar_S e with
+                           | Some s => Some (name, ATLDeep.Scalar s)
+                           | None => None
+                           end
+| Var x => None
+end.
 
 Definition pExpr_type var (t : type) : Type :=
   match t with
   | tZ => pZexpr (var tZ)
   | tB => pBexpr (var tZ)
   | tensor_n n => pATLexpr var n
-  end.  
+  end.
 
 Definition pair_to_reify (f : (type -> Type) -> Type) : Type :=
   f interp_type * (forall var, f (pExpr_type var)).
 
-Print pATLexpr.
 Definition gen_n n := @genr (dim_n n) _.
 Definition sum_n n := @sumr (dim_n n) _.
 Definition iverson_n n := @iverson (dim_n n) _.
@@ -195,13 +337,14 @@ Definition concat_n n := @concat (dim_n n) _.
 Definition tile_n n := @tile (dim_n n) _.
 (*i guess we only reify bin_n O*)
 Definition bin_n n := @bin (dim_n n) _.
+Definition let_nm n m := @let_binding (dim_n n) (dim_n m).
 
 (*surely these notations are already available somewhere?*)
 (*surely this notation is stupid enough that it's not being used for naything else*)
 Notation "[> <]" := tt (format "[> <]").
 Notation "[> x <]" := (x, tt).
 Notation "[> x ; y ; .. ; z <]" := ((x, (y, .. (z, tt) ..))).
-
+Print let_binding.
 Check [> 5; 6; 7; 7; 7; 7; 8 <]. Print Flatten. Print Sbop.
 Definition pairs_to_reify :=
   [>
@@ -219,6 +362,8 @@ Definition pairs_to_reify :=
      : pair_to_reify (fun var => forall n, var tZ -> var tZ -> (var tZ -> var (tensor_n n)) -> var (tensor_n (S n)));
    (sum_n, fun var => (fun n lo hi body => @Sum var n lo hi (fun x => body (@ZVar (var tZ) x))))
      : pair_to_reify (fun var => forall n, var tZ -> var tZ -> (var tZ -> var (tensor_n n)) -> var (tensor_n n));
+   (let_nm, fun var => (fun n m x f => @Lbind var n m x (fun x0 => f (@Var var n x0))))
+     : pair_to_reify (fun var => forall n m, var (tensor_n n) -> (var (tensor_n n) -> var (tensor_n m)) -> var (tensor_n m));
    (@gget, fun var => @Get var)
      : pair_to_reify (fun var => forall n, var (tensor_n n) -> list (var tZ) -> var (tensor_n O));
    (iverson_n, fun var => @Guard var)
@@ -333,6 +478,11 @@ Ltac pattern_shallows x :=
  interp_type tZ ->
  (interp_type tZ -> interp_type (tensor_n n)) -> interp_type (tensor_n n))
 )
+,( let_nm :
+(forall n m : nat,
+ interp_type (tensor_n n) ->
+ (interp_type (tensor_n n) -> interp_type (tensor_n m)) -> interp_type (tensor_n m))
+)
 ,( @gget :
 (forall n : nat,
  interp_type (tensor_n n) -> list (interp_type tZ) -> interp_type (tensor_n 0))
@@ -409,6 +559,7 @@ Ltac make_types_reifiable :=
   repeat change (@transpose (interp_type (tensor_n ?n)) _) with (transpose_n n);
   repeat change (@concat (interp_type (tensor_n ?n)) _) with (concat_n n);
   repeat change (@tile (interp_type (tensor_n ?n)) _) with (tile_n n);
+  repeat change (@let_binding (interp_type (tensor_n ?n)) (interp_type (tensor_n ?m))) with (let_nm n m);
   change (@bin (interp_type (tensor_n O)) _) with Rplus.
 
 Ltac Reify x name :=
@@ -431,15 +582,18 @@ Ltac Reify_lhs name :=
 
 Ltac R :=
   let foo := fresh "foo" in
-  let _ := match goal with _ =>
-                             intros;
-                             autounfold with examples;
-                             Reify_lhs foo
+  let _ := match goal with
+             _ =>
+               intros;
+               autounfold with examples;
+               Reify_lhs foo
            end in
       let x := eval cbv [foo] in foo in
         let y := eval simpl in x in
           y.
 
+           
+           
 (*leaving this here, for now, for comparison*)
 (*what was normalize good for?  should i do that still?*)
 
