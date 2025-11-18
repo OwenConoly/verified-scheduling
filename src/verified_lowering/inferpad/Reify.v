@@ -213,6 +213,112 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 .
 Arguments pATLexpr : clear implicits.
 
+Section well_formed.
+  Context (var1 var2 : type -> Type).
+Record ctx_elt2 :=
+  { ctx_elt_t : type; ctx_elt_p1 : var1 ctx_elt_t; ctx_elt_p2 : var2 ctx_elt_t }.
+
+Inductive wf_Zexpr (ctx : list ctx_elt2) : pZexpr (var1 tZ) -> pZexpr (var2 tZ) -> Prop :=
+| wf_ZBop o x1 x2 y1 y2 :
+  wf_Zexpr _ x1 x2 ->
+  wf_Zexpr _ y1 y2 ->
+  wf_Zexpr _ (ZBop o x1 y1) (ZBop o x2 y2)
+| wf_ZVar v1 v2 :
+  In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
+  wf_Zexpr _ (ZVar v1) (ZVar v2)
+| wf_ZZ0 :
+  wf_Zexpr _ ZZ0 ZZ0
+| wf_ZZpos p :
+  wf_Zexpr _ (ZZpos p) (ZZpos p)
+| wf_ZZneg p :
+  wf_Zexpr _ (ZZneg p) (ZZneg p)
+| wf_ZZ_of_nat n :
+  wf_Zexpr _ (ZZ_of_nat n) (ZZ_of_nat n)
+| wf_ZZopp x1 x2 :
+  wf_Zexpr _ x1 x2 ->
+  wf_Zexpr _ (ZZopp x1) (ZZopp x2).
+
+Print pBexpr.
+Inductive wf_Bexpr (ctx : list ctx_elt2) : pBexpr (var1 tZ) -> pBexpr (var2 tZ) -> Prop :=
+| wf_BAnd x1 x2 y1 y2 :
+  wf_Bexpr _ x1 x2 ->
+  wf_Bexpr _ y1 y2 ->
+  wf_Bexpr _ (BAnd x1 y1) (BAnd x2 y2)
+| wf_BBop o x1 x2 y1 y2 :
+  wf_Zexpr ctx x1 x2 ->
+  wf_Zexpr ctx y1 y2 ->
+  wf_Bexpr _ (BBop o x1 y1) (BBop o x2 y2)
+.
+
+Print pATLexpr.
+(*i'd have to write a bit less if i made this a fixpoint...*)
+(*but using it would be a bit annoying. idk.*)
+Inductive wf_ATLexpr : list ctx_elt2 -> forall n, pATLexpr var1 n -> pATLexpr var2 n -> Prop :=
+| wf_Gen ctx n lo1 lo2 hi1 hi2 body1 body2 :
+  wf_Zexpr ctx lo1 lo2 ->
+  wf_Zexpr ctx hi1 hi2 ->
+  (forall x1 x2, wf_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) n (body1 x1) (body2 x2)) ->
+  wf_ATLexpr ctx _ (Gen lo1 hi1 body1) (Gen lo2 hi2 body2)
+| wf_Sum ctx n lo1 lo2 hi1 hi2 body1 body2 :
+  wf_Zexpr ctx lo1 lo2 ->
+  wf_Zexpr ctx hi1 hi2 ->
+  (forall x1 x2, wf_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) n (body1 x1) (body2 x2)) ->
+  wf_ATLexpr ctx _ (Sum lo1 hi1 body1) (Sum lo2 hi2 body2)
+| wf_Guard ctx n b1 x1 b2 x2 :
+  wf_Bexpr ctx b1 b2 ->
+  wf_ATLexpr ctx n x1 x2 ->
+  wf_ATLexpr ctx _ (Guard b1 x1) (Guard b2 x2)
+| wf_Lbind ctx n m x1 x2 f1 f2 :
+  wf_ATLexpr ctx n x1 x2 ->
+  (forall x1' x2', wf_ATLexpr ({| ctx_elt_p1 := x1'; ctx_elt_p2 := x2' |} :: ctx) m (f1 x1') (f2 x2')) ->
+  wf_ATLexpr ctx _ (Lbind x1 f1) (Lbind x2 f2)
+| wf_Concat ctx n x1 x2 y1 y2 :
+  wf_ATLexpr ctx (S n) x1 x2 ->
+  wf_ATLexpr ctx (S n) y1 y2 ->
+  wf_ATLexpr ctx _ (Concat x1 y1) (Concat x2 y2)
+| wf_Flatten ctx n x1 x2 :
+  wf_ATLexpr ctx (S (S n)) x1 x2 ->
+  wf_ATLexpr ctx _ (Flatten x1) (Flatten x2)
+| wf_Split ctx n k x1 x2 :
+  wf_ATLexpr ctx (S n) x1 x2 ->
+  wf_ATLexpr ctx _ (Split k x1) (Split k x2)
+| wf_Transpose ctx n x1 x2 :
+  wf_ATLexpr ctx (S (S n)) x1 x2 ->
+  wf_ATLexpr ctx _ (Transpose x1) (Transpose x2)
+| wf_Truncr ctx n k x1 x2 :
+  wf_ATLexpr ctx (S n) x1 x2 ->
+  wf_ATLexpr ctx _ (Truncr k x1) (Truncr k x2)
+| wf_Truncl ctx n k x1 x2 :
+  wf_ATLexpr ctx (S n) x1 x2 ->
+  wf_ATLexpr ctx _ (Truncl k x1) (Truncl k x2)
+| wf_Padl ctx n k x1 x2 :
+  wf_ATLexpr ctx (S n) x1 x2 ->
+  wf_ATLexpr ctx _ (Padl k x1) (Padl k x2)
+| wf_Padr ctx n k x1 x2 :
+  wf_ATLexpr ctx (S n) x1 x2 ->
+  wf_ATLexpr ctx _ (Padr k x1) (Padr k x2)
+| wf_Var ctx n v1 v2 :
+  In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
+  wf_ATLexpr ctx n (Var v1) (Var v2)
+| wf_Get ctx n x1 x2 idxs1 idxs2 :
+  wf_ATLexpr ctx n x1 x2 ->
+  Forall2 (wf_Zexpr ctx) idxs1 idxs2 ->
+  wf_ATLexpr ctx _ (Get x1 idxs1) (Get x2 idxs2)
+| wf_SBop ctx o x1 x2 y1 y2 :
+  wf_ATLexpr ctx _ x1 x2 ->
+  wf_ATLexpr ctx _ y1 y2 ->
+  wf_ATLexpr ctx _ (SBop o x1 y1) (SBop o x2 y2)
+| wf_SIZR ctx x1 x2 :
+  wf_Zexpr ctx x1 x2 ->
+  wf_ATLexpr ctx _ (SIZR x1) (SIZR x2)
+. 
+End well_formed.
+
+Definition pATLExpr n := forall var, pATLexpr var n.
+
+Definition Wf_ATLExpr {n} (e : pATLExpr n) :=
+  forall var1 var2, wf_ATLexpr var1 var2 [] _ (e var1) (e var2).
+
 Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_n n) :=
   match e with
   | Gen lo hi body =>
@@ -234,6 +340,116 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
   | SIZR x => IZR (interp_pZexpr x)
   end.
+
+(*Following https://github.com/mit-plv/reification-by-parametricity/blob/d1bc17cf99a66e0268f655e28cdb375e712cd831/MiscIntro.v#L316 *)
+(*we probably don't even need the speed here, and furthermore i'm probably doing enough
+  nonsense in other places that the efficiency of proving
+  well-formedness doesn't even matter...
+  but why not*)
+
+Record ctx_elt var := { ctx_elt_t0 : type; ctx_elt0 : var ctx_elt_t0 }.
+
+Fixpoint unnatify_Z {var} (ctx : list (ctx_elt var)) (e : pZexpr nat) : pZexpr (var tZ) :=
+  match e with
+  | ZBop o x y => ZBop o (unnatify_Z ctx x) (unnatify_Z ctx y)
+  | ZVar v => match nth_error (rev ctx) v with
+             | Some {| ctx_elt_t0 := t; ctx_elt0 := x |} =>
+                 match t return var t -> _ with
+                 | tZ => fun x => ZVar x
+                 | _ => fun _ => ZZ0
+                 end x
+             | None => ZZ0
+             end
+  | ZZ0 => ZZ0
+  | ZZpos p => ZZpos p
+  | ZZneg p => ZZneg p
+  | ZZ_of_nat n => ZZ_of_nat n
+  | ZZopp x => ZZopp (unnatify_Z ctx x)
+  end.
+
+Fixpoint unnatify_B {var} (ctx : list (ctx_elt var)) (e : pBexpr nat) : pBexpr (var tZ) :=
+  match e with
+  | BAnd x y => BAnd (unnatify_B ctx x) (unnatify_B ctx y)
+  | BBop o x y => BBop o (unnatify_Z ctx x) (unnatify_Z ctx y)
+  end.
+
+Fixpoint dummy {var n} : pATLexpr var n :=
+  match n with
+  | S n' => Gen ZZ0 ZZ0 (fun _ => dummy)
+  | O => SIZR ZZ0
+  end. Print eq_rect.
+
+Fixpoint unnatify {var n} (ctx : list (ctx_elt var)) (e : pATLexpr (fun _ => nat) n) : pATLexpr var n :=
+  match e with
+  | Gen lo hi body =>
+      Gen (unnatify_Z ctx lo) (unnatify_Z ctx hi)
+        (fun x => unnatify ({| ctx_elt0 := x |} :: ctx) (body (length ctx)))
+  | Sum lo hi body =>
+      Sum (unnatify_Z ctx lo) (unnatify_Z ctx hi)
+        (fun x => unnatify ({| ctx_elt0 := x |} :: ctx) (body (length ctx)))
+  | Guard b e1 =>
+      Guard (unnatify_B ctx b) (unnatify ctx e1)
+  | Lbind x f =>
+      Lbind (unnatify ctx x)
+        (fun x => unnatify ({|ctx_elt0 := x |} :: ctx) (f (length ctx)))
+  | Concat x y => Concat (unnatify ctx x) (unnatify ctx y)
+  | Flatten x => Flatten (unnatify ctx x)
+  | Split k x => Split k (unnatify ctx x)
+  | Transpose x => Transpose (unnatify ctx x)
+  | Truncr k x => Truncr k (unnatify ctx x)
+  | Truncl k x => Truncl k (unnatify ctx x)
+  | Padl k x => Padl k (unnatify ctx x)
+  | Padr k x => Padr k (unnatify ctx x)
+  (*i do not understand why need @Var _ n here*)
+  | @Var _ n v => match nth_error (rev ctx) v with
+                 | Some {| ctx_elt_t0 := t; ctx_elt0 := x |} =>
+                     match t return var t -> pATLexpr var n with
+                     | tZ|tB => fun _ => @dummy var n
+                     | tensor_n m => fun x =>
+                                      match Nat.eq_dec n m with
+                                      | left pf =>
+                                          match pf in (_ = q) return var (tensor_n q) -> _ with
+                                          | Logic.eq_refl => fun x => @Var var n x
+                                          end x
+                                      | right _ => @dummy var n
+                    end
+                end x
+            | None => @dummy var n
+            end
+  | Get x idxs => Get (unnatify ctx x) (map (unnatify_Z ctx) idxs)
+  | SBop o x y => SBop o (unnatify ctx x) (unnatify ctx y)
+  | SIZR x => SIZR (unnatify_Z ctx x)
+  end.
+
+Definition ctx1 {var1 var2} (x : ctx_elt2 var1 var2) :=
+  {| ctx_elt0 := x.(ctx_elt_p1 _ _) |}.
+Definition ctx2 {var1 var2} (x : ctx_elt2 var1 var2) :=
+  {| ctx_elt0 := x.(ctx_elt_p2 _ _) |}.
+
+Hint Constructors wf_Zexpr : core.
+Lemma wf_unnatify_Z var1 var2 ctx e :
+  wf_Zexpr var1 var2 ctx (unnatify_Z (map ctx1 ctx) e) (unnatify_Z (map ctx2 ctx) e).
+Proof.
+  induction e; simpl; intros; repeat constructor; eauto.
+  do 2 rewrite <- map_rev. do 2 rewrite nth_error_map.
+  destruct (nth_error _ _) eqn:E; auto.
+  simpl. Abort.
+
+Hint Constructors wf_ATLexpr : core.
+Lemma wf_unnatify n var1 var2 ctx e :
+  wf_ATLexpr var1 var2 ctx n (unnatify (map ctx1 ctx) e) (unnatify (map ctx2 ctx) e).
+Proof.
+  revert ctx. induction e; simpl; intros; repeat constructor; eauto; intros.
+  - intros. simpl.
+
+
+
+Lemma WfByUnnatify n (E : pATLExpr n) :
+  E = (fun var => unnatify nil (E (fun _ => nat))) ->
+  Wf_ATLExpr E.
+Proof.
+  intros H. rewrite H. cbv [Wf_ATLExpr]. intros. apply wf_unnatify.
+Qed.
 
 (*yes, I'm using the same name generation for Z and tensor, even though they
  don't need to be distinct*)
