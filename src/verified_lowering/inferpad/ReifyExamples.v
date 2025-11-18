@@ -191,6 +191,12 @@ Proof.
   Reify_lhs foo.
 Abort.
 
+Goal (fun l : list (list R) => tlet y := l in y)
+    = (fun _ => nil).
+Proof.
+  Reify_lhs foo.
+Abort.
+
 Goal forall n m,
     (fun l : list (list R) => fusion_no_boundary n m l) = (fun _ => nil).
 Proof.
