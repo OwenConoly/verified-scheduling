@@ -107,8 +107,12 @@ Proof.
                   (Reify.Get i0
                      [Reify.ZVar x; Reify.ZVar x0; Reify.ZVar x1; Reify.ZVar x2])))))).
        exact (fun var A B C D m1 m2 => foo var A B C D (Reify.Var m1) (Reify.Var m2)). }
-  simpl. subst x. simpl. reflexivity.
-Qed.
+  (* simpl. subst x. simpl. reflexivity. Time Qed. *)
+  (* Finished transaction in 5.264 secs (5.262u,0.s) (successful) *)
+  reflexivity.
+  Time Qed.
+(*Finished transaction in 0.004 secs (0.004u,0.s) (successful)*)
+
   
 Goal forall (A B C D : nat),
     (fun m1 m2 => add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2) =
