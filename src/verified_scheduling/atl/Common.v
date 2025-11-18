@@ -533,7 +533,7 @@ Proof.
         rewrite Nat2Z.id. zify. lia.
     + zify. lia.
 Qed.
-
+Check nth_gen_helper_some.
 Lemma get_genr_some {X} `{TensorElem X} :
   forall I n m (body : Z -> X),
     (m < n)%Z ->
@@ -782,6 +782,13 @@ Proof.
   rewrite Z.eqb_refl.
   simpl.
   auto with crunch.
+Qed.
+
+Lemma nth_error_genr_Some {X} `{TensorElem X} i lo hi (f : _ -> X) :
+  i < Z.to_nat (hi - lo) ->
+  nth_error (genr lo hi f) i = Some (f (lo + Z.of_nat i)%Z).
+Proof.
+  cbv [genr]. intros. rewrite nth_gen_helper_some; auto.
 Qed.
 
 Lemma get_genr_indic_not {X} `{TensorElem X} :
