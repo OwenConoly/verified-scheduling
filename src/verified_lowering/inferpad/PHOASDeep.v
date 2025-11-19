@@ -306,6 +306,17 @@ Fixpoint to_result n (x : dim_n n) : Result.result :=
   | O => fun x => Result.S (Result.SS x)
   end x.
 
+Print Result.gen_pad.
+Definition x := @null (dim_n O) _.
+Goal x = x. cbv [x null]. simpl. Abort.
+(* Fixpoint to_result_of_shape n (e : pATLexpr (x : dim_n (length sh)) : Result.result := *)
+(*   match sh return dim_n (length sh) -> Result.result with *)
+(*   | [] => fun x => Result.S (Result.SS x) *)
+(*   | x :: xs => fun x => *)
+(*                match x with *)
+(*                | [] => gen_pad (x :: xs) *)
+(*                | _ => Result.V (map (to_result xs) *)
+
 Variant Sbop := Mul | Add | Div | Sub.
 
 Definition interp_Sbop o x y :=
@@ -491,6 +502,21 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
   | SIZR x => IZR (interp_pZexpr x)
   end.
+
+Search (_ -> TensorElem _). Search TupleTensorElem.
+Definition rich_interp_type t :=
+  match t with
+  | tZ => Z
+  | tB => bool
+  | tensor_n n => 
+  end.                       
+
+Fixpoint result_of_pATLexpr {n} (sz : list nat) (e : pATLexpr result_interp_type n) : Result.result :=
+  match e with
+  | Gen lo hi body =>
+      genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr (body x)))
+  | 
+      
 
 (*"unnatify" as in https://github.com/mit-plv/reification-by-parametricity/blob/d1bc17cf99a66e0268f655e28cdb375e712cd831/MiscIntro.v#L316 *)
 (*we probably don't even need the speed here, and furthermore i'm probably doing enough
@@ -703,9 +729,6 @@ Some (name',
 | Var x => None
 end.
 
-Check stringvar_ATLexpr. Check wf_ATLexpr. Print eval_expr.
-Print eval_expr.
-Check ctx_elt2. Check fold_right. Print ctx_elt2. Check add.
 Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type)) : valuation :=
   match ctx with
   | {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
@@ -721,33 +744,6 @@ Fixpoint ec_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type)) : expr_context
   | _ :: ctx' => ec_of ctx'
   | nil => $0
   end.
-
-Lemma mk_eval_gen v ctx i lo hi body loz hiz rl :
-  eval_Zexpr_Z v lo = Some loz ->
-  eval_Zexpr_Z v hi = Some hiz ->
-  length rl = Z.to_nat (hiz - loz) ->
-  (forall i', (loz <= i' < hiz)%Z ->
-         (~ i \in dom v) /\
-           (~ contains_substring "?" i) /\
-           match nth_error rl (Z.to_nat (i' - loz)) with
-           | None => False
-           | Some r =>  eval_expr (v $+ (i, i')) ctx body r
-           end) ->
-  eval_expr v ctx (ATLDeep.Gen i lo hi body) (Result.V rl).
-Proof.
-  intros Hlo Hhi Hlen Hbody. revert lo loz Hlen Hlo Hbody.
-  induction rl; intros lo loz Hlen Hlo Hbody.
-  - eapply EvalGenBase; eauto. simpl in Hlen. lia.
-  - simpl in Hlen.
-    pose proof (Hbody loz ltac:(lia)) as Hbody0. invs'.
-    replace (loz - loz)%Z with 0%Z in * by lia. simpl in *. invs'.
-    econstructor; eauto; try lia. eapply IHrl; eauto.
-    2: { simpl. rewrite Hlo. reflexivity. }
-    { lia. }
-    intros i' Hi'. specialize (Hbody i' ltac:(lia)). invs'. intuition.
-    replace (Z.to_nat (i' - loz)) with (S (Z.to_nat (i' - (loz + 1)))) in * by lia.
-    simpl in H7. apply H7.
-Qed.
 
 (* as usual, i miss coqutil.  map.of_list.. *)
 Lemma valuation_of_correct ctx x y :
@@ -789,19 +785,62 @@ Proof.
     rewrite dom_add. sets.
 Qed.
 
-Lemma stringvar_ATLexpr_correct ctx n e_nat e_shal name name' e_string :
+Lemma stringvar_ATLexpr_size_of ctx n e_nat e_shal name name' e_string :
+  wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
+  stringvar_ATLexpr name e_nat = Some (name', e_string) ->
+  size_of e_string (sizeof e_string).
+Proof.
+  intros H. revert name name' e_string. induction H; simpl; intros name name' e_string H';
+    repeat match goal with
+      | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
+          let E := fresh "E" in
+          destruct (stringvar_ATLexpr name e) as [(?&?)|] eqn:E; [|congruence]
+      end.
+  - invert H'. simpl. Print size_of. Abort.
+
+Print null.
+Search to_result.
+Print add_list_result.
+Search ATLDeep.Sum.
+Print to_result. Search "pad". Print Result.pad_list_result_to_shape. Search Result.pad_list_result_to_shape.
+(* Print invert_sum. *)
+(* Print eval_expr. Print Result.gen_pad. Print to_result. *)
+(* Definition x : dim_n (S O) := null. *)
+(* Goal x = x. *)
+(*   cbv [x]. cbv [null]. simpl. *)
+
+Lemma sum_list n f lo hi sz :
+  add_list_result sz (map (to_result n) (map f (zrange lo hi))) (to_result n (sumr lo hi f)).
+Proof.
+  rewrite zrange_seq. remember (Z.to_nat (hi - lo)) as k eqn:Ek. revert lo hi Ek.
+  induction k; intros lo hi Ek; simpl.
+  - constructor. cbv [sumr]. rewrite <- Ek. simpl.
+    (* Lemma to_result_null n : *)
+    (*   to_result n null = Result.ge *)
+    (* Search null. cbv [null]. *)
+    (* cbv [dim_n_TensorElem]. simpl. *)
+    (* simpl. *)
+    (* Opaque Result.gen_pad. *)
+    (* vm_compute. reflexivity. simpl. constructor. *)
+Abort.
+
+Lemma stringvar_ATLexpr_correct ctx n e_nat e_shal name name' e_string sz :
   wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
   map fst_ctx_elt ctx = rev (seq O name) ->
   stringvar_ATLexpr name e_nat = Some (name', e_string) ->
+  sound_sizeof e_string = Some sz ->
   eval_expr (valuation_of ctx) (ec_of ctx) e_string (to_result _ (interp_pATLexpr e_shal)).
 Proof.
-  intros H. revert name name' e_string.
-  induction H; cbn -[to_result] in *; intros name name' e_string Hctx H';
+  intros H. revert name name' e_string sz.
+  induction H; cbn -[to_result] in *; intros name name' e_string sz Hctx H' Hsz;
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
           let E := fresh "E" in
           destruct (stringvar_ATLexpr name e) as [(?&?)|] eqn:E; [|congruence]
       end;
+    invs';
+    simpl in Hsz;
+    repeat (destruct_one_match_hyp; try congruence; []);
     invs'.
   - simpl. eapply mk_eval_gen.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
@@ -817,6 +856,12 @@ Proof.
         apply in_seq in H2'. lia. }
       split.
       { apply no_question_marks. }
-      eapply H2; [|eassumption]. rewrite seq_S. rewrite rev_app_distr.
+      eapply H2; try eassumption. rewrite seq_S. rewrite rev_app_distr.
       simpl. f_equal. assumption.
-  - 
+  - eapply mk_eval_sum.
+    + apply sound_sizeof_size_of. eassumption.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
+      rewrite Hctx. apply NoDup_rev. Fail apply NoDup_seq. (*why*) apply seq_NoDup.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
+      rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
+    +  Print genr. Print gen_helper. Print sum_helper.

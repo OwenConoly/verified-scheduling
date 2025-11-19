@@ -415,3 +415,41 @@ Proof.
     simpl. rewrite IHn by lia. f_equal. lia.
 Qed.
 
+Lemma length_zrange min max :
+  length (zrange min max) = Z.to_nat (max - min).
+Proof.
+  cbv [zrange]. rewrite length_zrange'. reflexivity.
+Qed.
+
+Lemma zrange'_seq x n start :
+  zrange' x n = map (fun y => x + Z.of_nat y - Z.of_nat start)%Z (seq start n).
+Proof.
+  revert x start. induction n; simpl; auto. intros. f_equal; [lia|]. erewrite IHn.
+  apply map_ext. lia.
+Qed.
+
+Lemma zrange_seq min max :
+  zrange min max = map (fun y => min + Z.of_nat y)%Z (seq O (Z.to_nat (max - min))).
+Proof.
+  cbv [zrange]. erewrite zrange'_seq. apply map_ext. lia.
+Qed.
+
+Lemma nth_error_seq_Some n1 n2 n3 n4 :
+  nth_error (seq n1 n2) n3 = Some n4 ->
+  n4 = n1 + n3.
+Proof.
+  revert n1 n3 n4. induction n2; intros n1 n3 n4 H; simpl in *.
+  - destruct n3; discriminate H.
+  - destruct n3; simpl in H.
+    + invert H. lia.
+    + apply IHn2 in H. lia.
+Qed.
+
+Lemma nth_error_zrange_Some min max n x :
+  nth_error (zrange min max) n = Some x ->
+  x = (min + Z.of_nat n)%Z.
+Proof.
+  rewrite zrange_seq, nth_error_map. intros H.
+  destruct (nth_error _ _) eqn:E; simpl in H; try discriminate H.
+  apply nth_error_seq_Some in E. subst. invert H. lia.
+Qed.
