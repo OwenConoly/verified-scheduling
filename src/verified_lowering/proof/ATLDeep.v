@@ -146,16 +146,24 @@ Definition list_eqb {A: Type} (aeqb : A -> A -> bool) (x y : list A) : bool :=
 Lemma list_eqb_sound {A : Type} (aeqb : A -> A -> bool) x y :
   (forall x y, aeqb x y = true -> x = y) ->
   list_eqb aeqb x y = true -> x = y.
-Proof. Admitted.  
+Proof. Admitted.
+
+Inductive bin_tree {T : Type} :=
+| tree0 : bin_tree
+| tree1 : T -> bin_tree -> bin_tree
+| tree2 : bin_tree -> bin_tree -> bin_tree.
+Arguments bin_tree : clear implicits.
+
+Definition tree_eqb {T : Type} (teqb : T -> T -> bool) (x y : bin_tree T) : bool. Admitted.
 
 (*i want this for reification.  probably, all uses of sizeof could be replaced with
   sound_sizeof, but i will not bother.*)
 (*this is actually stronger than size_of.  it's like "hereditarily size_of"*)
-Fixpoint sound_sizeof (e : ATLexpr) : option (list nat) :=
+Fixpoint sound_sizeof (e : ATLexpr) : option (bin_tree nat) :=
   match e with
   | Gen i lo hi body =>
       match sound_sizeof body, eval_Zexpr_Z $0 (ZMinus hi lo) with
-      | Some sz, Some n => Some (Z.to_nat n :: sz)
+      | Some sz, Some n => Some (tree1 (Z.to_nat n) sz)
       | _, _ => None
       end
   | Sum i lo hi body =>
@@ -169,9 +177,9 @@ Fixpoint sound_sizeof (e : ATLexpr) : option (list nat) :=
       end
   | Concat x y =>
       match sound_sizeof x, sound_sizeof y with
-      | Some (nx :: restx), Some (ny :: resty) =>
-          if list_eqb Nat.eqb restx resty then
-            Some (nx + ny :: restx)
+      | Some (tree1 nx restx), Some (tree1 ny resty) =>
+          if tree_eqb Nat.eqb restx resty then
+            Some (tree1 (nx + ny) restx)
           else
             None
       | _, _ => None
