@@ -89,14 +89,11 @@ Definition stringvar_Zbop o :=
   | ZMod => Zexpr.ZMod
   end.
 
-(*supposed to be injective*)
-Locate "mod".
-Search string.
 Definition alphabet_string := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".
 Definition alphabet := nodup ascii_dec (List.remove ascii_dec "?"%char (list_ascii_of_string alphabet_string)).
+
 Search no_dup. About no_dup. (*why is this a thing?*)
 Search NoDup. Search nodup. Check nodup. Search nodup. Search NoDup.
-Search nat string.
 (*is this in stdlib?*)
 Fixpoint to_radix r fuel n :=
   match fuel with
@@ -265,16 +262,18 @@ Fixpoint stringvar_Z (e : pZexpr nat) : Zexpr :=
   | ZZopp x => Zexpr.ZMinus (ZLit 0) (stringvar_Z x)
   end.
 
-Fixpoint interp_pZexpr (e : pZexpr Z) : Z :=
+Fixpoint eval_pZexpr {var} (eval_var : var -> Z) (e : pZexpr var) : Z :=
   match e with
-  | ZBop o x y => interp_Zbop o (interp_pZexpr x) (interp_pZexpr y)
-  | ZVar x => x
+  | ZBop o x y => interp_Zbop o (eval_pZexpr eval_var x) (eval_pZexpr eval_var y)
+  | ZVar x => eval_var x
   | ZZ0 => 0
   | ZZpos p => Zpos p
   | ZZneg p => Zneg p
   | ZZ_of_nat n => Z.of_nat n
-  | ZZopp x => - interp_pZexpr x
+  | ZZopp x => - eval_pZexpr eval_var x
   end.
+
+Definition interp_pZexpr := eval_pZexpr (fun x => x).
 
 Variant Bbop := BLt | BLe | BEq.
 
@@ -529,33 +528,117 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type_R n) : interp_type_R (ten
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
   | SIZR x => IZR (interp_pZexpr x)
   end.
+Print interp_pZexpr.
+(*this shouldnnt be seaprate defn, sbouut be paremetericzed over intepr_var*)
+Definition sizeof_pZexpr {var} := eval_pZexpr (fun (_ : var) => 0%Z).
 
-Fixpoint interp_pATLexpr_with_size {n} (sz : list nat) (e : pATLexpr interp_type_with_pad n) : interp_type_with_pad (tensor_n n) :=
-  match e in pATLexpr _ n with
-  | @Gen _ n lo hi body =>
-      match sz with
-      | _ :: sz' =>
-          genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_size sz' (body x))
-      | _ => ([] : interp_type_with_pad (tensor_n (S n)))
-      end
+Fixpoint sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : list nat :=
+  match e with
+  | Gen lo hi body =>
+      Z.to_nat (sizeof_pZexpr hi - sizeof_pZexpr lo) :: (sizeof dummy (body (dummy _)))
   | Sum lo hi body =>
-      sumr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_size sz (body x))
-  | Guard b e1 => if (interp_pBexpr b) then (interp_pATLexpr_with_size sz e1) else null
-  | Lbind x f => let_binding (interp_pATLexpr_with_size x) (fun x0 => interp_pATLexpr_with_size (f x0))
-  | Concat x y => concat (interp_pATLexpr_with_size x) (interp_pATLexpr_with_size y)
-  | Flatten x => Common.flatten (interp_pATLexpr x)
-  | Split k x => tile (interp_pATLexpr x) k
-  | Transpose x => transpose (interp_pATLexpr x)
-  | Truncr k x => truncr k (interp_pATLexpr x)
-  | Truncl k x => truncl k (interp_pATLexpr x)
-  | Padl k x => pad_l k (interp_pATLexpr x)
-  | Padr k x => pad_r k (interp_pATLexpr x)
-  | Var x => x
-  | Get x idxs => gget_R (interp_pATLexpr x) (map interp_pZexpr idxs)
-  | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
-  | SIZR x => IZR (interp_pZexpr x)
+    sizeof dummy (body (dummy _))
+  | Guard p body =>
+    sizeof dummy body
+  | Lbind e1 e2 =>
+    sizeof dummy (e2 (dummy _))
+  | Concat x y =>
+    let sx := sizeof dummy x in
+    let sy := sizeof dummy y in
+    match sx, sy with
+    | n::rest, m :: rest' =>
+        n + m ::rest
+    | _, _ => [0]
+    end
+  | Flatten e =>
+    match sizeof dummy e with
+    | a::b::rest => a * b :: rest
+    | [] => [0]
+    | s => s
+    end
+  | Split k e =>
+    match sizeof dummy e with
+    | a::rest => a //n k :: k :: rest
+    | [] => [0]
+    end
+  | Transpose e =>
+    match sizeof dummy e with
+    | a::b::rest => b::a::rest
+    | [] => [0]
+    | s => s
+    end
+  | Truncr n e =>
+    match sizeof dummy e with
+    | m::rest  =>
+      m - n ::rest
+    | [] => [0]
+    end
+  | Truncl n e =>
+    match sizeof dummy e with
+    | m::rest  =>
+      m - n ::rest
+    | [] => [0]
+    end           
+  | Padr n e =>
+    match sizeof dummy e with
+    | m :: rest => m + n ::rest
+    | [] => [0]
+    end         
+  | Padl n e =>
+    match sizeof dummy e with
+    | m::rest  =>
+      m + n ::rest
+    | [] => [0]
+    end                  
+  | Var x => [0] (*should never hit this case*)
+  | Get _ _ | SBop _ _ _ | SIZR _ => []
   end.
 
+Definition dummy_with_pad t : interp_type_with_pad t :=
+  match t with
+  | tZ => 0%Z
+  | tB => false
+  | tensor_n n => null
+  end.
+Print eval_Sexpr.
+Print Sbop. Check Result.SS.
+Definition interp_Sbop_with_pad (o : Sbop) : option R -> option R -> option R. Admitted.
+(* wnat to use bin_scalar_result, but compatibility issues between option R and scalar_result *)
+(* match o with *)
+(* | Mul => bin_sca *)
+(* | Add => *)
+(* | Div => *)
+(* | Sub => *)
+(* end.     *)
+
+(*TODO: Guard case and sum case are wrong.*)
+(*just need to give sumr an appropriate base case and replace null in Guard with gen_pad (sizeof e)*)
+(*annoying thing is that i guess i need to stop using option R and use scalar_result instead... otherwise i have to work with an isomorphism between the two...*)
+(*nevermind, isomorphism is the right thing to do*)
+Print sumr.
+Print sum_helper.
+Fixpoint interp_pATLexpr_with_pad {n} (e : pATLexpr interp_type_with_pad n) : interp_type_with_pad (tensor_n n) :=
+  match e in pATLexpr _ n with
+  | @Gen _ n lo hi body =>
+      genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_pad (body x))
+  | Sum lo hi body =>
+      sumr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_pad (body x))
+  | Guard b e1 => if (interp_pBexpr b) then (interp_pATLexpr_with_pad e1) else null
+  | Lbind x f => let_binding (interp_pATLexpr_with_pad x) (fun x0 => interp_pATLexpr_with_pad (f x0))
+  | Concat x y => concat (interp_pATLexpr_with_pad x) (interp_pATLexpr_with_pad y)
+  | Flatten x => Common.flatten (interp_pATLexpr_with_pad x)
+  | Split k x => tile (interp_pATLexpr_with_pad x) k
+  | Transpose x => transpose (interp_pATLexpr_with_pad x)
+  | Truncr k x => truncr k (interp_pATLexpr_with_pad x)
+  | Truncl k x => truncl k (interp_pATLexpr_with_pad x)
+  | Padl k x => pad_l k (interp_pATLexpr_with_pad x)
+  | Padr k x => pad_r k (interp_pATLexpr_with_pad x)
+  | Var x => x
+  | Get x idxs => gget_with_pad (interp_pATLexpr_with_pad x) (map interp_pZexpr idxs)
+  | SBop o x y => interp_Sbop_with_pad o (interp_pATLexpr_with_pad x) (interp_pATLexpr_with_pad y)
+  | SIZR x => Some (IZR (interp_pZexpr x))
+  end.
+Print sumr.
 
 
 
