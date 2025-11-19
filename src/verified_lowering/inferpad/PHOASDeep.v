@@ -314,16 +314,14 @@ Fixpoint R_to_result n (x : dim_n_R n) : Result.result :=
   | O => fun x => Result.S (Result.SS x)
   end x.
 
-Fixpoint with_pad_to_result (sh : list nat) (x : dim_n_with_pad (length sh)) : Result.result :=
-  match sh return dim_n_with_pad (length sh) -> _ with
-  | len :: sh' =>
-      fun x => Result.V (map (with_pad_to_result sh') x)
-  | [] =>
-      fun x =>
-        match x with
-        | Some x' => Result.S (Result.SS x')
-        | None => Result.S Result.SX
-        end
+Fixpoint with_pad_to_result {n} (x : dim_n_with_pad n) : Result.result :=
+  match n return dim_n_with_pad n -> _ with
+  | S n' => fun x => Result.V (map with_pad_to_result x)
+  | O => fun x =>
+          match x with
+          | None => Result.S Result.SX
+          | Some x' => Result.S (Result.SS x')
+          end
   end x.
 
 Variant Sbop := Mul | Add | Div | Sub.
@@ -611,19 +609,32 @@ Definition interp_Sbop_with_pad (o : Sbop) : option R -> option R -> option R. A
 (* | Sub => *)
 (* end.     *)
 
-(*TODO: Guard case and sum case are wrong.*)
-(*just need to give sumr an appropriate base case and replace null in Guard with gen_pad (sizeof e)*)
-(*annoying thing is that i guess i need to stop using option R and use scalar_result instead... otherwise i have to work with an isomorphism between the two...*)
-(*nevermind, isomorphism is the right thing to do*)
-Print sumr.
-Print sum_helper.
+Definition sum_with_zero {X} `{TensorElem X} (zero : X) min max (f : _ -> X) : X :=
+  fold_right bin zero (map f (zrange min max)).
+
+Fixpoint gen_pad_tensor' sh : dim_n_with_pad (length sh) :=
+  match sh with
+  | [] => None
+  | x :: xs => repeat (gen_pad_tensor' xs) x
+  end.
+
+Fixpoint gen_pad_tensor {n} sh : dim_n_with_pad n :=
+  match n, sh return dim_n_with_pad n with
+  | S n', len :: sh' => repeat (gen_pad_tensor sh') len
+  | O, [] => None
+  | S n', _ => dummy_with_pad (tensor_n (S n'))
+  | O, _ => dummy_with_pad (tensor_n 0)
+  end.
+
+(*is quadratic*)
 Fixpoint interp_pATLexpr_with_pad {n} (e : pATLexpr interp_type_with_pad n) : interp_type_with_pad (tensor_n n) :=
   match e in pATLexpr _ n with
   | @Gen _ n lo hi body =>
       genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_pad (body x))
   | Sum lo hi body =>
-      sumr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_pad (body x))
-  | Guard b e1 => if (interp_pBexpr b) then (interp_pATLexpr_with_pad e1) else null
+      sum_with_zero (gen_pad_tensor (sizeof dummy_with_pad (body (dummy_with_pad _))))
+        (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_pad (body x))
+  | Guard b e1 => if (interp_pBexpr b) then (interp_pATLexpr_with_pad e1) else gen_pad_tensor (sizeof dummy_with_pad e1)
   | Lbind x f => let_binding (interp_pATLexpr_with_pad x) (fun x0 => interp_pATLexpr_with_pad (f x0))
   | Concat x y => concat (interp_pATLexpr_with_pad x) (interp_pATLexpr_with_pad y)
   | Flatten x => Common.flatten (interp_pATLexpr_with_pad x)
@@ -638,24 +649,6 @@ Fixpoint interp_pATLexpr_with_pad {n} (e : pATLexpr interp_type_with_pad n) : in
   | SBop o x y => interp_Sbop_with_pad o (interp_pATLexpr_with_pad x) (interp_pATLexpr_with_pad y)
   | SIZR x => Some (IZR (interp_pZexpr x))
   end.
-Print sumr.
-
-
-
-Search (_ -> TensorElem _). Search TupleTensorElem.
-Definition rich_interp_type t :=
-  match t with
-  | tZ => Z
-  | tB => bool
-  | tensor_n n => 
-  end.                       
-
-Fixpoint result_of_pATLexpr {n} (sz : list nat) (e : pATLexpr result_interp_type n) : Result.result :=
-  match e with
-  | Gen lo hi body =>
-      genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr (body x)))
-  | 
-      
 
 (*"unnatify" as in https://github.com/mit-plv/reification-by-parametricity/blob/d1bc17cf99a66e0268f655e28cdb375e712cd831/MiscIntro.v#L316 *)
 (*we probably don't even need the speed here, and furthermore i'm probably doing enough
@@ -868,7 +861,7 @@ Some (name',
 | Var x => None
 end.
 
-Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type)) : valuation :=
+Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type_with_pad)) : valuation :=
   match ctx with
   | {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
       valuation_of ctx' $+ (nat_to_string x, y)
@@ -876,10 +869,10 @@ Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type)) : valua
   | nil => $0
   end.
 
-Fixpoint ec_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type)) : expr_context :=
+Fixpoint ec_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type_with_pad)) : expr_context :=
   match ctx with
   | {| ctx_elt_t := tensor_n n; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
-      ec_of ctx' $+ (nat_to_string x, to_result _ y)
+      ec_of ctx' $+ (nat_to_string x, with_pad_to_result y)
   | _ :: ctx' => ec_of ctx'
   | nil => $0
   end.
@@ -906,10 +899,10 @@ Definition fst_ctx_elt {T var2} (elt : ctx_elt2 (fun _ => T) var2) :=
 
 Lemma stringvar_Z_correct ctx e_nat e_shal :
   NoDup (map fst_ctx_elt ctx) ->
-  wf_Zexpr (fun _ => nat) interp_type ctx e_nat e_shal ->
+  wf_Zexpr (fun _ => nat) interp_type_with_pad ctx e_nat e_shal ->
   eval_Zexpr (valuation_of ctx) (stringvar_Z e_nat) (interp_pZexpr e_shal).
 Proof.
-  intros H. induction 1; simpl; eauto.
+  intros H. cbv [interp_pZexpr]. induction 1; simpl; eauto.
   - destruct o; simpl; eauto.
   - constructor. apply valuation_of_correct; auto.
   - eenough (- _ = _)%Z as ->; [eauto|]. lia.
@@ -924,44 +917,116 @@ Proof.
     rewrite dom_add. sets.
 Qed.
 
-Lemma stringvar_ATLexpr_size_of ctx n e_nat e_shal name name' e_string :
-  wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
-  stringvar_ATLexpr name e_nat = Some (name', e_string) ->
-  size_of e_string (sizeof e_string).
+Lemma with_pad_to_result_gen_pad_tensor sz :
+  with_pad_to_result (n := (length sz)) (gen_pad_tensor sz) = Result.gen_pad sz.
 Proof.
-  intros H. revert name name' e_string. induction H; simpl; intros name name' e_string H';
-    repeat match goal with
-      | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
-          let E := fresh "E" in
-          destruct (stringvar_ATLexpr name e) as [(?&?)|] eqn:E; [|congruence]
-      end.
-  - invert H'. simpl. Print size_of. Abort.
+  induction sz; simpl; auto. f_equal. rewrite map_repeat. f_equal. assumption.
+Qed.
 
-Print null.
-Search to_result.
-Print add_list_result.
-Search ATLDeep.Sum.
-Print to_result. Search "pad". Print Result.pad_list_result_to_shape. Search Result.pad_list_result_to_shape.
-(* Print invert_sum. *)
-(* Print eval_expr. Print Result.gen_pad. Print to_result. *)
-(* Definition x : dim_n (S O) := null. *)
-(* Goal x = x. *)
-(*   cbv [x]. cbv [null]. simpl. *)
+Fail Lemma mk_add_result_V x y z :
+  Forall3 Result.add_result x y ->
+  Result.add_result x y.
+(* :( *)
 
-Lemma sum_list n f lo hi sz :
-  add_list_result sz (map (to_result n) (map f (zrange lo hi))) (to_result n (sumr lo hi f)).
+Inductive tensor_has_size : forall sh : list nat, dim_n_with_pad (length sh) -> Prop :=
+| has_size_S x :
+  @tensor_has_size [] x
+| has_size_V len sh x :
+  (forall x', In x' x -> tensor_has_size sh x') ->
+  tensor_has_size (len :: sh) x.
+(*cannot invert thing above*)
+
+Fixpoint Forall' {X} (P : X -> Prop) l :=
+  match l with
+  | a :: l' => P a /\ Forall' P l'
+  | [] => True
+  end.
+
+Fixpoint tensor_has_size' sh (x : dim_n_with_pad (length sh)) :=
+  match sh return dim_n_with_pad (length sh) -> _ with
+  | len :: sh' => fun x => length x = len /\ Forall' (tensor_has_size' sh') x
+  | [] => fun _ => True
+  end x.
+
+(*alternatively, tensor_has_size'' sh x := result_has_size sh (to_result x)*)
+
+Lemma add_result_with_pad_to_result sh x y :
+  tensor_has_size' sh x ->
+  tensor_has_size' sh y ->
+  Result.add_result (with_pad_to_result x) (with_pad_to_result y)
+    (with_pad_to_result (x <+> y)).
 Proof.
-  rewrite zrange_seq. remember (Z.to_nat (hi - lo)) as k eqn:Ek. revert lo hi Ek.
-  induction k; intros lo hi Ek; simpl.
-  - constructor. cbv [sumr]. rewrite <- Ek. simpl.
-    (* Lemma to_result_null n : *)
-    (*   to_result n null = Result.ge *)
-    (* Search null. cbv [null]. *)
-    (* cbv [dim_n_TensorElem]. simpl. *)
-    (* simpl. *)
-    (* Opaque Result.gen_pad. *)
-    (* vm_compute. reflexivity. simpl. constructor. *)
-Abort.
+  revert x y. induction sh; intros x y Hx Hy; simpl.
+  - destruct x, y; simpl; repeat constructor.
+  - (*would be so much easier if it were Forall3 something*)
+    simpl in x, y. constructor. revert a y Hx Hy.
+    induction x; intros len y Hx Hy.
+    + simpl in *. invs'. destruct y; [|discriminate H]. simpl. constructor.
+    + simpl in *. invs'. destruct y; [discriminate H|]. simpl in H, H0. invert H. invs'.
+      simpl. rewrite tensor_add_step by auto. simpl.
+      constructor.
+      -- apply IHsh; assumption.
+      -- eapply IHx; eauto.
+Qed.
+
+Lemma Forall_Forall' {X} (P : X -> _) l :
+  Forall P l ->
+  Forall' P l.
+Proof.
+  induction 1; simpl; eauto.
+Qed.
+  
+Lemma tensor_has_size'_gen_pad_tensor sz :
+  tensor_has_size' sz (gen_pad_tensor sz).
+Proof.
+  induction sz; simpl; auto. split.
+  - rewrite repeat_length. reflexivity.
+  - apply Forall_Forall'. apply Forall_repeat. assumption.
+Qed.
+
+Lemma tensor_has_size'_plus sh x y :
+  tensor_has_size' sh x ->
+  tensor_has_size' sh y ->
+  tensor_has_size' sh (x <+> y).
+Proof.
+  revert x y. induction sh; simpl; auto.
+  intros x y (Hx1&Hx2) (Hy1&Hy2).
+  subst. erewrite length_add_length by eauto. split; [reflexivity|].
+  (*should be easy if i characterize genr in terms of map and fold_right.*)
+  cbv [tensor_add gen genr]. Search gen_helper. Print gen_helper. cbv [gen_helper].
+Admitted.
+  
+  
+
+Lemma size_of_sum sz l :
+  Forall (tensor_has_size' sz) l ->
+  tensor_has_size' sz (fold_right bin (gen_pad_tensor sz) l).
+Proof.
+  induction 1; simpl.
+  - apply tensor_has_size'_gen_pad_tensor.
+  - apply tensor_has_size'_plus; auto.
+Qed.
+        
+Lemma sum_list' sz l :
+  Forall (tensor_has_size' sz) l ->
+  add_list_result sz (map with_pad_to_result l)
+    (with_pad_to_result (n := length sz) (fold_right bin (gen_pad_tensor sz) l)).
+Proof.
+  induction 1.
+  - simpl. constructor. auto using with_pad_to_result_gen_pad_tensor.
+  - simpl. econstructor.
+    + apply IHForall.
+    + apply add_result_with_pad_to_result; auto. apply size_of_sum. assumption.
+Qed.
+
+Lemma sum_list sz f lo hi :
+  (forall x, tensor_has_size' sz (f x)) ->
+  add_list_result sz (map with_pad_to_result (map f (zrange lo hi)))
+    (with_pad_to_result (n := length sz) (sum_with_zero (gen_pad_tensor sz) lo hi f)).
+Proof.
+  cbv [sum_with_zero]. intros. apply sum_list'. apply Forall_map. rewrite zrange_seq.
+  apply Forall_map. apply Forall_forall. auto.
+Qed.
 
 Lemma stringvar_ATLexpr_correct ctx n e_nat e_shal name name' e_string sz :
   wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
