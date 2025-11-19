@@ -34,18 +34,27 @@ Inductive type :=
 | tB
 | tensor_n (n : nat).
 
-Fixpoint dim_n n :=
+Fixpoint dim_n_R n :=
   match n with
   | O => R
-  | Datatypes.S n' => list (dim_n n')
+  | S n' => list (dim_n_R n')
   end.
 
-Definition interp_type t : Type :=
+Fixpoint dim_n_with_pad n :=
+  match n with
+  | O => option R
+  | S n' => list (dim_n_with_pad n')
+  end.
+
+Definition interp_type dim_n t : Type :=
   match t with
   | tZ => Z
   | tB => bool
   | tensor_n n => dim_n n
   end.
+
+Definition interp_type_R := interp_type dim_n_R.
+Definition interp_type_with_pad := interp_type dim_n_with_pad.
 
 Variant Zbop := ZPlus | ZMinus | ZTimes | ZDivf | ZDivc | ZMod.
 
@@ -300,22 +309,23 @@ Fixpoint interp_pBexpr (e : pBexpr Z) : bool :=
   | BAnd x y => interp_pBexpr x && interp_pBexpr y
   end.
 
-Fixpoint to_result n (x : dim_n n) : Result.result :=
-  match n return dim_n n -> Result.result with
-  | Datatypes.S n' => fun x => Result.V (map (to_result _) x)
+Fixpoint R_to_result n (x : dim_n_R n) : Result.result :=
+  match n return dim_n_R n -> Result.result with
+  | S n' => fun x => Result.V (map (R_to_result _) x)
   | O => fun x => Result.S (Result.SS x)
   end x.
 
-Print Result.gen_pad.
-Definition x := @null (dim_n O) _.
-Goal x = x. cbv [x null]. simpl. Abort.
-(* Fixpoint to_result_of_shape n (e : pATLexpr (x : dim_n (length sh)) : Result.result := *)
-(*   match sh return dim_n (length sh) -> Result.result with *)
-(*   | [] => fun x => Result.S (Result.SS x) *)
-(*   | x :: xs => fun x => *)
-(*                match x with *)
-(*                | [] => gen_pad (x :: xs) *)
-(*                | _ => Result.V (map (to_result xs) *)
+Fixpoint with_pad_to_result (sh : list nat) (x : dim_n_with_pad (length sh)) : Result.result :=
+  match sh return dim_n_with_pad (length sh) -> _ with
+  | len :: sh' =>
+      fun x => Result.V (map (with_pad_to_result sh') x)
+  | [] =>
+      fun x =>
+        match x with
+        | Some x' => Result.S (Result.SS x')
+        | None => Result.S Result.SX
+        end
+  end x.
 
 Variant Sbop := Mul | Add | Div | Sub.
 
@@ -335,22 +345,38 @@ Definition stringvar_Sbop o :=
   | Sub => Sexpr.Sub
   end.
 
-Fixpoint dim_n_TensorElem n : TensorElem (dim_n n) :=
-  match n return TensorElem (dim_n n) with
-  | Datatypes.S n => @TensorTensorElem _ (dim_n_TensorElem n)
+Fixpoint dim_n_R_TensorElem n : TensorElem (dim_n_R n) :=
+  match n return TensorElem (dim_n_R n) with
+  | S n => TensorTensorElem (*_ (dim_n_R_TensorElem n)*)
   | O => RTensorElem
   end.
+Existing Instance dim_n_R_TensorElem.
 
-Existing Instance dim_n_TensorElem.
+Fixpoint dim_n_with_pad_TensorElem n : TensorElem (dim_n_with_pad n) :=
+  match n return TensorElem (dim_n_with_pad n) with
+  | S n => TensorTensorElem (*_ (@TensorTensorElem _ (dim_n_with_pad_TensorElem n))*)
+  | O => OptionTensorElem
+  end.
+Existing Instance dim_n_with_pad_TensorElem.
 
 Goal forall n m , S n - S m = n - m. reflexivity. (*hooray*) Abort.
 
-Fixpoint gget {n} (v : dim_n n) (idxs : list Z) :=
-  match n, idxs return dim_n n -> R with
+(*all the other language constructs fit beautifully in the TensorElem thing, but not this one... yet?*)
+(*nope this one should work out fine.  will do it in a bit.*)
+Fixpoint gget_R {n} (v : dim_n_R n) (idxs : list Z) :=
+  match n, idxs return dim_n_R n -> R with
   | S n', idx :: idxs' =>
-      fun v => gget (get v idx) idxs'
+      fun v => gget_R (get v idx) idxs'
   | O, _ => fun v => v
-  | _, _ => fun v => 0%R
+  | _, _ => fun v => 0%R (*garbage*)
+  end v.
+
+Fixpoint gget_with_pad {n} (v : dim_n_with_pad n) (idxs : list Z) :=
+  match n, idxs return dim_n_with_pad n -> option R with
+  | S n', idx :: idxs' =>
+      fun v => gget_with_pad (get v idx) idxs'
+  | O, _ => fun v => v
+  | _, _ => fun v => None
   end v.
 
 (*the dependent types aren't too tricky here, but i could imagine it getting bad (?)...
@@ -481,7 +507,8 @@ Definition pATLExpr n := forall var, pATLexpr var n.
 Definition Wf_ATLExpr {n} (e : pATLExpr n) :=
   forall var1 var2, wf_ATLexpr var1 var2 [] _ (e var1) (e var2).
 
-Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_n n) :=
+(*TODO should be able to replace this and the next function by just one fucntion*)
+Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type_R n) : interp_type_R (tensor_n n) :=
   match e with
   | Gen lo hi body =>
       genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr (body x))
@@ -498,10 +525,39 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   | Padl k x => pad_l k (interp_pATLexpr x)
   | Padr k x => pad_r k (interp_pATLexpr x)
   | Var x => x
-  | Get x idxs => gget (interp_pATLexpr x) (map interp_pZexpr idxs)
+  | Get x idxs => gget_R (interp_pATLexpr x) (map interp_pZexpr idxs)
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
   | SIZR x => IZR (interp_pZexpr x)
   end.
+
+Fixpoint interp_pATLexpr_with_size {n} (sz : list nat) (e : pATLexpr interp_type_with_pad n) : interp_type_with_pad (tensor_n n) :=
+  match e in pATLexpr _ n with
+  | @Gen _ n lo hi body =>
+      match sz with
+      | _ :: sz' =>
+          genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_size sz' (body x))
+      | _ => ([] : interp_type_with_pad (tensor_n (S n)))
+      end
+  | Sum lo hi body =>
+      sumr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr_with_size sz (body x))
+  | Guard b e1 => if (interp_pBexpr b) then (interp_pATLexpr_with_size sz e1) else null
+  | Lbind x f => let_binding (interp_pATLexpr_with_size x) (fun x0 => interp_pATLexpr_with_size (f x0))
+  | Concat x y => concat (interp_pATLexpr_with_size x) (interp_pATLexpr_with_size y)
+  | Flatten x => Common.flatten (interp_pATLexpr x)
+  | Split k x => tile (interp_pATLexpr x) k
+  | Transpose x => transpose (interp_pATLexpr x)
+  | Truncr k x => truncr k (interp_pATLexpr x)
+  | Truncl k x => truncl k (interp_pATLexpr x)
+  | Padl k x => pad_l k (interp_pATLexpr x)
+  | Padr k x => pad_r k (interp_pATLexpr x)
+  | Var x => x
+  | Get x idxs => gget_R (interp_pATLexpr x) (map interp_pZexpr idxs)
+  | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
+  | SIZR x => IZR (interp_pZexpr x)
+  end.
+
+
+
 
 Search (_ -> TensorElem _). Search TupleTensorElem.
 Definition rich_interp_type t :=
