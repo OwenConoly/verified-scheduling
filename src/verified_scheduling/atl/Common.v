@@ -34,15 +34,6 @@ Definition to_val {X} `{TensorElem X} (opt : option X) : X :=
   | Some v => v
   end.
 
-Lemma nth_map {X} `{TensorElem X} : forall i f v,
-    i < length v ->
-    @nth_error X (List.map f v) i = Some (f (to_val (nth_error v i))).
-Proof.
-  induction i; intros f v H0; destruct v; simpl in *;
-    try contra_crush; auto.
-  apply IHi. lia.
-Qed.
-
 (* Hole Establishing and Context Diving *)
 
 Lemma concat_eq_l {X} `{TensorElem X} :
@@ -2703,7 +2694,7 @@ Proof.
      + destruct e.
        simpl in ie. lia.
        simpl. auto.
-     + simpl in *. rewrite nth_map by (zify; lia).
+     + simpl in *. rewrite nth_error_map by (zify; lia).
        destruct e. simpl in *. lia.
        simpl.
        unfold to_val.
