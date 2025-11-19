@@ -15,10 +15,14 @@ Import ListNotations.
 
 Set Warnings "-omega-is-deprecated,-deprecated".
 
-From Codegen Require Import IdentParsing NatToString IntToString Normalize CodeGen.
-From Lower Require Import ATLDeep Sexpr Zexpr Bexpr.
-From ATL Require Import FrapWithoutSets ATL Common CommonTactics Div Map Sets Var.
-About In. (*why :( *)
+From ATL Require Import Common Map Sets FrapWithoutSets Div Tactics ATL.
+From Lower Require Import Zexpr Bexpr Array Range Sexpr ListMisc
+  Meshgrid VarGeneration Injective Constant InterpretReindexer
+  WellFormedEnvironment ATLDeep.
+(* From Codegen Require Import IdentParsing NatToString IntToString Normalize CodeGen. *)
+(* From Lower Require Import ATLDeep Sexpr Zexpr Bexpr. *)
+(* From ATL Require Import FrapWithoutSets Sets Div Map Sets Var ATL Common CommonTactics. *)
+(* (* About In. (*why :( *) *) *)
 
 Open Scope string_scope.
 
@@ -77,7 +81,155 @@ Definition stringvar_Zbop o :=
   end.
 
 (*supposed to be injective*)
-Definition nat_to_string (n : nat) : string. Admitted.
+Locate "mod".
+Search string.
+Definition alphabet_string := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".
+Definition alphabet := nodup ascii_dec (List.remove ascii_dec "?"%char (list_ascii_of_string alphabet_string)).
+Search no_dup. About no_dup. (*why is this a thing?*)
+Search NoDup. Search nodup. Check nodup. Search nodup. Search NoDup.
+Search nat string.
+(*is this in stdlib?*)
+Fixpoint to_radix r fuel n :=
+  match fuel with
+  | S fuel' => n mod r :: to_radix r fuel' (n / r)
+  | O => nil
+  end.
+
+Fixpoint from_radix r n :=
+  match n with
+  | n0 :: n' => n0 + r * from_radix r n'
+  | [] => O
+  end.
+
+Lemma from_radix_to_radix r fuel n :
+  n <= fuel ->
+  1 < r ->
+  from_radix r (to_radix r fuel n) = n.
+Proof.
+  intros Hn Hr. revert n Hn. induction fuel; intros n Hn.
+  - simpl. lia.
+  - simpl.
+    rewrite IHfuel.
+    + rewrite (Nat.div_mod_eq n r) at 3. lia.
+    + rewrite (Nat.div_mod_eq n r) in Hn.
+      remember (n / r) as k eqn:Ek. clear Ek. assert (k + k <= r * k).
+      { destruct r; try lia. destruct r; lia. }
+      lia.
+Qed.
+
+Lemma to_radix_injective r n m :
+  1 < r ->
+  to_radix r n n = to_radix r m m ->
+  n = m.
+Proof.
+  intros ? H.
+  rewrite <- (from_radix_to_radix r n n) by lia.
+  rewrite <- (from_radix_to_radix r m m) by lia.
+  rewrite H.
+  reflexivity.
+Qed.
+
+Lemma to_radix_small r fuel n :
+  1 <= r ->
+  Forall (fun digit => digit < r) (to_radix r fuel n).
+Proof.
+  intros Hr. revert n. induction fuel; simpl; intros; constructor; auto.
+  apply Nat.mod_upper_bound. lia.
+Qed.  
+
+Definition encode {T} (default : T) (alphabet : list T) (n : list nat) :=
+  map (fun digit => nth_default default alphabet digit) n.
+
+Lemma encode_injective {T} n m default (alphabet : list T) :
+  NoDup alphabet ->
+  Forall (fun digit => digit < length alphabet) n ->
+  Forall (fun digit => digit < length alphabet) m ->
+  encode default alphabet n = encode default alphabet m ->
+  n = m.
+Proof.
+  intros Ha Hn. revert m. induction n; simpl; intros m Hm Hnm.
+  - destruct m; [|discriminate Hnm]. reflexivity.
+  - destruct m; [discriminate Hnm|]. simpl in Hnm.
+    cbv [nth_default] in Hnm. invert Hnm. invert Hn. invert Hm.
+    f_equal; eauto; []. clear IHn.
+    rewrite NoDup_nth_error in Ha. apply Ha; auto.
+    destruct (nth_error _ _) eqn:E; [|apply nth_error_None in E; lia].
+    clear E.
+    destruct (nth_error _ _) eqn:E; [|apply nth_error_None in E; lia].
+    clear E. subst. reflexivity.
+Qed.
+
+Lemma encode_In {T} n default (alphabet : list T) :
+  Forall (fun digit => digit < length alphabet) n ->
+  Forall (fun digit => In digit alphabet) (encode default alphabet n).
+Proof.
+  intros H. induction H; simpl; constructor; auto.
+  cbv [nth_default]. destruct (nth_error _ _) eqn:E.
+  - apply nth_error_In in E. apply E.
+  - apply nth_error_None in E. lia.
+Qed.
+  
+Definition nat_to_string n :=
+  string_of_list_ascii (encode (ascii_of_nat O) alphabet (to_radix (length alphabet) n n)).
+
+Lemma alphabet_long : 2 <= length alphabet.
+Proof. vm_compute. lia. Qed.
+
+Lemma string_of_list_ascii_injective n m :
+  string_of_list_ascii n = string_of_list_ascii m ->
+  n = m.
+Proof.
+  intros H.
+  rewrite <- (list_ascii_of_string_of_list_ascii n).
+  rewrite <- (list_ascii_of_string_of_list_ascii m).
+  rewrite H.
+  reflexivity.
+Qed.
+
+Lemma nat_to_string_injective x y :
+  nat_to_string x = nat_to_string y ->
+  x = y.
+Proof.
+  cbv [nat_to_string]. intros. pose proof alphabet_long.
+  eapply to_radix_injective; cycle 1.
+  - eapply encode_injective; cycle -1.
+    + apply string_of_list_ascii_injective. eassumption.
+    + cbv [alphabet]. apply NoDup_nodup.
+    + apply to_radix_small. lia.
+    + apply to_radix_small. lia.
+  - lia.
+Qed.
+Search ascii string substring.
+Search substring.
+
+Lemma contains_substring_In c s :
+  contains_substring (String c EmptyString) s ->
+  In c (list_ascii_of_string s).
+Proof.
+  intros H. cbv [contains_substring] in H. destruct H as [n H].
+  revert n H. induction s; intros n H; simpl in H.
+  - destruct n; discriminate H.
+  - rewrite substring0 in H. destruct n; simpl in *.
+    + invert H. auto.
+    + eauto.
+Qed.
+  
+Lemma nat_to_string_In x :
+  Forall (fun digit => In digit alphabet) (list_ascii_of_string (nat_to_string x)).
+Proof.
+  cbv [nat_to_string]. rewrite list_ascii_of_string_of_list_ascii.
+  apply encode_In. apply to_radix_small. pose proof alphabet_long. lia.
+Qed.
+
+Opaque alphabet_string. (*Qed is slow otherwise, not sure why*)
+Lemma no_question_marks n :
+  ~ contains_substring "?" (nat_to_string n).
+Proof.
+  intros H. apply contains_substring_In in H.
+  eapply Forall_forall in H; [|apply nat_to_string_In]. cbv beta in H.
+  cbv [alphabet] in H. apply nodup_In in H.
+  apply in_remove in H. destruct H as (_&H). congruence.
+Qed.
 
 Fixpoint stringvar_ZLit (e : pZexpr nat) : option Z :=
   match e with
@@ -597,11 +749,6 @@ Proof.
     simpl in H7. apply H7.
 Qed.
 
-Lemma nat_to_string_injective x y :
-  nat_to_string x = nat_to_string y ->
-  x = y.
-Proof. Admitted.
-
 (* as usual, i miss coqutil.  map.of_list.. *)
 Lemma valuation_of_correct ctx x y :
   NoDup (@map _ nat (fun elt => elt.(ctx_elt_p1 _ _)) ctx) ->
@@ -619,8 +766,11 @@ Proof.
       split; [|eassumption]. reflexivity.
 Qed.
 
+Definition fst_ctx_elt {T var2} (elt : ctx_elt2 (fun _ => T) var2) :=
+  elt.(ctx_elt_p1 _ _).
+
 Lemma stringvar_Z_correct ctx e_nat e_shal :
-  NoDup (@map _ nat (fun elt => elt.(ctx_elt_p1 _ _)) ctx) ->
+  NoDup (map fst_ctx_elt ctx) ->
   wf_Zexpr (fun _ => nat) interp_type ctx e_nat e_shal ->
   eval_Zexpr (valuation_of ctx) (stringvar_Z e_nat) (interp_pZexpr e_shal).
 Proof.
@@ -630,28 +780,43 @@ Proof.
   - eenough (- _ = _)%Z as ->; [eauto|]. lia.
 Qed.
 
+Lemma dom_valuation_of ctx :
+  dom (valuation_of ctx) \subseteq constant (map nat_to_string (map fst_ctx_elt ctx)).
+Proof.
+  induction ctx; simpl.
+  - rewrite dom_empty. sets.
+  - destruct a. simpl. destruct ctx_elt_t1; try solve[sets]. 
+    rewrite dom_add. sets.
+Qed.
+
 Lemma stringvar_ATLexpr_correct ctx n e_nat e_shal name name' e_string :
   wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
-  @map _ nat (fun elt => elt.(ctx_elt_p1 _ _)) ctx = rev (seq O name) ->
+  map fst_ctx_elt ctx = rev (seq O name) ->
   stringvar_ATLexpr name e_nat = Some (name', e_string) ->
   eval_expr (valuation_of ctx) (ec_of ctx) e_string (to_result _ (interp_pATLexpr e_shal)).
 Proof.
-  intros H. revert name name' e_string. induction H; cbn -[to_result] in *; intros;
+  intros H. revert name name' e_string.
+  induction H; cbn -[to_result] in *; intros name name' e_string Hctx H';
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
           let E := fresh "E" in
-          destruct (stringvar_ATLexpr name e) as [(?&?)|] eqn:E
+          destruct (stringvar_ATLexpr name e) as [(?&?)|] eqn:E; [|congruence]
       end;
     invs'.
   - simpl. eapply mk_eval_gen.
-    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto. admit.
-    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto. admit.
-    + rewrite length_map. Search length genr. rewrite genr_length. reflexivity.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
+      rewrite Hctx. apply NoDup_rev. Fail apply NoDup_seq. (*why*) apply seq_NoDup.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
+      rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
+    + rewrite length_map. rewrite genr_length. reflexivity.
     + intros i' Hi'. rewrite nth_error_map. rewrite nth_error_genr_Some by lia.
       simpl. replace (_ + _)%Z with i' by lia. split.
-      { admit. }
+      { intros H''. apply dom_valuation_of in H''. apply in_map_iff in H''.
+        rewrite Hctx in H''. destruct H'' as (x&H1'&H2').
+        apply nat_to_string_injective in H1'. subst. apply in_rev in H2'.
+        apply in_seq in H2'. lia. }
       split.
-      { admit. }
-      eapply H2; [|eassumption]. Search seq S. rewrite seq_S. rewrite rev_app_distr.
+      { apply no_question_marks. }
+      eapply H2; [|eassumption]. rewrite seq_S. rewrite rev_app_distr.
       simpl. f_equal. assumption.
   - 
