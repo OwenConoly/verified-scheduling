@@ -984,6 +984,42 @@ Proof.
   - apply Forall_Forall'. apply Forall_repeat. assumption.
 Qed.
 
+Lemma gen_helper_is_map {X} `{TensorElem X} n x f :
+  gen_helper n x f = map f (map (fun y => x + Z.of_nat y)%Z (seq O n)).
+Proof.
+  revert f x.
+  induction n; intros f x; simpl; try reflexivity. f_equal.
+  - f_equal. lia.
+  - rewrite IHn. do 2 rewrite map_map. rewrite <- seq_shift. rewrite map_map.
+    apply map_ext. intros. f_equal. lia.
+Qed.
+
+Lemma genr_is_map {X} `{TensorElem X} min max f :
+  genr min max f = map f (zrange min max).
+Proof.
+  cbv [genr]. rewrite gen_helper_is_map. rewrite zrange_seq. reflexivity.
+Qed.
+
+Lemma Forall'_Forall {X} (P : X -> _) l :
+  Forall' P l ->
+  Forall P l.
+Proof.
+  induction l; simpl; intros; invs'; eauto.
+Qed.
+
+Print get.
+
+Lemma get_is_nth_error {X} `{TensorElem X} (v : list X) i :
+  (0 <= i < Z.of_nat (length v))%Z ->
+  nth_error v (Z.to_nat i) = Some (get v i).
+Proof.
+  intros H'. cbv [get]. destruct v; simpl in *; [lia|].
+  destruct i; simpl in *; try lia.
+  - reflexivity.
+  - destruct (nth_error _ _) eqn:E; [reflexivity|].
+    apply nth_error_None in E. simpl in *. lia.
+Qed.
+
 Lemma tensor_has_size'_plus sh x y :
   tensor_has_size' sh x ->
   tensor_has_size' sh y ->
@@ -993,10 +1029,21 @@ Proof.
   intros x y (Hx1&Hx2) (Hy1&Hy2).
   subst. erewrite length_add_length by eauto. split; [reflexivity|].
   (*should be easy if i characterize genr in terms of map and fold_right.*)
-  cbv [tensor_add gen genr]. Search gen_helper. Print gen_helper. cbv [gen_helper].
-Admitted.
-  
-  
+  cbv [tensor_add].
+  eassert (Nat.max _ _ = length x) as ->.
+  { Fail lia. Fail rewrite Hy1.
+    cbv [Datatypes.length dim_n_with_pad] in *. rewrite Hy1. lia. }
+  cbv [gen]. rewrite genr_is_map. apply Forall_Forall'.
+  apply Forall'_Forall in Hx2, Hy2. rewrite zrange_seq.
+  rewrite map_map. apply Forall_map. apply Forall_forall.
+  intros z Hz. apply in_seq in Hz.
+  pose proof (get_is_nth_error x (Z.of_nat z) ltac:(lia)) as Hx.
+  pose proof (get_is_nth_error y (Z.of_nat z)) as Hy.
+  eassert _ as blah. 2: specialize (Hy blah).
+  { cbv [Datatypes.length dim_n_with_pad] in *. rewrite Hy1. lia. }
+  apply nth_error_In in Hx, Hy. rewrite Forall_forall in Hx2, Hy2.
+  apply Hx2 in Hx. apply Hy2 in Hy. apply IHsh; assumption.
+Qed.
 
 Lemma size_of_sum sz l :
   Forall (tensor_has_size' sz) l ->
@@ -1029,14 +1076,14 @@ Proof.
 Qed.
 
 Lemma stringvar_ATLexpr_correct ctx n e_nat e_shal name name' e_string sz :
-  wf_ATLexpr (fun _ => nat) interp_type ctx n e_nat e_shal ->
+  wf_ATLexpr (fun _ => nat) interp_type_with_pad ctx n e_nat e_shal ->
   map fst_ctx_elt ctx = rev (seq O name) ->
   stringvar_ATLexpr name e_nat = Some (name', e_string) ->
   sound_sizeof e_string = Some sz ->
-  eval_expr (valuation_of ctx) (ec_of ctx) e_string (to_result _ (interp_pATLexpr e_shal)).
+  eval_expr (valuation_of ctx) (ec_of ctx) e_string (with_pad_to_result (interp_pATLexpr_with_pad e_shal)).
 Proof.
   intros H. revert name name' e_string sz.
-  induction H; cbn -[to_result] in *; intros name name' e_string sz Hctx H' Hsz;
+  induction H; cbn -[with_pad_to_result] in *; intros name name' e_string sz Hctx H' Hsz;
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
           let E := fresh "E" in
@@ -1062,10 +1109,16 @@ Proof.
       { apply no_question_marks. }
       eapply H2; try eassumption. rewrite seq_S. rewrite rev_app_distr.
       simpl. f_equal. assumption.
-  - eapply mk_eval_sum.
+  - remember (sizeof _ _) as x.
+    assert (n = length x) as ->.
+    { admit. }
+    assert (x = sz) as ->.
+    { admit. }
+    eapply mk_eval_sum.
     + apply sound_sizeof_size_of. eassumption.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
       rewrite Hctx. apply NoDup_rev. Fail apply NoDup_seq. (*why*) apply seq_NoDup.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
       rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
-    +  Print genr. Print gen_helper. Print sum_helper.
+    + apply sum_list.
+      replace n with (length sz). apply sum_list. Check sum_list. apply sum_list. Print genr. Print gen_helper. Print sum_helper.
