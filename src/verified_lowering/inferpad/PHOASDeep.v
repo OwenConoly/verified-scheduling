@@ -1120,5 +1120,7 @@ Proof.
       rewrite Hctx. apply NoDup_rev. Fail apply NoDup_seq. (*why*) apply seq_NoDup.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
       rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
-    + apply sum_list.
+    + apply sum_list. Fail rewrite Heqx.
+      (*ugh, maybe i hsould make tensor_has_size' less dependently typed*)
+      Set Printing All. rewrite Heqx.
       replace n with (length sz). apply sum_list. Check sum_list. apply sum_list. Print genr. Print gen_helper. Print sum_helper.
