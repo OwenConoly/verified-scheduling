@@ -1912,8 +1912,8 @@ Lemma gen_mul_distr : forall n f g,
 Proof. intros. apply gen_helper_mul_distr. Qed.
 
 Lemma tensor_consistent_forall_consistent {X} `{TensorElem X} :
-  forall s (l : list X),
-    consistent l (length l,s) -> Forall (fun x => consistent x s) l.
+  forall s n (l : list X),
+    consistent l (n,s) -> Forall (fun x => consistent x s) l.
 Proof.
   intros.
   inversion H0. subst.
