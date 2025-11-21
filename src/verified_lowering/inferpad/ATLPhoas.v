@@ -989,6 +989,15 @@ Proof.
     rewrite dom_add. sets.
 Qed.
 
+Lemma dom_ec_of ctx :
+  dom (ec_of ctx) \subseteq constant (map nat_to_string (map fst_ctx_elt ctx)).
+Proof.
+  induction ctx; simpl.
+  - rewrite dom_empty. sets.
+  - destruct a. simpl. destruct ctx_elt_t1; try solve[sets]. 
+    rewrite dom_add. sets.
+Qed.
+
 Fail Lemma mk_add_result_V x y z :
   Forall3 Result.add_result x y ->
   Result.add_result x y.
@@ -1366,6 +1375,57 @@ Proof.
   Search (_ <? _ = false)%nat. apply Nat.ltb_ge in E. lia.
 Qed.
 
+Hint Extern 5 (_ <= _)%nat => lia.
+Hint Extern 5 (_ <= _ < _)%nat => lia.
+Hint Extern 5 (_ < _)%nat => lia.
+
+Lemma name_gets_bigger n (e : pATLexpr _ n) name name' e_string :
+  stringvar_ATLexpr name e = Some (name', e_string) ->
+  name <= name'.
+Proof.
+  revert name name' e_string. induction e;
+    simpl; intros name name' e_string He;
+    repeat (destruct_one_match_hyp; simpl in *; try congruence; []); invs';
+    repeat match goal with
+      | H1: _, H2: stringvar_ATLexpr _ _ = _ |- _ => apply H1 in H2
+      end; lia || congruence.
+Qed.
+    
+Lemma vars_of_stringvar_ATLexpr n name (e : pATLexpr _ n) name' e_string :
+  stringvar_ATLexpr name e = Some (name', e_string) ->
+  (forall str,
+      vars_of e_string str ->
+      exists n,
+        str = nat_to_string n /\
+          name <= n < name').
+Proof.
+  revert name name' e_string. induction e;
+    simpl; intros name name' e_string He str Hvars;
+    repeat (destruct_one_match_hyp; simpl in *; try congruence; []); invs';
+    simpl in *;
+    try lazymatch goal with
+      | H1: stringvar_ATLexpr _ _ = _ , H2: stringvar_ATLexpr _ _ = _ |- _ =>
+          pose proof H1 as H1'; pose proof H2 as H2';
+          apply name_gets_bigger in H1', H2'
+      | H1: stringvar_ATLexpr _ _ = _ |- _ =>
+          pose proof H1 as H1'; apply name_gets_bigger in H1'
+      end;
+    repeat (destruct Hvars as [Hvars|Hvars]);
+    subst;
+    try contradiction || congruence || solve[eauto];
+    try match goal with
+      | H1: _, H2: stringvar_ATLexpr _ _ = _ |- _ =>
+          eapply H1 in H2; solve[invs'; eauto]
+      end.
+Qed.
+
+Ltac nts_inj :=
+  repeat match goal with
+    | H: nat_to_string _ = nat_to_string _ |- _ => apply nat_to_string_injective in H
+    end.
+
+Ltac invs'' := invs'; nts_inj; subst.
+
 Hint Resolve dummy_result : core.
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
@@ -1437,11 +1497,25 @@ Proof.
       -- cbv [sizeof]. simpl. erewrite <- sound_sizeof_wf.
          2: solve[eauto]. rewrite Hsz. eapply sound_sizeof_size_of; eauto.
          apply dummy_result.
-  - destruct l. (*size of e1*)
+  - pose proof E0 as E0'. pose proof E2 as E2'.
+    apply name_gets_bigger in E0', E2'.
+    pose proof (vars_of_stringvar_ATLexpr _ _ _ _ _ E0) as E0''.
+    pose proof (vars_of_stringvar_ATLexpr _ _ _ _ _ E2) as E2''.
+    destruct l. (*size of e1*)
     + eapply EvalLbindS.
       -- eapply sound_sizeof_size_of. 4: eassumption. all: eauto. apply dummy_result.
+      -- apply None_dom_lookup. intros H'. apply dom_ec_of in H'.
+         apply in_map_iff in H'. destruct H' as (x&H1'&H2').
+         apply nat_to_string_injective in H1'. subst.
+         rewrite Hctx in H2'. apply in_rev in H2'. apply in_seq in H2'. lia.
+      -- split; intros H'.
+         ++ apply E0'' in H'. invs''. lia.
+         ++ apply E2'' in H'. invs''. lia.
       -- 
-         erewrite sound_sizeof_wf by eassumption. eassumption.
+
+            lia.
+qw            apply nat_to
+         Search vars_of stringvar_ATLexpr. erewrite sound_sizeof_wf by eassumption. eassumption.
          econstructor. Search eval_expr ATLDeep.Lbind. constructor. simpl.
          
     
