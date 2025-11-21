@@ -42,6 +42,13 @@ Fixpoint map2 {X Y Z}(f : X -> Y -> Z) (l1 : list X) (l2 : list Y) : list Z :=
   | _,_ => []
   end.
 
+Lemma map2_is_map_combine {X Y Z} (f : X -> Y -> Z) (l1 : list X) (l2 : list Y) :
+  map2 f l1 l2 = map (fun '(x, y) => f x y) (combine l1 l2).
+Proof.
+  revert l2. induction l1; simpl; auto.
+  destruct l2; auto. simpl. f_equal. auto.
+Qed.
+
 Lemma fold_left_cons {X} : forall (f : X -> X -> X) x xs a,
     (forall a b, f a b = f b a) ->
     (forall a b c, f a (f b c) = f (f a b) c) ->
