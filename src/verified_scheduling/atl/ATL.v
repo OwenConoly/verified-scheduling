@@ -218,47 +218,6 @@ Proof.
   intros. ring.
 Defined.
 
-Definition option_bin {T : Type} (bin : T -> T -> T) x y :=
-  match x, y with
-  | Some x, Some y => Some (bin x y)
-  | Some x, None => Some x
-  | None, Some y => Some y
-  | None, None => None
-  end.
-
-Definition option_consistent {T shape : Type} (consistent : T -> shape -> Prop) x sh :=
-  match x, sh with
-  | Some x, Some sh => consistent x sh
-  | None, None => True
-  | _, _ => False
-  end.
-
-#[refine] Instance OptionTensorElem {X} `{TensorElem X} : TensorElem (option X) :=
-  { null := None;
-    bin := option_bin bin;
-    shape := option shape;
-    consistent := option_consistent consistent;
-    scalar_mul := fun c => option_map (scalar_mul c) }.
-Proof.
-  all: intros; subst;
-    try solve [
-        repeat match goal with
-          | x : option _ |- _ => destruct x
-          end;
-        simpl;
-        try (reflexivity || contradiction || auto);
-        try match goal with
-          | |- Some _ = Some _ => f_equal
-          end;
-        eapply H; eauto].
-  - destruct s1, s2; try (right; congruence); try (left; reflexivity).
-    destruct (shape_dec s s0); subst; auto. right. congruence.
-  - destruct s1, s2; try (right; congruence); try (left; reflexivity).
-    destruct (eq_dec x x0); subst; auto. right. congruence.
-  - destruct e; simpl; try reflexivity. f_equal. apply H.
-Defined.
-(*idk why defined, but it's what's done above..*)
-
 Lemma get_empty_null {X} `{TensorElem X} : forall i, [] _[ i ] = null.
 Proof. destruct i; simpl; unfold get; reflexivity. Qed.
 
