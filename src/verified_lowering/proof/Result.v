@@ -1001,7 +1001,7 @@ Qed.
 
 Lemma result_has_shape_truncl_list :
   forall l k x xs,
-    result_has_shape (V l) (filter_until (x::xs) 0) ->
+    result_has_shape (V l) (x::xs) ->
     result_has_shape (V (truncl_list k l)) (x -k::xs).
 Proof.
   induct l; intros; cases x.
@@ -1010,10 +1010,10 @@ Proof.
   - invert H.
   - cases k.
     + simpl. simpl in *. invert H. econstructor. auto.
-      eapply result_has_shape_filter_until_0. auto.
+      auto.
       eapply Forall_impl. 2: eassumption.
       simpl. intros.
-      eapply result_has_shape_filter_until_0. auto.
+      auto.
     + simpl truncl_list. simpl Nat.sub.
       eapply IHl.
       cases l.
