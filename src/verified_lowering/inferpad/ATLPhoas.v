@@ -964,10 +964,20 @@ Lemma stringvar_Z_correct ctx e_nat e_shal :
   wf_Zexpr (fun _ => nat) interp_type_result ctx e_nat e_shal ->
   eval_Zexpr (valuation_of ctx) (stringvar_Z e_nat) (interp_pZexpr e_shal).
 Proof.
-  intros H. cbv [interp_pZexpr]. induction 1; simpl; eauto.
+  intros H. induction 1; simpl; eauto.
   - destruct o; simpl; eauto.
   - constructor. apply valuation_of_correct; auto.
   - eenough (- _ = _)%Z as ->; [eauto|]. lia.
+Qed.
+
+Lemma stringvar_B_correct ctx e_nat e_shal :
+  NoDup (map fst_ctx_elt ctx) ->
+  wf_Bexpr (fun _ => nat) interp_type_result ctx e_nat e_shal ->
+  eval_Bexpr (valuation_of ctx) (stringvar_B e_nat) (interp_pBexpr e_shal).
+Proof.
+  intros H. induction 1; simpl.
+  - constructor; eauto.
+  - destruct o; simpl; constructor; eauto using stringvar_Z_correct.
 Qed.
 
 Lemma dom_valuation_of ctx :
@@ -1224,36 +1234,73 @@ Proof.
       intros ? (?&H'). edestruct H'. eauto.
 Qed.
 
-Lemma result_has_shape'_add_result' sz x y :
+Search add_result result_has_shape.
+
+Lemma add_result_add_result' sz x y :
   result_has_shape' sz x ->
   result_has_shape' sz y ->
-  result_has_shape' sz (add_result' x y).
+  add_result x y (add_result' x y).
 Proof.
   revert x y. induction sz; simpl; invert 1; invert 1; simpl.
+  - constructor. destruct s, s0; constructor.
   - constructor.
-  - constructor.
-    + rewrite length_map2. lia.
-    + rewrite map2_is_map_combine. apply Forall_map. apply Forall_forall.
-      intros [x y] Hx. pose proof Hx as Hy.
-      apply in_combine_l in Hx. apply in_combine_r in Hy.
-      rewrite Forall_forall in *. eauto.
+    (*i really wish add_list was forall3 something; i don't want to do induction here*)
+    revert xs0 H2 H5. induction H4; intros xs0 H2 H5.
+    + destruct xs0; [|discriminate H2]. constructor.
+    + destruct xs0; [discriminate H2|]. simpl in H2, H5. invert H5. invert H2.
+      simpl. constructor; auto.
+Qed.  
+
+Lemma fold_right_pres {A B : Type} (f : B -> A -> A) l Q a :
+  Q a ->
+  (forall a b, Q a -> In b l -> Q (f b a)) ->
+  Q (fold_right f a l).
+Proof. revert a. induction l; simpl; auto. Qed.
+
+Lemma fold_right_rel_fold_right {A B : Type} (f : B -> A -> A) R l a P Q :
+  P a ->
+  Q a ->
+  (forall a b, Q a -> In b l -> Q (f b a)) ->
+  Forall (fun b => forall a, Q a -> R b a (f b a)) l ->
+  fold_right_rel R P l (fold_right f a l).
+Proof.
+  intros Ha HQ1 HQ2 Hl. revert a HQ1 HQ2 Ha.
+  induction Hl; simpl; intros; econstructor; eauto.
+  apply H. apply fold_right_pres; auto.
 Qed.
 
-Lemma result_has_shape'_fold_right_add_result' sz init l :
-  result_has_shape' sz init ->
-  Forall (result_has_shape' sz) l ->
-  result_has_shape' sz (fold_right add_result' init l).
+Lemma add_list_result_sum_with_sz sz min max f :
+  (forall x, result_has_shape' sz (f x)) ->
+  add_list_result sz (map f (zrange min max)) (sum_with_sz sz min max f).
 Proof.
-  intros H1 H2. revert init H1. induction H2; simpl; intros; auto.
-  apply result_has_shape'_add_result'; auto.
+  intros. apply fold_right_rel_fold_right with (Q := result_has_shape' sz); auto.
+  - apply result_has_shape'_iff. apply result_has_shape_gen_pad.
+  - intros ? ? ? H'. apply in_map_iff in H'. destruct H' as (?&?&?). subst.
+    apply result_has_shape'_iff. eapply result_has_shape_add_result.
+    + eapply add_result_add_result'; eauto.
+    + apply result_has_shape'_iff. auto.
+    + apply result_has_shape'_iff. auto.
+  - apply Forall_map. apply Forall_forall.
+    intros. eapply add_result_add_result'; eauto.
+Qed.
+
+Lemma result_has_shape_add_list sz l r :
+  Forall (result_has_shape' sz) l ->
+  add_list_result sz l r ->
+  result_has_shape' sz r.
+Proof.
+  intros H. revert r. induction H; intros r; invert 1.
+  - apply result_has_shape'_iff. apply result_has_shape_gen_pad.
+  - rewrite result_has_shape'_iff in *. eapply result_has_shape_add_result; eauto.
+    apply result_has_shape'_iff. apply IHForall. assumption.
 Qed.
 
 Lemma result_has_shape'_sum_with_shape sz min max f :
   (forall x, result_has_shape' sz (f x)) ->
   result_has_shape' sz (sum_with_sz sz min max f).
 Proof.
-  intros H. cbv [sum_with_sz]. apply result_has_shape'_fold_right_add_result'.
-  - apply result_has_shape'_iff. apply result_has_shape_gen_pad.
+  intros H. eapply result_has_shape_add_list; cycle 1.
+  - apply add_list_result_sum_with_sz. assumption.
   - apply Forall_map. apply Forall_forall. auto.
 Qed.
 
@@ -1318,7 +1365,8 @@ Proof.
   rewrite nth_error_seq. destruct (_ <? _)%nat eqn:E; try reflexivity.
   Search (_ <? _ = false)%nat. apply Nat.ltb_ge in E. lia.
 Qed.
-    
+
+Hint Resolve dummy_result : core.
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
   map fst_ctx_elt ctx = rev (seq O name) ->
@@ -1364,7 +1412,38 @@ Proof.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
       rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
     + cbv [sizeof]. simpl. erewrite <- sound_sizeof_wf with (dummy1 := fun _ => 0).
-      2: solve[eauto]. rewrite Hsz. Search sum_with_sz.
-      apply sum_list.
-      { eapply sound_sizeof_gives_dim. eassumption. }
-      
+      2: solve[eauto]. rewrite Hsz. apply add_list_result_sum_with_sz.
+      intros. eapply sound_sizeof_tensor_has_size; eauto.
+    + rewrite length_map. rewrite length_zrange. reflexivity.
+    + intros i' Hi'. rewrite nth_error_map. rewrite nth_error_zrange_is_Some by lia.
+      simpl. replace (_ + _)%Z with i' by lia. split.
+      { intros H''. apply dom_valuation_of in H''. apply in_map_iff in H''.
+        rewrite Hctx in H''. destruct H'' as (x&H1'&H2').
+        apply nat_to_string_injective in H1'. subst. apply in_rev in H2'.
+        apply in_seq in H2'. lia. }
+      split.
+      { apply no_question_marks. }
+      eapply H2; try eassumption.
+      { rewrite seq_S. rewrite rev_app_distr. simpl. f_equal. assumption. }
+      erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
+      erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
+  - destruct (interp_pBexpr _) eqn:Eb.
+    + apply EvalGuardTrue; eauto.
+      rewrite <- Eb. apply stringvar_B_correct; auto.
+      rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
+    + apply EvalGuardFalse; eauto.
+      -- rewrite <- Eb. apply stringvar_B_correct; auto.
+         rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
+      -- cbv [sizeof]. simpl. erewrite <- sound_sizeof_wf.
+         2: solve[eauto]. rewrite Hsz. eapply sound_sizeof_size_of; eauto.
+         apply dummy_result.
+  - destruct l. (*size of e1*)
+    + eapply EvalLbindS.
+      -- eapply sound_sizeof_size_of. 4: eassumption. all: eauto. apply dummy_result.
+      -- 
+         erewrite sound_sizeof_wf by eassumption. eassumption.
+         econstructor. Search eval_expr ATLDeep.Lbind. constructor. simpl.
+         
+    
+    Search interp_pBexpr.
+    Lemma interp_pBexpr
