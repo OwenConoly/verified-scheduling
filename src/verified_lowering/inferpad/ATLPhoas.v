@@ -1330,7 +1330,27 @@ Proof.
     
 Lemma length_tensor_concat {X} `{TensorElem X} (x y : list X) :
   length (concat x y) = length x + length y.
-Proof. Abort.
+Proof. Admitted.
+
+Fixpoint n_tuple (T : Type) n : Type :=
+  match n with
+  | S n' => T * n_tuple T n'
+  | O => unit
+  end.
+
+Fixpoint tuple_of_list (sh : list nat) : (@shape (dim_n_with_pad (length sh)) _) :=
+  match sh return (@shape (dim_n_with_pad (length sh)) _) with
+  | len :: sh' => (len, tuple_of_list sh')
+  | [] => Some tt
+  end.
+
+Lemma tensor_has_size'_consistent sh (x : dim_n_with_pad (length sh)) :
+  tensor_has_size' sh x ->
+  consistent x (tuple_of_list sh).
+Proof.
+  induction sh; simpl.
+  - intros _. cbv [option_consistent]. simpl.
+  inttos H.
 
 Lemma sound_sizeof_tensor_has_size n var1 ctx e0 dummy1 sz (e : pATLexpr _ n) :
   wf_ATLexpr var1 interp_type_with_pad ctx n e0 e ->
@@ -1358,7 +1378,7 @@ Proof.
     replace n with (length sz).
     { apply tensor_has_size'_gen_pad_tensor. }
     eapply sound_sizeof_gives_dim. eassumption.
-  - Abort.
+  - Search concat. Abort.
 
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   wf_ATLexpr (fun _ => nat) interp_type_with_pad ctx n e_nat e_shal ->
@@ -1408,3 +1428,4 @@ Proof.
       2: solve[eauto]. rewrite Hsz.
       apply sum_list.
       { eapply sound_sizeof_gives_dim. eassumption. }
+      
