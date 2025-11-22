@@ -1429,13 +1429,14 @@ Ltac invs'' := invs'; nts_inj; subst.
 Hint Resolve dummy_result : core.
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
-  map fst_ctx_elt ctx = rev (seq O name) ->
+  NoDup (map fst_ctx_elt ctx) ->
+  (forall name'', In name'' (map fst_ctx_elt ctx) -> name'' < name) ->
   stringvar_ATLexpr name e_nat = Some (name', e_string) ->
   sound_sizeof (fun _ => O) e_nat = Some sz ->
   eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr e_shal).
 Proof.
   intros H. revert name name' e_string sz.
-  induction H; intros name name' e_string sz Hctx H' Hsz;
+  induction H; intros name name' e_string sz Hctx1 Hctx2 H' Hsz;
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
           let E := fresh "E" in
@@ -1447,20 +1448,19 @@ Proof.
     invs'.
   - simpl. eapply mk_eval_gen.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
-      rewrite Hctx. apply NoDup_rev. Fail apply NoDup_seq. (*why*) apply seq_NoDup.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
-      rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
     + rewrite length_map. rewrite length_zrange. reflexivity.
     + intros i' Hi'. rewrite nth_error_map. rewrite nth_error_zrange_is_Some by lia.
       simpl. replace (_ + _)%Z with i' by lia. split.
       { intros H''. apply dom_valuation_of in H''. apply in_map_iff in H''.
-        rewrite Hctx in H''. destruct H'' as (x&H1'&H2').
-        apply nat_to_string_injective in H1'. subst. apply in_rev in H2'.
-        apply in_seq in H2'. lia. }
+        destruct H'' as (x&H1'&H2').
+        apply nat_to_string_injective in H1'. subst.
+        apply Hctx2 in H2'. lia. }
       split.
       { apply no_question_marks. }
       eapply H2; try eassumption.
-      { rewrite seq_S. rewrite rev_app_distr. simpl. f_equal. assumption. }
+      { constructor; auto. intros H'. apply Hctx2 in H'. lia. }
+      { intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
       erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
       erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
   - eapply mk_eval_sum.
@@ -1468,9 +1468,7 @@ Proof.
       erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
       erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
-      rewrite Hctx. apply NoDup_rev. Fail apply NoDup_seq. (*why*) apply seq_NoDup.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
-      rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
     + cbv [sizeof]. simpl. erewrite <- sound_sizeof_wf with (dummy1 := fun _ => 0).
       2: solve[eauto]. rewrite Hsz. apply add_list_result_sum_with_sz.
       intros. eapply sound_sizeof_tensor_has_size; eauto.
@@ -1478,22 +1476,20 @@ Proof.
     + intros i' Hi'. rewrite nth_error_map. rewrite nth_error_zrange_is_Some by lia.
       simpl. replace (_ + _)%Z with i' by lia. split.
       { intros H''. apply dom_valuation_of in H''. apply in_map_iff in H''.
-        rewrite Hctx in H''. destruct H'' as (x&H1'&H2').
-        apply nat_to_string_injective in H1'. subst. apply in_rev in H2'.
-        apply in_seq in H2'. lia. }
+        destruct H'' as (x&H1'&H2').
+        apply nat_to_string_injective in H1'. subst. apply Hctx2 in H2'. lia. }
       split.
       { apply no_question_marks. }
       eapply H2; try eassumption.
-      { rewrite seq_S. rewrite rev_app_distr. simpl. f_equal. assumption. }
+      { constructor; auto. intros H'. apply Hctx2 in H'. lia. }
+      { intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
       erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
       erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
   - destruct (interp_pBexpr _) eqn:Eb.
     + apply EvalGuardTrue; eauto.
       rewrite <- Eb. apply stringvar_B_correct; auto.
-      rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
     + apply EvalGuardFalse; eauto.
       -- rewrite <- Eb. apply stringvar_B_correct; auto.
-         rewrite Hctx. apply NoDup_rev. apply seq_NoDup.
       -- cbv [sizeof]. simpl. erewrite <- sound_sizeof_wf.
          2: solve[eauto]. rewrite Hsz. eapply sound_sizeof_size_of; eauto.
          apply dummy_result.
@@ -1501,23 +1497,22 @@ Proof.
     apply name_gets_bigger in E0', E2'.
     pose proof (vars_of_stringvar_ATLexpr _ _ _ _ _ E0) as E0''.
     pose proof (vars_of_stringvar_ATLexpr _ _ _ _ _ E2) as E2''.
-    destruct l. (*size of e1*)
-    + eapply EvalLbindS.
-      -- eapply sound_sizeof_size_of. 4: eassumption. all: eauto. apply dummy_result.
-      -- apply None_dom_lookup. intros H'. apply dom_ec_of in H'.
-         apply in_map_iff in H'. destruct H' as (x&H1'&H2').
-         apply nat_to_string_injective in H1'. subst.
-         rewrite Hctx in H2'. apply in_rev in H2'. apply in_seq in H2'. lia.
-      -- split; intros H'.
-         ++ apply E0'' in H'. invs''. lia.
-         ++ apply E2'' in H'. invs''. lia.
-      -- 
-
-            lia.
-qw            apply nat_to
-         Search vars_of stringvar_ATLexpr. erewrite sound_sizeof_wf by eassumption. eassumption.
-         econstructor. Search eval_expr ATLDeep.Lbind. constructor. simpl.
-         
-    
-    Search interp_pBexpr.
-    Lemma interp_pBexpr
+    eapply EvalLbind.
+    + eapply sound_sizeof_size_of. 4: eassumption. all: eauto. apply dummy_result.
+    + apply None_dom_lookup. intros H'. apply dom_ec_of in H'.
+      apply in_map_iff in H'. destruct H' as (x&H1'&H2').
+      apply nat_to_string_injective in H1'. subst.
+      apply Hctx2 in H2'. lia.
+    + split; intros H'.
+      -- apply E0'' in H'. invs''. lia.
+      -- apply E2'' in H'. invs''. lia.
+    + apply sets_equal. split; try contradiction. intros [H1' H2'].
+      apply E0'' in H1'. apply E2'' in H2'. invs''. lia.
+    + eapply IHwf_ATLexpr. 3: eassumption. all: eauto.
+      intros ? H'. apply Hctx2 in H'. lia.
+    + eapply H1. 3: eassumption.
+      -- constructor; auto. intros H'. apply Hctx2 in H'. lia.
+      -- intros ? [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia.
+      -- erewrite sound_sizeof_wf by eauto. erewrite <- sound_sizeof_wf by eauto.
+         eassumption.
+  - 
