@@ -22,7 +22,6 @@ Definition expr_context := fmap string result.
 Definition stack := fmap string R.
 
 Inductive Sexpr :=
-| Var (v : string)
 | Get (v : string) (i : list Zexpr)
 | Mul (x y : Sexpr)
 | Add (x y : Sexpr)
@@ -42,11 +41,11 @@ Inductive Sstmt :=
 Fixpoint lowerS (s : Sexpr) (sh : context) : Sstmt :=
   match s with
   | Lit r => SLit r
-  | Var v => SVar v
   | Get v i =>
     match sh $? v with
+    | Some [] => SVar v
     | Some str => SGet v (List.combine (map Z.of_nat str) i)
-    | None => SVar v
+    | None => SVar v (*should not happen*)
     end    
   | Mul x y => SMul (lowerS x sh) (lowerS y sh)
   | Add x y => SAdd (lowerS x sh) (lowerS y sh)
@@ -55,18 +54,15 @@ Fixpoint lowerS (s : Sexpr) (sh : context) : Sstmt :=
   end.
 
 Inductive eval_get (v : valuation) :
-  list result -> list Zexpr -> scalar_result -> Prop :=
+  result -> list Zexpr -> scalar_result -> Prop :=
 | EvalGetV : forall x xs i l l' r,
     eval_Zexpr v x i ->
     (0 <= i)%Z ->
-    nth_error l (Z.to_nat i) = Some (V l') ->
+    nth_error l (Z.to_nat i) = Some l' ->
     eval_get v l' xs r ->
-    eval_get v l (x::xs) r
-| EvalGetS : forall x i l r,
-    eval_Zexpr v x i ->
-    (0 <= i)%Z ->
-    nth_error l (Z.to_nat i) = Some (S r) ->
-    eval_get v l [x] r
+    eval_get v (V l) (x::xs) r
+| EvalGetS : forall r,
+    eval_get v (S r) [] r
 .
 
 Definition bin_scalar_result f r1 r2 :=
@@ -79,14 +75,8 @@ Definition bin_scalar_result f r1 r2 :=
 
 Inductive eval_Sexpr :
   valuation -> expr_context -> Sexpr -> scalar_result -> Prop :=
-| EvalVar : forall s v ec r,
-    ec $? s = Some (S r) ->
-    eval_Sexpr v ec (Var s) (match r with
-                             | SS s => r
-                             | _  => SS 0%R
-                             end)
 | EvalGet : forall x l v r ec rs,
-    ec $? x = Some (V rs) ->
+    ec $? x = Some rs ->
     eval_get v rs l r ->
     eval_Sexpr v ec (Get x l) (match r with
                                | SS s => r
@@ -148,4 +138,3 @@ Inductive eval_Sstmt :
     eval_Sstmt v st h (SSub s1 s2) r
 | EvalSLit: forall v st h r,
     eval_Sstmt v st h (SLit r) r.
-

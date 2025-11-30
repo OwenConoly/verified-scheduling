@@ -3610,7 +3610,6 @@ Proof.
             unfold nondestructivity in Hnondstr. invert Hnondstr. clear H1.
             invert H.
             - cases r; try discriminate.
-            - cases r; try discriminate.
             - cases r1; cases r2; simpl in *; try discriminate.
             - cases r1; cases r2; simpl in *; try discriminate.
             - cases r1; cases r2; simpl in *; try discriminate.
