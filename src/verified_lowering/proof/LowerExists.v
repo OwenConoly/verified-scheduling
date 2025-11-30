@@ -1354,9 +1354,9 @@ Proof.
     eapply well_formed_allocation_flatten;
       try apply Henv; try apply Hrdx; eauto.
   - simpl in *. invs. invert Hpad. eq_size_of. invs'.
-    rename H7 into Hsize. pose proof Hsize as Hsh.
+    rename H6 into Hsize. pose proof Hsize as Hsh.
     eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
-    rename H4 into Hk. apply eval_Zexpr_Z_eval_Zexpr in Hk.
+    rename H3 into Hk. apply eval_Zexpr_Z_eval_Zexpr in Hk.
     cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *. invs'.
     
     pose proof Hsize as Heval.
