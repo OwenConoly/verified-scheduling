@@ -116,7 +116,6 @@ Ltac reify_R s :=
   | _ =>
       let tup := reify_get s in
       constr:(match tup with
-              | (var,[]) => Var var
               | (var,idx) => Get var idx
               end)
   end.

@@ -47,12 +47,15 @@ Lemma eval_Sexpr_eval_Sstmt_exists
                                        end.
 Proof.
   induct 1; intros; simpl in *.
-  - econstructor. eapply H0 in H. invs. rewrite H2. f_equal.
-    cases r; auto.
-  - eapply H1 in H. invs'. rewrite H.
+  - destruct rs as [?|rs].
+    { invert H0. apply H1 in H. invs'. rewrite H0. econstructor.
+      rewrite H2. f_equal. cases r; auto. }
+    eapply H1 in H. invs'. rewrite H.
     pose proof H0 as H0'. eapply eval_get_eval_Zexprlist in H0'. invs'.
     assert (length x0 = length l).
     { eapply eval_get_length in H0; eauto. }
+    destruct x0 as [|? x0]; [invert0 H2|].
+    remember (_ :: x0) as x0' eqn:E. clear x0 E. rename x0' into x0.
     econstructor. eauto.
     eapply eval_Zexpr_Z_eval_Zexpr.
     eapply eval_Zexpr_Z_flatten_index_flatten.
@@ -86,8 +89,8 @@ Proof.
          eapply injective_flatten. eauto. eauto. eauto. }
     cases x0. invert H2.
     pose proof (lookup_alloc_array
-                      (Z.to_nat (fold_left Z.mul (map Z.of_nat (n :: x0)) 1%Z))
-                      (flatten (map Z.of_nat (n :: x0)) x1)) as H7.
+                  (Z.to_nat (fold_left Z.mul (map Z.of_nat (n0 :: x0)) 1%Z))
+                  (flatten (map Z.of_nat (n0 :: x0)) x1)) as H7.
     pose proof H0' as H0''. rewrite map_cons in *.
     eapply in_mesh_grid_args_flatten_bounds in H0'.
     destruct H7 as [H7|H7].
@@ -1727,7 +1730,6 @@ Proof.
         eexists. eexists. econstructor. eauto. eassumption. auto.
     + cases r.
       2: { invert H. cases r; try discriminate.
-           cases r; try discriminate.
            cases r1; cases r2; try discriminate.
            cases r1; cases r2; try discriminate.
            cases r1; cases r2; try discriminate.
