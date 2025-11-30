@@ -431,7 +431,6 @@ Inductive eval_expr :
 | EvalSplit : forall e v ec l k kz,
     eval_expr v ec e (V l) ->
     eval_Zexpr_Z $0 k = Some kz ->
-    Forall (fun x => exists v, x = V v) l ->
     eval_expr v ec (Split k e) (V (split_result (Z.to_nat kz) l))
 | EvalTruncr : forall e v ec k kz l,
     eval_Zexpr_Z v k = Some kz ->

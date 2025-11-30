@@ -84,7 +84,7 @@ Proof.
   induct 1; intros ls Hsize p st h st' h' reindexer asm sh
                    Heval Henv Hrdx Halloc Hctx pads g Hpad Hrelate.
   11: { (* SPLIT *) simpl in *. invert Hsize.
-        rename H4 into Hk. apply eval_Zexpr_Z_eval_Zexpr in Hk.
+        rename H3 into Hk. apply eval_Zexpr_Z_eval_Zexpr in Hk.
         cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *. invs'.
         
      assert (result_has_shape (V l) (n::sh0)) as Hsh.
@@ -191,21 +191,21 @@ Proof.
           decomp_goal_index. split.
           rewrite Z2Nat.id by lia. eapply Z.mod_pos_bound. lia.
           eauto.
-          rewrite <- H10.
+          rewrite <- H9.
           f_equal. f_equal.
           rewrite <- (Z2Nat.id kz) at 1 by lia.
           rewrite <- (Z2Nat.id kz) at 2 by lia.
           erewrite result_lookup_Z_option_split. reflexivity.
-          eauto. lia. apply H4. lia. eauto.
+          eauto. lia. apply H3. lia. eauto.
         - repeat rewrite map_cons.
           intros. repeat decomp_index.
           eexists ((z*kz + z0)%Z::x0).
           rewrite Z.div_add_l by lia.
           rewrite Z.div_small by lia. rewrite Z.add_0_r.
           pose proof Z.add_mul_mod_distr_r.
-          specialize H11 with (b:=1%Z) (c:= kz).
+          specialize H10 with (b:=1%Z) (c:= kz).
           rewrite Z.mul_1_l in *.
-          rewrite H11.
+          rewrite H10.
           rewrite Z.mod_1_r. split. auto.
           eapply filter_In. split.
           repeat decomp_goal_index. split.
@@ -215,7 +215,7 @@ Proof.
           eapply result_lookup_Z_option_split_true. eauto.
           lia. lia. lia. eauto. rewrite Nat2Z.id. eauto.
           decomp_goal_index. eauto.
-          rewrite <- H10. f_equal. f_equal.
+          rewrite <- H9. f_equal. f_equal.
           erewrite <- result_lookup_Z_option_split with (k:=Z.to_nat kz).
           2: { eauto. }
           2: { lia. }
@@ -230,9 +230,9 @@ Proof.
           rewrite Z.div_add_l by lia. rewrite Z.div_small by lia.
           rewrite Z.add_0_r.
           pose proof Z.add_mul_mod_distr_r.
-          specialize H13 with (b:=1%Z) (c:= kz).
+          specialize H12 with (b:=1%Z) (c:= kz).
           rewrite Z.mul_1_l in *.
-          rewrite H11.
+          rewrite H10.
           rewrite Z.mod_1_r. reflexivity. lia. lia. lia.
         - replace (map Z.of_nat (Datatypes.S m :: filter_until sh1 0))
             with
@@ -256,10 +256,10 @@ Proof.
         - unfold injective. propositional.
           repeat decomp_index.
           repeat rewrite map_cons in *. repeat decomp_index.
-          invert H11.
+          invert H10.
           rewrite (Z.div_mod z kz).
           rewrite (Z.div_mod z0 kz).
-          rewrite H16. rewrite H17. reflexivity. lia. lia.
+          rewrite H15. rewrite H16. reflexivity. lia. lia.
         - eapply no_dup_filter. eauto with reindexers.
         - eapply no_dup_filter. eauto with reindexers.
   }
