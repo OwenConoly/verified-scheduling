@@ -1445,7 +1445,16 @@ Proof.
     invs';
     simpl in *;
     repeat (destruct_one_match_hyp; try congruence; []);
-    invs'.
+    invs';
+    repeat match goal with
+      (* | H: list_eqb Nat.eqb _ _ = true |- _ => *)
+      (*     apply list_eqb_sound in H; *)
+      (*     [subst|intros; apply Nat.eqb_eq; solve[auto] ] *)
+      | H: (_ <? _)%nat = true |- _ =>
+          apply Nat.ltb_lt in H
+      | H: (_ <=? _)%nat = true |- _ =>
+          apply Nat.leb_le in H
+      end.
   - simpl. eapply mk_eval_gen.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
@@ -1515,4 +1524,39 @@ Proof.
       -- intros ? [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia.
       -- erewrite sound_sizeof_wf by eauto. erewrite <- sound_sizeof_wf by eauto.
          eassumption.
-  - 
+  - pose proof E4 as E4'. pose proof E6 as E6'.
+    apply name_gets_bigger in E4', E6'.
+    eapply sound_sizeof_tensor_has_size in E1; eauto; [].
+    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    invert E. invert E1.
+    constructor;
+      match goal with
+      | H: V _ = _ |- _ => rewrite H
+      end.
+    + eauto.
+    + eapply IHwf_ATLexpr2. 3: eassumption. all: eauto. intros ? H''. Search ctx.
+      apply Hctx2 in H''. lia.
+  - pose proof E2 as E2'.
+    apply name_gets_bigger in E2'.
+    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    invert E.
+    constructor;
+      try match goal with
+      | H: V _ = _ |- _ => rewrite H
+        end.
+    + eauto.
+    + eapply Forall_impl; [|eassumption]. invert 1; eauto.
+  - pose proof E2 as E2'.
+    apply name_gets_bigger in E2'.
+    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    invert E.
+    replace k with (Z.to_nat (Z.of_nat k)) by lia.
+    constructor;
+      try match goal with
+      | H: V _ = _ |- _ => rewrite H
+        end.
+    + eauto.
+    + simpl. f_equal. lia.
+    + Check tile. Check EvalSplit. Print split_result.
+      constructor.
+    constructor; eauto.
