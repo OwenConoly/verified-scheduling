@@ -950,6 +950,22 @@ Proof.
       split; [|eassumption]. reflexivity.
 Qed.
 
+Lemma ec_of_correct ctx n x y :
+  NoDup (@map _ nat (fun elt => elt.(ctx_elt_p1 _ _)) ctx) ->
+  List.In {| ctx_elt_t := tensor_n n; ctx_elt_p1 := x; ctx_elt_p2 := y |} ctx ->
+  ec_of ctx $? (nat_to_string x) = Some y.
+Proof.
+  induction ctx.
+  - simpl. intros. contradiction.
+  - simpl. intros H1 H2. destruct H2 as [H2|H2]; subst.
+    + rewrite lookup_add_eq; reflexivity.
+    + invert H1. specialize (IHctx ltac:(eassumption) ltac:(eassumption)).
+      destruct a. destruct ctx_elt_t1; auto. rewrite lookup_add_ne; auto.
+      intro H'. apply nat_to_string_injective in H'. subst.
+      match goal with |H: ~_ |- _ => apply H end. apply in_map_iff. eexists.
+      split; [|eassumption]. reflexivity.
+Qed.
+
 Definition fst_ctx_elt {T var2} (elt : ctx_elt2 (fun _ => T) var2) :=
   elt.(ctx_elt_p1 _ _).
 
@@ -1447,9 +1463,6 @@ Proof.
     repeat (destruct_one_match_hyp; try congruence; []);
     invs';
     repeat match goal with
-      (* | H: list_eqb Nat.eqb _ _ = true |- _ => *)
-      (*     apply list_eqb_sound in H; *)
-      (*     [subst|intros; apply Nat.eqb_eq; solve[auto] ] *)
       | H: (_ <? _)%nat = true |- _ =>
           apply Nat.ltb_lt in H
       | H: (_ <=? _)%nat = true |- _ =>
@@ -1553,10 +1566,95 @@ Proof.
     replace k with (Z.to_nat (Z.of_nat k)) by lia.
     constructor;
       try match goal with
-      | H: V _ = _ |- _ => rewrite H
+        | H: V _ = _ |- _ => rewrite H
         end.
     + eauto.
     + simpl. f_equal. lia.
-    + Check tile. Check EvalSplit. Print split_result.
-      constructor.
-    constructor; eauto.
+  - pose proof E2 as E2'.
+    apply name_gets_bigger in E2'.
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto; [].
+    invert E'.
+    cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto. rewrite E.
+    constructor;
+      try match goal with
+        | H: V _ = _ |- _ => rewrite H
+        end.
+    + eauto.
+    + eapply sound_sizeof_size_of; eauto. apply dummy_result.
+  - pose proof E2 as E2'.
+    apply name_gets_bigger in E2'.
+    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    invert E.
+    replace k with (Z.to_nat (Z.of_nat k)) by lia.
+    constructor;
+      try match goal with
+        | H: V _ = _ |- _ => rewrite H
+        end.
+    + simpl. f_equal. lia.
+    + lia.
+    + eauto.
+  - pose proof E2 as E2'.
+    apply name_gets_bigger in E2'.
+    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    invert E.
+    replace k with (Z.to_nat (Z.of_nat k)) by lia.
+    constructor;
+      try match goal with
+        | H: V _ = _ |- _ => rewrite H
+        end.
+    + simpl. f_equal. lia.
+    + lia.
+    + eauto.
+  - pose proof E1 as E1'.
+    apply name_gets_bigger in E1'.
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto; [].
+    invert E'.
+    cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto. rewrite E.
+    replace k with (Z.to_nat (Z.of_nat k)) by lia.
+    econstructor;
+      try match goal with
+        | H: V _ = _ |- _ => rewrite H
+        end.
+    + simpl. f_equal. lia.
+    + lia.
+    + eapply sound_sizeof_size_of; eauto. exact dummy_result.
+    + eauto.
+  - pose proof E1 as E1'.
+    apply name_gets_bigger in E1'.
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto; [].
+    invert E'.
+    cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto. rewrite E.
+    replace k with (Z.to_nat (Z.of_nat k)) by lia.
+    econstructor;
+      try match goal with
+        | H: V _ = _ |- _ => rewrite H
+        end.
+    + simpl. f_equal. lia.
+    + lia.
+    + eapply sound_sizeof_size_of; eauto. exact dummy_result.
+    + eauto.
+  - congruence.
+  - (*i do not understand what happened here*)
+    remember (Var n0) eqn:E. destruct H; try congruence. invert E.
+    constructor. eassert (eval_get' _ _ = _) as ->; cycle 1.
+    { Print eval_Sexpr. econstructor.
+      - eapply ec_of_correct; eauto.
+        destruct H.
+        Print wf_ATLexpr. destruct H. invert H.
+    2: { econstruc
+  - 
+  - 
+    + simpl. f_equal. lia.
+    constructor.
+    cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto. rewrite E.
+    constructor;
+      try match goal with
+        | H: V _ = _ |- _ => rewrite H
+        end.
+    + eauto.
+    + eapply sound_sizeof_size_of; eauto. apply dummy_result.
+  - 
+    
