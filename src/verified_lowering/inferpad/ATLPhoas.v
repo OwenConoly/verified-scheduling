@@ -321,7 +321,7 @@ Definition interp_Sbop o x y :=
   match o with
   | Mul => x * y
   | Add => x + y
-  | Div => x * y
+  | Div => x / y
   | Sub => x - y
   end%R.
 
@@ -1505,16 +1505,62 @@ Proof.
       apply nth_In. lia.
 Qed.
 
-Check stringvar_S.
+Lemma stringvar_ZLit_correct ctx e1 e2 z :
+  wf_Zexpr (fun _ : type => nat) interp_type_result ctx e1 e2 ->
+  stringvar_ZLit e1 = Some z ->
+  interp_pZexpr e2 = z.
+Proof.
+  intros H. revert z. induction H; intros z Hz; simpl in *;
+    cbv [option_map] in *;
+    repeat (destruct_one_match_hyp; try congruence ; []);
+    invs';
+    repeat match goal with
+      | H: forall _, _ -> _ |- _ => specialize (H _ eq_refl)
+      end;
+    subst;
+    auto;
+    congruence.
+Qed.
+
 Lemma stringvar_S_correct ctx n e_nat e_shal e_string :
+  NoDup (map fst_ctx_elt ctx) ->
   wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
   stringvar_S e_nat = Some e_string ->
   idxs_in_bounds e_shal ->
-  exists s,
-    result_of_pATLexpr e_shal = Result.S s /\
-      eval_Sexpr (valuation_of ctx) (ec_of ctx) e_string s.
+  match (result_of_pATLexpr e_shal) with
+  | Result.S s =>
+      result_of_pATLexpr e_shal = Result.S s /\
+        eval_Sexpr (valuation_of ctx) (ec_of ctx) e_string s
+  | Result.V _ => False
+  end.
 Proof.
-  
+  intros H0 H. revert e_string. induction H; intros e_string H' Hbds;
+    simpl in *; try congruence;
+    invs';
+    repeat (destruct_one_match_hyp; try congruence ; []);
+    invs'.
+  - remember (Var n0) eqn:E'. destruct H; try congruence. invert E'.
+    split; [reflexivity|].
+    eassert (eval_get' _ _ = _) as ->; cycle 1.
+    { econstructor.
+      - eapply ec_of_correct; eauto.
+      - eapply eval_get_eval_get'. 1: eauto. 3: eauto. 3: eauto.
+        { simpl in *. assumption. }
+        apply Forall2_length in H4. rewrite length_map in H4. auto. }
+    reflexivity.
+  - specialize (IHwf_ATLexpr1 ltac:(eassumption) _ eq_refl ltac:(assumption)).
+    specialize (IHwf_ATLexpr2 ltac:(eassumption) _ eq_refl ltac:(assumption)).
+    repeat (destruct_one_match_hyp; try congruence || contradiction; []; invs').
+    repeat match goal with
+           | H: Result.S _ = Result.S _ |- _ => invert H
+           end.
+    split; [reflexivity|].
+    destruct o; constructor; auto. admit. (*TODO i have no idea what to do about this*)
+  - split; [reflexivity|].
+    cbv [option_map] in *.
+    repeat (destruct_one_match_hyp; try congruence || contradiction; []; invs').
+    erewrite stringvar_ZLit_correct by eassumption. constructor.
+Admitted.
 
 Opaque stringvar_S.
 Hint Resolve dummy_result : core.
