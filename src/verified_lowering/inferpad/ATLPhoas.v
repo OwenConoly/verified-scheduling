@@ -515,7 +515,7 @@ Definition list_eqb {A: Type} (aeqb : A -> A -> bool) (x y : list A) : bool :=
 Lemma list_eqb_sound {A : Type} (aeqb : A -> A -> bool) x y :
   (forall x y, aeqb x y = true -> x = y) ->
   list_eqb aeqb x y = true -> x = y.
-Proof. Admitted.  
+Proof. Admitted.
 
 Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : option (list nat) :=
   match e with
@@ -587,7 +587,13 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
     | _ => None
     end                  
   | Var x => None (*should never hit this case*)
-  | Get _ _ | SBop _ _ _ | SIZR _ => Some []
+  | Get v idxs => ???
+  | SBop _ x y =>
+      match sound_sizeof dummy x, sound_sizeof dummy y with
+      | Some _, Some _ => Some []
+      | _, _ => None
+      end
+  | SIZR _ => Some []
   end.
 
 Definition sizeof {var n} dummy (e : pATLexpr var n) :=
@@ -1442,6 +1448,24 @@ Ltac nts_inj :=
 
 Ltac invs'' := invs'; nts_inj; subst.
 
+Check eval_get'.
+Lemma eval_get'_correct ctx r sh idxs1 idxs2 :
+  NoDup (map fst_ctx_elt ctx) ->
+  result_has_shape' sh r ->
+  length sh = length idxs1 ->
+  Forall2 (wf_Zexpr (fun _ : type => nat) interp_type_result ctx) idxs1 idxs2 ->
+  eval_get (valuation_of ctx) r (map stringvar_Z idxs1) (eval_get' r (map interp_pZexpr idxs2)).
+Proof.
+  intros H0 H1 H2 H3. revert sh r H1 H2. induction H3; intros sh r H1 H2; simpl.
+  - destruct sh; try discriminate. invert H1. constructor.
+  - destruct sh; try discriminate. invert H1. econstructor.
+    + eapply stringvar_Z_correct; eauto.
+    + admit.
+    + Search x.
+    eassert (eval_get' _ _ = _) as ->; cycle 1.
+    { econstructor.
+    apply IHForall2. constructor.
+
 Hint Resolve dummy_result : core.
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
@@ -1642,6 +1666,7 @@ Proof.
     constructor. eassert (eval_get' _ _ = _) as ->; cycle 1.
     { Print eval_Sexpr. econstructor.
       - eapply ec_of_correct; eauto.
+      - Print eval_get'. Search eval_get.
         destruct H.
         Print wf_ATLexpr. destruct H. invert H.
     2: { econstruc
