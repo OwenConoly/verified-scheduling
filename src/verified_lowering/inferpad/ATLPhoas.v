@@ -1505,6 +1505,18 @@ Proof.
       apply nth_In. lia.
 Qed.
 
+Check stringvar_S.
+Lemma stringvar_S_correct ctx n e_nat e_shal e_string :
+  wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
+  stringvar_S e_nat = Some e_string ->
+  idxs_in_bounds e_shal ->
+  exists s,
+    result_of_pATLexpr e_shal = Result.S s /\
+      eval_Sexpr (valuation_of ctx) (ec_of ctx) e_string s.
+Proof.
+  
+
+Opaque stringvar_S.
 Hint Resolve dummy_result : core.
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
