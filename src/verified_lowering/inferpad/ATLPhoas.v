@@ -1457,6 +1457,7 @@ Ltac nts_inj :=
     end.
 
 Ltac invs'' := invs'; nts_inj; subst.
+Print Sbop.
 
 Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
   match e with
@@ -1479,8 +1480,19 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
       exists sh,
       result_has_shape' sh (result_of_pATLexpr v) /\
         Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs) sh
-  | SBop _ x y =>
-      idxs_in_bounds x /\ idxs_in_bounds y
+  | SBop o x y =>
+      match o with
+      | Div =>
+          match result_of_pATLexpr y with
+          | Result.V _ => False
+          | Result.S s => match s with
+                         | SS s => s
+                         | SX => 0%R
+                         end <> 0%R
+          end
+      | _ => True
+      end
+      /\ idxs_in_bounds x /\ idxs_in_bounds y
   | SIZR _ => True
   end.    
 
@@ -1537,7 +1549,9 @@ Proof.
   intros H0 H. revert e_string. induction H; intros e_string H' Hbds;
     simpl in *; try congruence;
     invs';
-    repeat (destruct_one_match_hyp; try congruence ; []);
+    repeat match goal with
+      | H: context[match ?x with _ => _ end] |- _ => destruct x; try congruence; []
+      end;
     invs'.
   - remember (Var n0) eqn:E'. destruct H; try congruence. invert E'.
     split; [reflexivity|].
@@ -1550,17 +1564,20 @@ Proof.
     reflexivity.
   - specialize (IHwf_ATLexpr1 ltac:(eassumption) _ eq_refl ltac:(assumption)).
     specialize (IHwf_ATLexpr2 ltac:(eassumption) _ eq_refl ltac:(assumption)).
-    repeat (destruct_one_match_hyp; try congruence || contradiction; []; invs').
+    repeat match goal with
+           | H: context[match ?x with _ => _ end] |- _ => destruct x; try contradiction; []
+           end.
+    invs'.
     repeat match goal with
            | H: Result.S _ = Result.S _ |- _ => invert H
            end.
     split; [reflexivity|].
-    destruct o; constructor; auto. admit. (*TODO i have no idea what to do about this*)
+    destruct o; constructor; auto.
   - split; [reflexivity|].
     cbv [option_map] in *.
     repeat (destruct_one_match_hyp; try congruence || contradiction; []; invs').
     erewrite stringvar_ZLit_correct by eassumption. constructor.
-Admitted.
+Qed.
 
 Opaque stringvar_S.
 Hint Resolve dummy_result : core.
@@ -1762,35 +1779,33 @@ Proof.
     + eapply sound_sizeof_size_of; eauto. exact dummy_result.
     + eauto.
   - congruence.
-  - (*i do not understand what happened here*)
-    remember (Var n0) eqn:E'. destruct H; try congruence. invert E'.
-    constructor. eassert (eval_get' _ _ = _) as ->; cycle 1.
-    { Print eval_Sexpr. econstructor.
-      - eapply ec_of_correct; eauto.
-      - eapply eval_get_eval_get'. 1: eauto. 3: eauto. 3: eauto.
-        { simpl in *. assumption. }
-        apply Forall2_length in H3. rewrite length_map in H3. auto. }
-    reflexivity.
-  - admit.
-  - constructor. simpl in E. constructor.
-    Search x2. Search stringvar_S. Print stringvar_S. eassert (match result_of_pATLexpr x2 with _ => _ end = _) as ->. constructor.
-    simpl. Print eval_get. Print eval_get'.
-        
-        
-        ; eauto. eapply evalPrint eval_get'. Search eval_get.
-        destruct H.
-        Print wf_ATLexpr. destruct H. invert H.
-    2: { econstruc
-  - 
-  - 
-    + simpl. f_equal. lia.
-    constructor.
-    cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto. rewrite E.
-    constructor;
-      try match goal with
-        | H: V _ = _ |- _ => rewrite H
-        end.
-    + eauto.
-    + eapply sound_sizeof_size_of; eauto. apply dummy_result.
-  - 
-    
+  - pose proof stringvar_S_correct as H'.
+    epose proof (H' _ _ _ _ _) as H'.
+    specialize (H' ltac:(eassumption)).
+    specialize H' with (2 := E0).
+    specialize (H' ltac:(constructor; eauto) ltac:(simpl; eauto)).
+    simpl in H'.
+    invs'. constructor. assumption.
+  - repeat match goal with
+           | H: context[match ?x with _ => _ end] |- _ =>
+               let E := fresh "E" in destruct x eqn:E; [|congruence]; []
+           end.
+    invs'.
+    pose proof stringvar_S_correct as H'.
+    epose proof (H' _ _ _ _ _) as H'.
+    specialize (H' ltac:(eassumption)).
+    specialize H' with (2 := E1).
+    specialize (H' ltac:(constructor; eauto) ltac:(simpl; eauto)).
+    match goal with
+    | H: context[match ?x with _ => _ end] |- _ =>
+        let E := fresh "E" in destruct x eqn:E; try congruence || contradiction; []
+    end.
+    invs'.
+    simpl in E2.
+    rewrite E2.
+    constructor. assumption.
+  - constructor. eapply stringvar_S_correct in E; eauto.
+    simpl in E. invs'. assumption.
+    Unshelve.
+    all: try exact 0%Z || exact dummy_result || exact (fun _ => 0%nat) || exact (Result.S Result.SX).
+Qed.
