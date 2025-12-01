@@ -587,7 +587,10 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
     | _ => None
     end                  
   | Var x => None (*should never hit this case*)
-  | Get v idxs => ???
+  | @Get _ n v idxs =>
+      if (length idxs =? n)%nat then
+        Some []
+      else None
   | SBop _ x y =>
       match sound_sizeof dummy x, sound_sizeof dummy y with
       | Some _, Some _ => Some []
@@ -703,7 +706,14 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       | _, _ => V []
       end
   | Var x => x
-  | Get x idxs => Result.S (eval_get' (result_of_pATLexpr x) (map interp_pZexpr idxs))
+  | Get x idxs =>
+      (*why is it like this*)
+      let r := eval_get' (result_of_pATLexpr x) (map interp_pZexpr idxs) in
+      Result.S
+        match r with
+        | Result.SS _ => r
+        | Result.SX => Result.SS 0%R
+        end                          
   | SBop o x y =>
       match result_of_pATLexpr x, result_of_pATLexpr y with
       | Result.S x0, Result.S y0 => Result.S (bin_scalar_result (interp_Sbop o) x0 y0)
@@ -1077,8 +1087,8 @@ Proof.
       | H: _ |- _ => erewrite H by eauto
       end;
     try reflexivity.
-  (*why*)
-  erewrite (sound_sizeof_wf_Z _ _ _ hi1) by eauto. reflexivity.
+  - (*why*) erewrite (sound_sizeof_wf_Z _ _ _ hi1) by eauto. reflexivity.
+  - erewrite Forall2_length by eassumption. reflexivity.    
 Qed.
 
 Lemma sizeof_pZexpr_eval_Zexpr e e' :
@@ -1448,23 +1458,52 @@ Ltac nts_inj :=
 
 Ltac invs'' := invs'; nts_inj; subst.
 
-Check eval_get'.
-Lemma eval_get'_correct ctx r sh idxs1 idxs2 :
+Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
+  match e with
+  | Gen lo hi body | Sum lo hi body =>
+      forall i,
+        (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
+        idxs_in_bounds (body i)
+  | Guard p body =>
+      interp_pBexpr p = true ->
+      idxs_in_bounds body
+  | Lbind e1 e2 =>
+      idxs_in_bounds e1 /\ (forall x, idxs_in_bounds (e2 x))
+  | Concat x y =>
+      idxs_in_bounds x /\ idxs_in_bounds y
+  | Flatten e | Split _ e | Transpose e | Truncr _ e | Truncl _ e | Padr _ e
+  | Padl _ e =>
+      idxs_in_bounds e
+  | Var x => True
+  | Get v idxs =>
+      exists sh,
+      result_has_shape' sh (result_of_pATLexpr v) /\
+        Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs) sh
+  | SBop _ x y =>
+      idxs_in_bounds x /\ idxs_in_bounds y
+  | SIZR _ => True
+  end.    
+
+Lemma eval_get_eval_get' ctx r sh idxs1 idxs2 :
   NoDup (map fst_ctx_elt ctx) ->
   result_has_shape' sh r ->
-  length sh = length idxs1 ->
+  length sh = length idxs2 ->
   Forall2 (wf_Zexpr (fun _ : type => nat) interp_type_result ctx) idxs1 idxs2 ->
+  Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs2) sh ->
   eval_get (valuation_of ctx) r (map stringvar_Z idxs1) (eval_get' r (map interp_pZexpr idxs2)).
 Proof.
-  intros H0 H1 H2 H3. revert sh r H1 H2. induction H3; intros sh r H1 H2; simpl.
+  intros H0 H1 H2 H3 H4. revert sh r H1 H2 H4. induction H3; intros sh r H1 H2 H4; simpl.
   - destruct sh; try discriminate. invert H1. constructor.
-  - destruct sh; try discriminate. invert H1. econstructor.
+  - destruct sh; try discriminate. invert H1. simpl in H4. invert H4.
+    econstructor.
     + eapply stringvar_Z_correct; eauto.
-    + admit.
-    + Search x.
-    eassert (eval_get' _ _ = _) as ->; cycle 1.
-    { econstructor.
-    apply IHForall2. constructor.
+    + lia.
+    + apply nth_error_nth'. lia.
+    + rewrite <- nth_default_eq. eapply IHForall2; eauto.
+      pose proof nth_In as H'.
+      eapply Forall_forall; [eassumption|]. rewrite nth_default_eq.
+      apply nth_In. lia.
+Qed.
 
 Hint Resolve dummy_result : core.
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
@@ -1473,10 +1512,11 @@ Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   (forall name'', In name'' (map fst_ctx_elt ctx) -> name'' < name) ->
   stringvar_ATLexpr name e_nat = Some (name', e_string) ->
   sound_sizeof (fun _ => O) e_nat = Some sz ->
+  idxs_in_bounds e_shal ->
   eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr e_shal).
 Proof.
   intros H. revert name name' e_string sz.
-  induction H; intros name name' e_string sz Hctx1 Hctx2 H' Hsz;
+  induction H; intros name name' e_string sz Hctx1 Hctx2 H' Hsz Hbds;
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
           let E := fresh "E" in
@@ -1489,6 +1529,8 @@ Proof.
     repeat match goal with
       | H: (_ <? _)%nat = true |- _ =>
           apply Nat.ltb_lt in H
+      | H: (_ =? _)%nat = true |- _ =>
+          apply Nat.eqb_eq in H; subst
       | H: (_ <=? _)%nat = true |- _ =>
           apply Nat.leb_le in H
       end.
@@ -1504,7 +1546,7 @@ Proof.
         apply Hctx2 in H2'. lia. }
       split.
       { apply no_question_marks. }
-      eapply H2; try eassumption.
+      eapply H2; try eassumption; try eauto.
       { constructor; auto. intros H'. apply Hctx2 in H'. lia. }
       { intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
       erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
@@ -1526,7 +1568,7 @@ Proof.
         apply nat_to_string_injective in H1'. subst. apply Hctx2 in H2'. lia. }
       split.
       { apply no_question_marks. }
-      eapply H2; try eassumption.
+      eapply H2; try eassumption; try eauto.
       { constructor; auto. intros H'. apply Hctx2 in H'. lia. }
       { intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
       erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
@@ -1561,6 +1603,7 @@ Proof.
       -- intros ? [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia.
       -- erewrite sound_sizeof_wf by eauto. erewrite <- sound_sizeof_wf by eauto.
          eassumption.
+      -- auto.
   - pose proof E4 as E4'. pose proof E6 as E6'.
     apply name_gets_bigger in E4', E6'.
     eapply sound_sizeof_tensor_has_size in E1; eauto; [].
@@ -1662,11 +1705,21 @@ Proof.
     + eauto.
   - congruence.
   - (*i do not understand what happened here*)
-    remember (Var n0) eqn:E. destruct H; try congruence. invert E.
+    remember (Var n0) eqn:E'. destruct H; try congruence. invert E'.
     constructor. eassert (eval_get' _ _ = _) as ->; cycle 1.
     { Print eval_Sexpr. econstructor.
       - eapply ec_of_correct; eauto.
-      - Print eval_get'. Search eval_get.
+      - eapply eval_get_eval_get'. 1: eauto. 3: eauto. 3: eauto.
+        { simpl in *. assumption. }
+        apply Forall2_length in H3. rewrite length_map in H3. auto. }
+    reflexivity.
+  - admit.
+  - constructor. simpl in E. constructor.
+    Search x2. Search stringvar_S. Print stringvar_S. eassert (match result_of_pATLexpr x2 with _ => _ end = _) as ->. constructor.
+    simpl. Print eval_get. Print eval_get'.
+        
+        
+        ; eauto. eapply evalPrint eval_get'. Search eval_get.
         destruct H.
         Print wf_ATLexpr. destruct H. invert H.
     2: { econstruc
