@@ -1044,7 +1044,7 @@ Proof.
   - rewrite IHn. do 2 rewrite map_map. rewrite <- seq_shift. rewrite map_map.
     apply map_ext. intros. f_equal. lia.
 Qed.
-
+Check zrange_seq.
 Lemma genr_is_map {X} `{TensorElem X} min max f :
   genr min max f = map f (zrange min max).
 Proof.
@@ -1303,74 +1303,50 @@ Fixpoint tensor_has_size' sh {n} (x : dim_n n) {struct n} :=
              match sh with
              | [] => False
              | len :: sh' =>
-                 x = [] \/
-                   length x = len /\ Forall' (tensor_has_size' sh') x
+                 length x = len /\ Forall' (tensor_has_size' sh') x
              end
   | O => fun _ => sh = []
   end x.
 
-Lemma tensor_has_size'_plus sh x y :
-  tensor_has_size' (n := length sh) sh x ->
-  tensor_has_size' sh y ->
-  tensor_has_size' sh (x <+> y).
-Proof.
-  revert x y. induction sh; simpl; auto.
-  intros x y (Hx1&Hx2) (Hy1&Hy2).
-  subst. erewrite length_add_length by eauto. split; [reflexivity|].
-  (*should be easy if i characterize genr in terms of map and fold_right.*)
-  cbv [tensor_add]. rewrite Hy1.
-  Fail replace (Nat.max _ _) with (length x) by lia.
-  match goal with
-  | |- context[Nat.max ?x ?x] => replace (Nat.max x x) with x by lia
-  end.
-  cbv [gen]. rewrite genr_is_map. apply Forall_Forall'.
-  apply Forall'_Forall in Hx2, Hy2. rewrite zrange_seq.
-  rewrite map_map. apply Forall_map. apply Forall_forall.
-  intros z Hz. apply in_seq in Hz.
-  pose proof (get_is_nth_error x (Z.of_nat z)) as Hx.
-  eassert _ as blah. 2: specialize (Hx blah); clear blah.
-  { cbv [Datatypes.length dim_n_with_pad] in *. lia. }
-  pose proof (get_is_nth_error y (Z.of_nat z)) as Hy.
-  eassert _ as blah. 2: specialize (Hy blah); clear blah.
-  { cbv [Datatypes.length dim_n_with_pad] in *. lia. }
-  apply nth_error_In in Hx, Hy. rewrite Forall_forall in Hx2, Hy2.
-  apply Hx2 in Hx. apply Hy2 in Hy. apply IHsh; assumption.
-Qed.
+Search consistent bin.
+(*this is just consistent_bin*)
+(* Lemma tensor_has_size'_plus sh x y : *)
+(*   tensor_has_size' (n := length sh) sh x -> *)
+(*   tensor_has_size' sh y -> *)
+(*   tensor_has_size' sh (x <+> y). *)
 
-Lemma size_of_sum sz l :
-  Forall (tensor_has_size' sz) l ->
-  tensor_has_size' (n := length sz) sz (fold_right bin (gen_pad_tensor sz) l).
-Proof.
-  induction 1; simpl.
-  - apply tensor_has_size'_gen_pad_tensor.
-  - apply tensor_has_size'_plus; auto.
-Qed.
+(* Lemma size_of_sum sz l : *)
+(*   Forall (tensor_has_size' sz) l -> *)
+(*   tensor_has_size' (n := length sz) sz (fold_right bin (gen_pad_tensor sz) l). *)
+(* Proof. *)
+(*   induction 1; simpl. *)
+(*   - apply tensor_has_size'_gen_pad_tensor. *)
+(*   - apply tensor_has_size'_plus; auto. *)
+(* Qed. *)
         
-Lemma sum_list' sz n l :
-  length sz = n ->
-  Forall (tensor_has_size' sz) l ->
-  add_list_result sz (map with_pad_to_result l)
-    (with_pad_to_result (n := n) (fold_right bin (gen_pad_tensor sz) l)).
-Proof.
-  intros H0 H. subst.  induction H.
-  - simpl. constructor. auto using with_pad_to_result_gen_pad_tensor.
-  - simpl. econstructor.
-    + apply IHForall.
-    + eapply add_result_with_pad_to_result; eauto. apply size_of_sum. assumption.
-Qed.
-Print with_pad_to_result. Print gen_pad_tensor.
-Lemma sum_list sz n f lo hi :
-  length sz = n ->
-  (forall x, tensor_has_size' sz (f x)) ->
-  add_list_result sz (map with_pad_to_result (map f (zrange lo hi)))
-    (with_pad_to_result (sum_with_zero (gen_pad_tensor (n := n) sz) lo hi f)).
-Proof.
-  intros. subst. cbv [sum_with_zero]. intros. apply sum_list'; [reflexivity|].
-  apply Forall_map. rewrite zrange_seq.
-  apply Forall_map. apply Forall_forall. auto.
-Qed.
-
-Lemma consistent_is_tensor_has_size' :
+(* Lemma sum_list' sz n l : *)
+(*   length sz = n -> *)
+(*   Forall (tensor_has_size' sz) l -> *)
+(*   add_list_result sz (map with_pad_to_result l) *)
+(*     (with_pad_to_result (n := n) (fold_right bin (gen_pad_tensor sz) l)). *)
+(* Proof. *)
+(*   intros H0 H. subst.  induction H. *)
+(*   - simpl. constructor. auto using with_pad_to_result_gen_pad_tensor. *)
+(*   - simpl. econstructor. *)
+(*     + apply IHForall. *)
+(*     + eapply add_result_with_pad_to_result; eauto. apply size_of_sum. assumption. *)
+(* Qed. *)
+(* Print with_pad_to_result. Print gen_pad_tensor. *)
+(* Lemma sum_list sz n f lo hi : *)
+(*   length sz = n -> *)
+(*   (forall x, tensor_has_size' sz (f x)) -> *)
+(*   add_list_result sz (map with_pad_to_result (map f (zrange lo hi))) *)
+(*     (with_pad_to_result (sum_with_zero (gen_pad_tensor (n := n) sz) lo hi f)). *)
+(* Proof. *)
+(*   intros. subst. cbv [sum_with_zero]. intros. apply sum_list'; [reflexivity|]. *)
+(*   apply Forall_map. rewrite zrange_seq. *)
+(*   apply Forall_map. apply Forall_forall. auto. *)
+(* Qed. *)
 
 Inductive result_has_shape' : list nat -> result -> Prop :=
 | ScalarShape' s : result_has_shape' [] (Result.S s)
@@ -1580,6 +1556,7 @@ Ltac nts_inj :=
 Ltac invs'' := invs'; nts_inj; subst.
 Print Sbop.
 
+(*also checks that we don't divide by zero*)
 Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
   match e with
   | Gen lo hi body | Sum lo hi body =>
@@ -1615,7 +1592,33 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
       end
       /\ idxs_in_bounds x /\ idxs_in_bounds y
   | SIZR _ => True
-  end.    
+  end.
+
+(*because shallow ATL does not have reasonable semantics for zero-ary sums*)
+Fixpoint sum_bounds_good {n} (e : pATLexpr interp_type n) :=
+  match e with
+  | Gen lo hi body =>
+      forall i,
+        (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
+        sum_bounds_good (body i)
+  | Sum lo hi body =>
+      (interp_pZexpr lo < interp_pZexpr hi)%Z /\
+        forall i,
+          (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
+          sum_bounds_good (body i)
+  | Guard p body =>
+      interp_pBexpr p = true ->
+      sum_bounds_good body
+  | Lbind e1 e2 =>
+      sum_bounds_good e1 /\ (forall x, sum_bounds_good (e2 x))
+  | Concat x y =>
+      sum_bounds_good x /\ sum_bounds_good y
+  | Flatten e | Split _ e | Transpose e | Truncr _ e | Truncl _ e | Padr _ e
+  | Padl _ e =>
+      sum_bounds_good e
+  | Var _ | Get _ _ | SBop _ _ _ | SIZR _ =>
+                                     True
+  end.
 
 Lemma eval_get_eval_get' ctx r sh idxs1 idxs2 :
   NoDup (map fst_ctx_elt ctx) ->
@@ -1819,8 +1822,8 @@ Lemma tensor_has_size_mul {n} sz x (v : dim_n n) :
 Proof.
   revert sz. induction n; intros sz.
   - simpl. auto.
-  - simpl. destruct sz; try contradiction. intros [H|H]; invs'; subst; simpl; auto.
-    right. rewrite map_length. split; [reflexivity|].
+  - simpl. destruct sz; try contradiction. intros H; invs'; subst; simpl; auto.
+    rewrite map_length. split; [reflexivity|].
     rewrite Forall_Forall' in *. apply Forall_map. eapply Forall_impl; eauto.
 Qed.  
 
@@ -1828,6 +1831,16 @@ Ltac prove_sound_sizeof :=
   (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf by eauto; eassumption) ||
   (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf by eauto; eassumption).
 
+(*not true*)
+Lemma consistent_is_tensor_has_size' sh x :
+  tensor_has_size' sh x ->
+  consistent x (tuple_of_list sh).
+Proof.
+  induction sh; simpl; auto.
+  intros [H1 H2]. rewrite <- H1 in *. clear H1. simpl in x. Print tensor_consistent. econstructor. subst.
+  - Abort.
+
+Opaque tensor_has_size'.
 Lemma sound_sizeof_interp_pATLexpr {n} dummy (e : pATLexpr _ n) var2 ctx e2 sh :
   (forall t, var2 t) ->
   wf_ATLexpr interp_type var2 ctx n e e2 ->
@@ -1837,7 +1850,8 @@ Proof.
   intros dummy2 H. revert sh. induction H; intros sh Hsh; simpl in *;
     repeat (destruct_one_match_hyp; try congruence; []);
     invs'.
-  - rewrite genr_is_map. right. rewrite length_map, length_zrange.
+  - rewrite genr_is_map. cbn [tensor_has_size']. right.
+    rewrite length_map, length_zrange.
     do 2 erewrite sizeof_pZexpr_interp_pZexpr by eassumption.
     split; [reflexivity|].
     rewrite Forall_Forall'. apply Forall_map.
@@ -1848,7 +1862,14 @@ Proof.
     + apply tensor_has_size_mul. auto.
     + apply tensor_has_size_mul. auto.
   - apply H1; auto. prove_sound_sizeof.
-  - Search concat.
+  - specialize (IHwf_ATLexpr1 _ eq_refl). specialize (IHwf_ATLexpr2 _ eq_refl).
+    Print concat. Print iverson. Print sum_helper.
+    
+    Search concat consistent. Search consistent.
+    
+    simpl in *.
+
+    erewrite concat_is_app. Search concat.
 
       rewrite mul_1_id. auto.
     + 
