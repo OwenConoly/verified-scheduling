@@ -21,8 +21,6 @@ From Lower Require Import Zexpr Bexpr Array Range Sexpr ListMisc
   WellFormedEnvironment ATLDeep Result.
 Notation S := Datatypes.S.
 
-Open Scope string_scope.
-
 (*where did this come from?  did i put it here?*)
 Set Default Proof Mode "Classic".
 
@@ -521,7 +519,13 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
   match e with
   | Gen lo hi body =>
       match sound_sizeof dummy (body (dummy _)), sizeof_pZexpr lo, sizeof_pZexpr hi with
-      | Some sz, Some lo', Some hi' => Some (Z.to_nat (hi' - lo') :: sz)
+      | Some sz, Some lo', Some hi' =>
+          let n := Z.to_nat (hi' - lo') in
+          (*for reasons described below (truncl case),
+            we check that the tensor has nonzero length*)
+          if (n =? 0)%nat then None
+          else
+            Some (n :: sz)
       | _, _, _ => None
       end
   | Sum lo hi body =>
@@ -560,18 +564,16 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
     | Some (a :: b :: rest) => Some (b :: a :: rest)
     | _ => None
     end
-  | Truncr n e =>
+  | Truncr n e | Truncl n e =>
     match sound_sizeof dummy e with
     | Some (m :: rest) =>
-        if (n <=? m)%nat then
-          Some (m - n :: rest)
-        else None
-    | _ => None
-    end
-  | Truncl n e =>
-    match sound_sizeof dummy e with
-    | Some (m :: rest) =>
-        if (n <=? m)%nat then
+        (*note: ATLDeep.size_of only requires n <=? m.
+          here, we also check n <? m, because we want to
+          guarantee that all tensors have nonzero length.
+          this is because shallow ATL has weird semantics for zero-length tensors,
+          which are incompatible with deep ATL semantics.
+         *)
+        if (n <? m)%nat then
           Some (m - n :: rest)
         else None
     | _ => None
@@ -1190,6 +1192,32 @@ Proof.
     congruence.
 Qed.
 
+Lemma sound_sizeof_nz {var n} dummy (e : pATLexpr var n) sh :
+  sound_sizeof dummy e = Some sh ->
+  ~In 0 sh.
+Proof.
+  revert sh.
+  induction e; simpl; intros;
+    repeat (destruct_one_match_hyp; simpl in *; try congruence; []); invs';
+    repeat (destruct_one_match_hyp; simpl in *; try congruence; []); invs';
+    simpl in *; eauto;
+    repeat match goal with
+      | H: (_ =? _)%nat = false |- _ =>
+          apply Nat.eqb_neq in H
+      | H: (_ <? _)%nat = true |- _ =>
+          apply Nat.ltb_lt in H
+      | H: _ |- _ => specialize (H _ _ ltac:(eassumption))
+      | H: _ |- _ => specialize (H _ eq_refl)            
+      end;
+    simpl in *;
+    try solve [intros [?|?]; [lia|auto] ].
+  - intros [?| [?|?] ]; try lia.
+    + pose proof ndiv_pos as H'. specialize (H' n1 n0 ltac:(lia) ltac:(lia)). lia.
+    + auto.
+  - intros [?| [?|?] ]; [lia|lia|auto].
+  - congruence.
+Qed.
+
 Lemma map_seq a b :
   seq a b = map (plus a) (seq 0 b).
 Proof.
@@ -1275,6 +1303,30 @@ Proof.
     + cbv [nth_default]. replace i with (Z.to_nat (Z.of_nat i)) by lia.
       erewrite get_is_nth_error by lia. f_equal. lia.
 Qed.
+
+Print eval_expr. Print concat.
+Lemma flatten_is_concat {X} `{TensorElem X} n m sh (x : list (list X)) :
+  consistent x (n, (m, sh)) ->
+  Common.flatten x = List.concat x.
+Proof.
+  intros Hx. cbv [Common.flatten]. cbv [gen]. rewrite genr_is_map.
+  rewrite (map_nth_seq null (List.concat _)). rewrite zrange_seq.
+  invert Hx. invert H2.
+  cbn [length]. rewrite get_0_cons. cbn [length].
+  replace (Z.to_nat _) with (length (List.concat ((x :: xs0) :: xs))); cycle 1.
+  { erewrite length_concat.
+    2: { constructor; auto. eapply Forall_impl; [|eassumption].
+         simpl. intros a Ha. invert Ha. assumption. }
+    simpl. lia. }
+  rewrite map_map. apply map_ext_in.
+  remember ((x :: xs0) :: xs) as l.
+  intros i Hi. apply in_seq in Hi. cbv [nth_default].
+  destruct (nth_error _ _) eqn:E.
+  2: { apply nth_error_None in E. lia. }
+  Search sum.
+  
+    Search List.concat.
+  
 
 Fixpoint tuple_of_list (sh : list nat) : (@shape (dim_n (length sh)) _) :=
   match sh return (@shape (dim_n (length sh)) _) with
@@ -1831,14 +1883,65 @@ Ltac prove_sound_sizeof :=
   (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf by eauto; eassumption) ||
   (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf by eauto; eassumption).
 
-(*not true*)
-Lemma consistent_is_tensor_has_size' sh x :
+Lemma consistent_of_tensor_has_size' sh x :
   tensor_has_size' sh x ->
+  ~In 0 sh ->
   consistent x (tuple_of_list sh).
 Proof.
-  induction sh; simpl; auto.
-  intros [H1 H2]. rewrite <- H1 in *. clear H1. simpl in x. Print tensor_consistent. econstructor. subst.
-  - Abort.
+  revert x. induction sh; simpl; auto.
+  intros x [H1 H2] H3. subst. destruct x.
+  { exfalso. simpl in *. auto. }
+  invert H2. constructor.
+  - auto.
+  - rewrite Forall_Forall' in *. eapply Forall_impl; [|eassumption]. auto.
+  - reflexivity.
+Qed.
+
+Lemma tensor_has_size'_dim n sh (x : dim_n n) :
+  tensor_has_size' sh x ->
+  ~In 0 sh ->
+  n = length sh.
+Proof.
+  revert x sh. induction n; simpl.
+  - intros. subst. reflexivity.
+  - intros x sh H1 H2. destruct sh; [contradiction|].
+    destruct H1 as [H1 H3].
+    simpl. f_equal. simpl in *. subst. destruct x.
+    { exfalso. simpl in *. auto. }
+    invert H3. eauto.
+Qed.
+
+Lemma concat_is_app' n m d sh (x y : dim_n (S d)) :
+  tensor_has_size' (n :: sh) x ->
+  tensor_has_size' (m :: sh) y ->
+  ~In 0 sh ->
+  n <> 0 ->
+  m <> 0 ->
+  x <++> y = (x ++ y)%list.
+Proof.
+  intros Hx Hy Hsh Hn Hm.
+  pose proof Hx as Hx'.
+  apply tensor_has_size'_dim in Hx'; try solve [intros [?|?]; auto]; [].
+  simpl in Hx'. invert Hx'.
+  eapply concat_is_app.
+  - apply consistent_of_tensor_has_size' in Hx.
+    + apply Hx.
+    + intros [?|?]; auto.
+  - apply consistent_of_tensor_has_size' in Hy.
+    + apply Hy.
+    + intros [?|?]; auto.
+Qed.
+
+Lemma tensor_has_size'_of_consistent sh x :
+  consistent x (tuple_of_list sh) ->
+  tensor_has_size' sh x.
+Proof.
+  revert x. induction sh; simpl; auto.
+  intros x H. invert H. split; [reflexivity|].
+  rewrite Forall_Forall' in *. constructor; auto.
+  eapply Forall_impl; [|eassumption].
+  simpl. intros a Ha. eauto.
+Qed.
 
 Opaque tensor_has_size'.
 Lemma sound_sizeof_interp_pATLexpr {n} dummy (e : pATLexpr _ n) var2 ctx e2 sh :
@@ -1849,20 +1952,46 @@ Lemma sound_sizeof_interp_pATLexpr {n} dummy (e : pATLexpr _ n) var2 ctx e2 sh :
 Proof.
   intros dummy2 H. revert sh. induction H; intros sh Hsh; simpl in *;
     repeat (destruct_one_match_hyp; try congruence; []);
+    repeat match goal with
+      | H: list_eqb Nat.eqb _ _ = true |- _ =>
+          apply list_eqb_sound in H;
+          [subst|intros; apply Nat.eqb_eq; solve[auto] ]
+      end;
     invs'.
-  - rewrite genr_is_map. cbn [tensor_has_size']. right.
+  - rewrite genr_is_map. cbn [tensor_has_size'].
     rewrite length_map, length_zrange.
     do 2 erewrite sizeof_pZexpr_interp_pZexpr by eassumption.
     split; [reflexivity|].
     rewrite Forall_Forall'. apply Forall_map.
-    apply Forall_forall. intros. eapply H2; eauto.
-    prove_sound_sizeof.
+    apply Forall_forall. intros. eapply H2; eauto. prove_sound_sizeof.
   - Search sumr. admit.
   - destruct (interp_pBexpr _); cbv [iverson].
     + apply tensor_has_size_mul. auto.
     + apply tensor_has_size_mul. auto.
   - apply H1; auto. prove_sound_sizeof.
   - specialize (IHwf_ATLexpr1 _ eq_refl). specialize (IHwf_ATLexpr2 _ eq_refl).
+    apply sound_sizeof_nz in E, E1. simpl in *.
+    erewrite concat_is_app' by eauto. cbn [tensor_has_size']. split.
+    + rewrite length_app. cbn [tensor_has_size'] in *. invs'. reflexivity.
+    + cbn [tensor_has_size'] in *. invs'. rewrite Forall_Forall' in *.
+      apply Forall_app. auto.
+  - Search Common.flatten. Print Common.flatten.
+    constructor.
+    
+    2,3: eassumption.
+    Search tensor_has_size' consistent.
+    pose proof consistent_of_tensor_has_size' as IH1'.
+    specialize (IH1' (n0 :: l0)). simpl in IH1'.
+    pose proof E as E'. pose proof E1 as E1'.
+    apply sound_sizeof_gives_dim in E', E1'.
+    simpl in E', E1'.
+    Check tensor_has_size'.
+    replace (length l0) with n in IH1' by lia.
+    replace (length l2) with n in * by lia.
+    clear E' E1'.
+    
+    rewrite <- E' in x1.
+    apply tensor_has_size'_of_consistent.
     Print concat. Print iverson. Print sum_helper.
     
     Search concat consistent. Search consistent.
