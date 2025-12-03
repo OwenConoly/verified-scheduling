@@ -274,11 +274,11 @@ Proof.
     + left. eapply IHn. lia.
 Qed.
 
-Lemma In_zrange : forall x n,
-    In x (zrange 0 n) <->
-    (0 <= x < n)%Z.
+Lemma In_zrange : forall x min max,
+    In x (zrange min max) <->
+    (min <= x < max)%Z.
 Proof.
-  unfold zrange. intros. rewrite Z.sub_0_r in *.
+  unfold zrange. intros.
   split; intros.
   eapply In_zrange' in H. lia.
   eapply In_zrange'. lia.

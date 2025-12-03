@@ -1303,17 +1303,18 @@ Proof.
 Qed.
 
 Lemma sumr_is_fold_right_map_zero {X} `{TensorElem X} sh min max (f : _ -> X) :
-  (forall i, consistent (f i) sh) ->
+  (forall i, (min <= i < max)%Z -> consistent (f i) sh) ->
   (min < max)%Z ->
   sumr min max f = fold_right bin (scalar_mul 0 (f min)) (map f (zrange min max)).
 Proof.
-  intros. rewrite sumr_is_fold_right_map.
+  intros H1 H2. rewrite sumr_is_fold_right_map.
   do 2 rewrite fold_right_bin_fold_left.
   rewrite zrange_is_cons by lia.
   simpl. f_equal.
   rewrite bin_null_id_l.
-  erewrite bin_mul_0_id by eauto.
-  reflexivity.
+  erewrite bin_mul_0_id; eauto.
+  - apply H1. lia.
+  - apply H1. lia.
 Qed.
 
 Lemma concat_is_app {X} `{TensorElem X} n m sh (x y : list X) :
@@ -1633,10 +1634,12 @@ Proof.
   invert E. reflexivity.
 Qed.
 
-Fixpoint tuple_of_list (sh : list nat) : (@shape (dim_n (length sh)) _) :=
-  match sh return (@shape (dim_n (length sh)) _) with
-  | len :: sh' => (len, tuple_of_list sh')
-  | [] => tt
+Fixpoint tuple_of_list {n} (sh : list nat) : (@shape (dim_n n) _) :=
+  match n, sh return (@shape (dim_n n) _) with
+  | S n', len :: sh' => (len, tuple_of_list sh')
+  | O, [] => tt
+  | S _, _ => (O, tuple_of_list sh) (*garbage*)
+  | O, _ => tt (*garbage*)
   end.
 
 Fixpoint Forall' {X} (P : X -> Prop) l :=
@@ -2210,15 +2213,15 @@ Ltac prove_sound_sizeof :=
     (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf by eauto; eassumption) ||
     (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf by eauto; eassumption).
 
-Lemma consistent_of_tensor_has_size' sh x :
+Lemma consistent_of_tensor_has_size' n sh (x : dim_n n) :
   tensor_has_size' sh x ->
   ~In 0 sh ->
   consistent x (tuple_of_list sh).
 Proof.
-  revert x. induction sh; simpl; auto.
-  intros x [H1 H2] H3. subst. destruct x.
+  revert x sh. induction n; simpl; auto.
+  intros x sh. destruct sh; [contradiction|]. intros [H1 H2] H3. subst. destruct x.
   { exfalso. simpl in *. auto. }
-  invert H2. constructor.
+  invert H2. simpl in *. constructor.
   - auto.
   - rewrite Forall_Forall' in *. eapply Forall_impl; [|eassumption]. auto.
   - reflexivity.
@@ -2259,10 +2262,12 @@ Proof.
     + intros [?|?]; auto.
 Qed.
 
-Lemma tensor_has_size'_of_consistent sh x :
+Lemma tensor_has_size'_of_consistent n sh (x : dim_n n) :
+  n = length sh ->
   consistent x (tuple_of_list sh) ->
   tensor_has_size' sh x.
 Proof.
+  intro. subst.
   revert x. induction sh; simpl; auto.
   intros x H. invert H. split; [reflexivity|].
   rewrite Forall_Forall' in *. constructor; auto.
@@ -2333,15 +2338,20 @@ Proof.
   - invert Hr. simpl. ring.
   - invert Hr. simpl. rewrite map_map. rewrite <- map_constant_repeat.
     rewrite map_map. apply map_ext_in. rewrite Forall_forall in *. eauto.
-Qed.    
+Qed.
+
+Lemma fold_right_map f g x ys :
+  f (fold_right g x ys) = fold_right g (f x) (map f ys).
+
 
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
   wf_ATLexpr interp_type interp_type_result ctx n e_shal e_res ->
   sound_sizeof dummy_shal e_shal = Some sh ->
   Forall res_tensor_corresp ctx ->
+  sum_bounds_good e_shal ->
   tensor_of_result (result_of_pATLexpr e_res) = interp_pATLexpr e_shal.
 Proof.
-  intros H. revert sh. induction H; intros sz Hsz Hctx; simpl in *;
+  intros H. revert sh. induction H; intros sz Hsz Hctx Hbds; simpl in *;
     repeat (destruct_one_match_hyp; try congruence; []);
     invs';
     repeat match goal with
@@ -2355,12 +2365,29 @@ Proof.
   - f_equal. rewrite genr_is_map. rewrite map_map.
     erewrite <- (Zexprs_corresp_same _ _ lo2) by eassumption.
     erewrite <- (Zexprs_corresp_same _ _ hi2) by eassumption.
-    apply map_ext. intros i. eapply H2.
+    apply map_ext_in. intros i Hi. rewrite In_zrange in Hi. eapply H2.
     + prove_sound_sizeof.
     + constructor; auto. simpl. reflexivity.
+    + auto.
   - cbv [sizeof]. simpl.
     replace (sound_sizeof _ _) with (Some sz) by (symmetry; prove_sound_sizeof).
-    erewrite sumr_is_fold_right_map_zero. all: admit.
+    erewrite sumr_is_fold_right_map_zero; cycle 1.
+    + intros i Hi. apply consistent_of_tensor_has_size'.
+      -- erewrite <- H2.
+         ++ apply tensor_of_result_size.
+            --- apply sound_sizeof_gives_dim in Hsz. eauto.
+            --- eapply sound_sizeof_tensor_has_size; eauto.
+         ++ prove_sound_sizeof.
+         ++ constructor; eauto. simpl. reflexivity.
+         ++ auto.
+      -- apply sound_sizeof_nz in Hsz. assumption.
+    + assumption.
+    + cbv [sum_with_sz].
+      Search fold_right map.
+      Lemma fun_of_fold_right :
+        Forall2 (fun y1 y2 => 
+        x2 = f x1 ->
+        f (fold_right g1 x1 ys1) = fold_right g2 x2 ys2.
   - erewrite <- Bexprs_corresp_same by eauto. destruct (interp_pBexpr _); simpl.
     + cbv [iverson]. rewrite mul_1_id. eauto.
     + cbv [iverson]. erewrite <- IHwf_ATLexpr by eassumption.
@@ -2372,7 +2399,9 @@ Proof.
       -- reflexivity.
       -- apply sound_sizeof_gives_dim in Hsz. auto.
       -- assumption.
-  - admit.
+  - cbv [let_binding]. eapply H1.
+    + prove_sound_sizeof.
+    + constructor; [|assumption]. simpl. auto.
   - pose proof sound_sizeof_tensor_has_size as Hx.
     specialize Hx with (1 := H) (2 := E).
     pose proof sound_sizeof_tensor_has_size as Hy.
