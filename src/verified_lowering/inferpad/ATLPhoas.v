@@ -2088,20 +2088,39 @@ Fixpoint result_of_tensor {n} (sh : list nat) (x : dim_n n) :=
   | O => fun x => Result.S (Result.SS x)
   end x.
 
-Definition res_tensor_corresp (x : ctx_elt2 interp_type_result interp_type) :=
+Fixpoint tensor_of_result {n} (r : result) : dim_n n :=
+  match n, r return dim_n n with
+  | S n', Result.V rs =>
+      map tensor_of_result rs
+  | O, Result.S s =>
+      R_of_scalar s
+  | O, _ => 0%R (*garbage*)
+  | S _, _ => [] (*garbage*)
+  end.
+
+Lemma tensor_of_result_size n sh r :
+  n = length sh ->
+  result_has_shape' sh r ->
+  tensor_has_size' (n := n) sh (tensor_of_result r).
+Proof.
+  intros ?. subst. revert sh. induction r; intros sh Hsh.
+  - invert Hsh. simpl. reflexivity.
+  - invert Hsh. simpl. rewrite length_map. split; [reflexivity|].
+    rewrite Forall_Forall'. apply Forall_map. rewrite Forall_forall in *. eauto.
+Qed.
+
+Definition res_tensor_corresp (x : ctx_elt2 interp_type interp_type_result) :=
   match x with
   | {| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => x1 = x2
   | {| ctx_elt_t := tB; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => x1 = x2
   | {| ctx_elt_t := tensor_n _; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} =>
-      forall sh,
-        result_has_shape' sh x1 ->
-        depad x1 = result_of_tensor sh x2
+      x1 = tensor_of_result x2
   end.
 
 (*stupidly non-general*)
 Lemma Zexprs_corresp_same ctx e1 e2 :
   Forall res_tensor_corresp ctx ->
-  wf_Zexpr interp_type_result interp_type ctx e1 e2 ->
+  wf_Zexpr interp_type interp_type_result ctx e1 e2 ->
   interp_pZexpr e1 = interp_pZexpr e2.
 Proof.
   intros Hctx. induction 1; simpl; f_equal; auto.
@@ -2110,7 +2129,7 @@ Qed.
 
 Lemma Bexprs_corresp_same ctx e1 e2 :
   Forall res_tensor_corresp ctx ->
-  wf_Bexpr interp_type_result interp_type ctx e1 e2 ->
+  wf_Bexpr interp_type interp_type_result ctx e1 e2 ->
   interp_pBexpr e1 = interp_pBexpr e2.
 Proof.
   intros Hctx. induction 1; simpl; f_equal; eauto using Zexprs_corresp_same.
@@ -2185,8 +2204,11 @@ Proof.
 Qed.  
 
 Ltac prove_sound_sizeof :=
-  (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf by eauto; eassumption) ||
-  (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf by eauto; eassumption).
+  eassumption ||
+    (erewrite sound_sizeof_wf by eauto; eassumption) ||
+    (erewrite <- sound_sizeof_wf by eauto; eassumption) ||
+    (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf by eauto; eassumption) ||
+    (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf by eauto; eassumption).
 
 Lemma consistent_of_tensor_has_size' sh x :
   tensor_has_size' sh x ->
@@ -2249,106 +2271,135 @@ Proof.
 Qed.
 
 Opaque tensor_has_size'.
-Lemma sound_sizeof_interp_pATLexpr {n} dummy (e : pATLexpr _ n) var2 ctx e2 sh :
-  (forall t, var2 t) ->
-  wf_ATLexpr interp_type var2 ctx n e e2 ->
-  sound_sizeof dummy e = Some sh ->
-  tensor_has_size' sh (interp_pATLexpr e).
+(*I think i do not need to prove this*)
+(* Lemma sound_sizeof_interp_pATLexpr {n} dummy (e : pATLexpr _ n) var2 ctx e2 sh : *)
+(*   (forall t, var2 t) -> *)
+(*   wf_ATLexpr interp_type var2 ctx n e e2 -> *)
+(*   sound_sizeof dummy e = Some sh -> *)
+(*   tensor_has_size' sh (interp_pATLexpr e). *)
+(* Proof. *)
+(*   intros dummy2 H. revert sh. induction H; intros sh Hsh; simpl in *; *)
+(*     repeat (destruct_one_match_hyp; try congruence; []); *)
+(*     repeat match goal with *)
+(*       | H: list_eqb Nat.eqb _ _ = true |- _ => *)
+(*           apply list_eqb_sound in H; *)
+(*           [subst|intros; apply Nat.eqb_eq; solve[auto] ] *)
+(*       end; *)
+(*     invs'. *)
+(*   - rewrite genr_is_map. cbn [tensor_has_size']. *)
+(*     rewrite length_map, length_zrange. *)
+(*     do 2 erewrite sizeof_pZexpr_interp_pZexpr by eassumption. *)
+(*     split; [reflexivity|]. *)
+(*     rewrite Forall_Forall'. apply Forall_map. *)
+(*     apply Forall_forall. intros. eapply H2; eauto. prove_sound_sizeof. *)
+(*   - Search sumr. admit. *)
+(*   - destruct (interp_pBexpr _); cbv [iverson]. *)
+(*     + apply tensor_has_size_mul. auto. *)
+(*     + apply tensor_has_size_mul. auto. *)
+(*   - apply H1; auto. prove_sound_sizeof. *)
+(*   - specialize (IHwf_ATLexpr1 _ eq_refl). specialize (IHwf_ATLexpr2 _ eq_refl). *)
+(*     apply sound_sizeof_nz in E, E1. simpl in *. *)
+(*     erewrite concat_is_app' by eauto. cbn [tensor_has_size']. split. *)
+(*     + rewrite length_app. cbn [tensor_has_size'] in *. invs'. reflexivity. *)
+(*     + cbn [tensor_has_size'] in *. invs'. rewrite Forall_Forall' in *. *)
+(*       apply Forall_app. auto. *)
+(*   - Abort. *)
+
+Ltac specialize' H :=
+  let hyp := fresh "hyp" in
+  eassert _ as hyp;
+  [clear H|specialize (H hyp); clear hyp].  
+
+Ltac epose_dep H :=
+  repeat lazymatch type of H with
+  | ?A -> ?B => fail
+  | forall _, _ => epose proof (H _) as H
+  end.
+
+Definition dummy_shal t : interp_type t :=
+  match t with
+  | tZ => 0%Z
+  | tB => false
+  | tensor_n O => 0%R
+  | tensor_n (S _) => []
+  end.
+
+Lemma scalar_mul_0_tensor_of_result n sz r :
+  n = length sz ->
+  result_has_shape' sz r ->
+  scalar_mul 0 (tensor_of_result (n := n) r) = tensor_of_result (gen_pad sz).
 Proof.
-  intros dummy2 H. revert sh. induction H; intros sh Hsh; simpl in *;
-    repeat (destruct_one_match_hyp; try congruence; []);
-    repeat match goal with
-      | H: list_eqb Nat.eqb _ _ = true |- _ =>
-          apply list_eqb_sound in H;
-          [subst|intros; apply Nat.eqb_eq; solve[auto] ]
-      end;
-    invs'.
-  - rewrite genr_is_map. cbn [tensor_has_size'].
-    rewrite length_map, length_zrange.
-    do 2 erewrite sizeof_pZexpr_interp_pZexpr by eassumption.
-    split; [reflexivity|].
-    rewrite Forall_Forall'. apply Forall_map.
-    apply Forall_forall. intros. eapply H2; eauto. prove_sound_sizeof.
-  - Search sumr. admit.
-  - destruct (interp_pBexpr _); cbv [iverson].
-    + apply tensor_has_size_mul. auto.
-    + apply tensor_has_size_mul. auto.
-  - apply H1; auto. prove_sound_sizeof.
-  - specialize (IHwf_ATLexpr1 _ eq_refl). specialize (IHwf_ATLexpr2 _ eq_refl).
-    apply sound_sizeof_nz in E, E1. simpl in *.
-    erewrite concat_is_app' by eauto. cbn [tensor_has_size']. split.
-    + rewrite length_app. cbn [tensor_has_size'] in *. invs'. reflexivity.
-    + cbn [tensor_has_size'] in *. invs'. rewrite Forall_Forall' in *.
-      apply Forall_app. auto.
-  - Search Common.flatten. Print Common.flatten.
-    constructor.
-    
-    2,3: eassumption.
-    Search tensor_has_size' consistent.
-    pose proof consistent_of_tensor_has_size' as IH1'.
-    specialize (IH1' (n0 :: l0)). simpl in IH1'.
-    pose proof E as E'. pose proof E1 as E1'.
-    apply sound_sizeof_gives_dim in E', E1'.
-    simpl in E', E1'.
-    Check tensor_has_size'.
-    replace (length l0) with n in IH1' by lia.
-    replace (length l2) with n in * by lia.
-    clear E' E1'.
-    
-    rewrite <- E' in x1.
-    apply tensor_has_size'_of_consistent.
-    Print concat. Print iverson. Print sum_helper.
-    
-    Search concat consistent. Search consistent.
-    
-    simpl in *.
+  intros ?. subst. revert sz. induction r; intros sz Hr.
+  - invert Hr. simpl. ring.
+  - invert Hr. simpl. rewrite map_map. rewrite <- map_constant_repeat.
+    rewrite map_map. apply map_ext_in. rewrite Forall_forall in *. eauto.
+Qed.    
 
-    erewrite concat_is_app. Search concat.
-
-      rewrite mul_1_id. auto.
-    + 
-      
-    cbv [tensor_has_size]. 
-  
-  
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
-  wf_ATLexpr interp_type_result interp_type ctx n e_res e_shal ->
-  sound_sizeof dummy_result e_res = Some sh ->
+  wf_ATLexpr interp_type interp_type_result ctx n e_shal e_res ->
+  sound_sizeof dummy_shal e_shal = Some sh ->
   Forall res_tensor_corresp ctx ->
-  depad (result_of_pATLexpr e_res) = result_of_tensor sh (interp_pATLexpr e_shal).
+  tensor_of_result (result_of_pATLexpr e_res) = interp_pATLexpr e_shal.
 Proof.
   intros H. revert sh. induction H; intros sz Hsz Hctx; simpl in *;
     repeat (destruct_one_match_hyp; try congruence; []);
-    invs'.  
-  - f_equal. rewrite genr_is_map. do 2 rewrite map_map.
+    invs';
+    repeat match goal with
+      | H: list_eqb Nat.eqb _ _ = true |- _ =>
+          apply list_eqb_sound in H;
+          [subst|intros; apply Nat.eqb_eq; solve[auto] ]      
+      | IH : _ |- _ => specialize (IH _ eq_refl ltac:(eauto))
+      end;
+    repeat (destruct_one_match_hyp; try congruence; []);
+    invs'.
+  - f_equal. rewrite genr_is_map. rewrite map_map.
     erewrite <- (Zexprs_corresp_same _ _ lo2) by eassumption.
     erewrite <- (Zexprs_corresp_same _ _ hi2) by eassumption.
-    match goal with
-    | |- context[match ?x with | [] => _ | _ :: _ => _ end] => 
-        pose proof (nil_or_not x) as [E'|E'];
-        [rewrite E'|rewrite (not_nil _ _ (fun _ => _)) by eassumption]
-    end.
-    + apply map_eq_nil in E'. rewrite E'.
-      do 2 erewrite sizeof_pZexpr_interp_pZexpr in E' by eassumption.
-      apply zrange_nil_impl in E'. replace (Z.to_nat _) with 0 by lia.
-      simpl. reflexivity.
-    + simpl. f_equal. apply map_ext.
-      intros. apply H2.
-      -- erewrite sound_sizeof_wf by eauto. erewrite <- sound_sizeof_wf by eauto.
-         eassumption.
-      -- constructor; auto. simpl. reflexivity.
+    apply map_ext. intros i. eapply H2.
+    + prove_sound_sizeof.
+    + constructor; auto. simpl. reflexivity.
+  - cbv [sizeof]. simpl.
+    replace (sound_sizeof _ _) with (Some sz) by (symmetry; prove_sound_sizeof).
+    erewrite sumr_is_fold_right_map_zero. all: admit.
+  - erewrite <- Bexprs_corresp_same by eauto. destruct (interp_pBexpr _); simpl.
+    + cbv [iverson]. rewrite mul_1_id. eauto.
+    + cbv [iverson]. erewrite <- IHwf_ATLexpr by eassumption.
+      pose proof sound_sizeof_tensor_has_size as H'.
+      specialize H' with (1 := H0) (2 := Hsz).
+      cbv [sizeof].
+      replace (sound_sizeof _ _) with (Some sz) by (symmetry; prove_sound_sizeof).
+      erewrite scalar_mul_0_tensor_of_result.
+      -- reflexivity.
+      -- apply sound_sizeof_gives_dim in Hsz. auto.
+      -- assumption.
   - admit.
-  - erewrite Bexprs_corresp_same by eauto. destruct (interp_pBexpr _); simpl.
-    + cbv [iverson]. rewrite mul_1_id. auto.
-    + cbv [iverson]. Search sound_sizeof interp_pATLexpr.
-      Search (scalar_mul 0).
-      Unset Printing Notations. cbv [iverson]. Print padless_result_of_tensor.
-    desturct b1
-    cbv [sum_with_sz]. Search fold_right. Search sumr. Print depad. simpl. cbv [sum_with_sz]. Search sumr.
-  - 
-    
-  
-  
+  - pose proof sound_sizeof_tensor_has_size as Hx.
+    specialize Hx with (1 := H) (2 := E).
+    pose proof sound_sizeof_tensor_has_size as Hy.
+    specialize Hy with (1 := H0) (2 := E1).
+    pose proof E as E'. pose proof E1 as E1'.
+    apply sound_sizeof_nz in E, E1. simpl in E, E1.
+    invert Hx. invert Hy. subst.
+    do 2 (destruct_one_match_hyp; try congruence; []).
+    do 2 match goal with
+      | H: Result.V _ = Result.V _ |- _ => invert H
+      end.
+    rewrite <- IHwf_ATLexpr1, <- IHwf_ATLexpr2. clear IHwf_ATLexpr1 IHwf_ATLexpr2.
+    erewrite concat_is_app'.
+    + rewrite map_app. reflexivity.
+    + cbn [tensor_has_size']. rewrite length_map. split; [reflexivity|].
+      rewrite Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
+      intros r Hr. apply tensor_of_result_size. 2: eassumption.
+      apply sound_sizeof_gives_dim in E'. simpl in E'. lia.
+    + cbn [tensor_has_size']. rewrite length_map. split; [reflexivity|].
+      rewrite Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
+      intros r Hr. apply tensor_of_result_size. 2: eassumption.
+      apply sound_sizeof_gives_dim in E'. simpl in E'. lia.
+    + auto.
+    + auto.
+    + auto.
+  - erewrite flatten_is_concat. all: admit.
+Abort.
 
 Opaque stringvar_S.
 Hint Resolve dummy_result : core.
