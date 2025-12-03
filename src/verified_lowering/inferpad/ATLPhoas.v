@@ -1420,8 +1420,47 @@ Proof.
   2: { split.
        - apply Z_div_nonneg_nonneg; lia.
        - cbn [length]. apply Zdiv_lt_upper_bound; lia. }
-  rewrite map_app. rewrite fold_right_app.
+  rewrite map_app. rewrite fold_right_bin_fold_left. rewrite fold_left_app.
+  do 2 rewrite <- fold_right_bin_fold_left.
   rewrite fold_right_id with (x := scalar_mul 0 _); cycle 1.
+  { apply Forall_map. rewrite zrange_seq. apply Forall_map.
+    apply Forall_forall. intros j Hj. apply in_seq in Hj.
+    erewrite sumr_is_fold_right_map_zero; try lia.
+    2: { intros. apply consistent_iverson. eapply consistent_get. eapply consistent_get.
+         subst. constructor; eauto. constructor; eauto. }
+    rewrite fold_right_id; cycle 1.
+    { apply Forall_map. rewrite zrange_seq. apply Forall_map.
+      apply Forall_forall. intros k Hk. apply in_seq in Hk.
+      replace (_ =? _)%Z with false; cycle 1.
+      { symmetry. apply Z.eqb_neq. cbn [length] in *. Fail lia.
+        match goal with
+        | |- ?a <> ?b => enough (b < a)%Z by lia
+        end.
+        repeat rewrite Nat.add_0_l in *. repeat rewrite Z.add_0_l in *.
+        remember ((length xs)) as l1.
+        remember (length xs0) as l2.
+        assert (Z.of_nat j < Z.of_nat i / Z.of_nat (S l2))%Z as Hj' by lia.
+        apply floor_div_mono_upper in Hj'; lia. }
+      unfold iverson at 1. eapply bin_mul_0_id.
+      - eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - apply consistent_mul. apply consistent_iverson.
+        eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - reflexivity. }
+    eapply bin_mul_0_id.
+      - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - apply consistent_mul. apply consistent_sumr. 1: lia.
+        intros. apply consistent_iverson.
+        eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - reflexivity. }
+  rewrite zrange_is_cons; cycle 1.
+  { assert (i < S (length xs0) * S (length xs)) as Hi' by lia.
+    apply Nat.Div0.div_lt_upper_bound in Hi'. cbn [length].
+    Search (Z.of_nat _ / Z.of_nat _)%Z. rewrite <- Nat2Z.inj_div. lia. }
+  cbn [map fold_right]. rewrite fold_right_id; cycle 1.
   { apply Forall_map. rewrite zrange_seq. apply Forall_map.
     apply Forall_forall. intros j Hj. apply in_seq in Hj.
     erewrite sumr_is_fold_right_map_zero; try lia.
@@ -1436,9 +1475,132 @@ Proof.
         | |- ?a <> ?b => enough (a < b)%Z by lia
         end.
         repeat rewrite Nat.add_0_l in *. repeat rewrite Z.add_0_l in *.
-        remember (Z.of_nat (S (length xs))) as l1.
-        remember (length xs0) as l2. Search ((_ + _) * _)%Z.
-        rewrite Z.mul_add_distr_r. Search Common.flatten. Search sum.
+        remember ((length xs)) as l1.
+        remember (length xs0) as l2.
+        do 2 rewrite Z.mul_add_distr_r.
+        rewrite Z.mul_1_l. rewrite <- Nat2Z.inj_div.
+        enough (i < i / S l2 * S l2 + S l2) by lia. clear.
+        remember (_ + _).
+        rewrite (Nat.div_mod_eq i (S l2)).
+        subst.
+        enough (i mod S l2 < S l2) by lia.
+        apply Nat.mod_upper_bound. lia. }
+      unfold iverson at 1. eapply bin_mul_0_id.
+      - eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - apply consistent_mul. apply consistent_iverson.
+        eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - reflexivity. }
+    eapply bin_mul_0_id.
+      - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - apply consistent_mul. apply consistent_sumr. 1: lia.
+        intros. apply consistent_iverson.
+        eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - reflexivity. }
+  erewrite sumr_is_fold_right_map_zero; try lia.
+  2: { intros. apply consistent_iverson. eapply consistent_get. eapply consistent_get.
+       subst. constructor; eauto. constructor; eauto. }
+  rewrite split_zrange with (mid := (Z.of_nat i mod Z.of_nat (length (x :: xs0)))%Z).
+  2: { split.
+       - apply mod_nonneg. simpl. lia.
+       - cbn [length].Search (_ mod _ < _)%Z. apply Z.mod_pos_bound. lia. }
+  rewrite map_app. rewrite fold_right_bin_fold_left. rewrite fold_left_app.
+  do 2 rewrite <- fold_right_bin_fold_left.
+  rewrite fold_right_id with (x := scalar_mul 0 _); cycle 1.
+  { apply Forall_map. rewrite zrange_seq. apply Forall_map.
+      apply Forall_forall. intros k Hk. apply in_seq in Hk.
+      replace (_ =? _)%Z with false; cycle 1.
+      { symmetry. apply Z.eqb_neq. cbn [length] in *. Fail lia.
+        match goal with
+        | |- ?a <> ?b => enough (b < a)%Z by lia
+        end.
+        repeat rewrite Nat.add_0_l in *. repeat rewrite Z.add_0_l in *.
+        remember ((length xs)) as l1.
+        remember (length xs0) as l2.
+        Search (_ / _ * _ + _)%Z.
+        remember (_ + _)%Z.
+        rewrite <- (div_mod_eq (Z.of_nat i) (Z.of_nat (S l2))) by lia.
+        subst. lia. }
+      unfold iverson at 1. eapply bin_mul_0_id.
+    - eapply consistent_get. eapply consistent_get. subst.
+      constructor; eauto. constructor; eauto.
+    - apply consistent_mul. apply consistent_iverson.
+      eapply consistent_get. eapply consistent_get. subst.
+      constructor; eauto. constructor; eauto.
+    - reflexivity. }
+  rewrite zrange_is_cons; cycle 1.
+  { cbn [length]. Search (_ mod _ < _)%Z. apply mod_upper_bound. lia. }
+  cbn [map fold_right]. rewrite fold_right_id; cycle 1.
+  { apply Forall_map. rewrite zrange_seq. apply Forall_map.
+    apply Forall_forall. intros j Hj. apply in_seq in Hj.
+    replace (_ =? _)%Z with false; cycle 1.
+    { symmetry. apply Z.eqb_neq. cbn [length] in *. Fail lia.
+      match goal with
+      | |- ?a <> ?b => enough (a < b)%Z by lia
+      end.
+      repeat rewrite Nat.add_0_l in *. repeat rewrite Z.add_0_l in *.
+      remember ((length xs)) as l1.
+      remember (length xs0) as l2.
+      match goal with
+      | |- (_ < ?b)%Z => remember b
+      end.
+      rewrite <- (div_mod_eq (Z.of_nat i) (Z.of_nat (S l2))) by lia.
+      lia. }
+      unfold iverson at 1. eapply bin_mul_0_id.
+      - eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - apply consistent_mul. apply consistent_iverson.
+        eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - reflexivity. }
+  replace (_ =? _)%Z with true; cycle 1.
+  { symmetry. apply Z.eqb_eq. cbn [length] in *.
+    remember ((length xs)) as l1.
+    remember (length xs0) as l2.
+    match goal with
+    | |- (_ = ?b)%Z => remember b
+    end.
+    rewrite <- (div_mod_eq (Z.of_nat i) (Z.of_nat (S l2))) by lia.
+    lia. }
+  unfold iverson at 1. eapply bin_mul_0_id.
+  - eapply consistent_get. eapply consistent_get. subst.
+    constructor; eauto. constructor; eauto.
+  - apply consistent_mul. apply consistent_iverson.
+    eapply consistent_get. eapply consistent_get. subst.
+    constructor; eauto. constructor; eauto.
+  - reflexivity. 
+  
+    eapply bin_mul_0_id.
+      - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - apply consistent_mul. apply consistent_sumr. 1: lia.
+        intros. apply consistent_iverson.
+        eapply consistent_get. eapply consistent_get. subst.
+        constructor; eauto. constructor; eauto.
+      - reflexivity. }
+  
+  eapply bin_mul_0_id.
+  - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
+    constructor; eauto. constructor; eauto.
+  - apply consistent_mul. apply consistent_sumr. 1: lia.
+    intros. apply consistent_iverson.
+    eapply consistent_get. eapply consistent_get. subst.
+    constructor; eauto. constructor; eauto.
+  - reflexivity.
+  
+  
+  
+    
+  replace (_ =? _)%Z with true.
+    cbn [Nat.add] in *. simpl in *. Search (_ < _ * _). lia.
+  - 
+        
+      erewrite bin_mul_0_id; [reflexivity|
+        Print Common.flatten.
+        Search Common.flatten. Search sum.
         enough (Z.of_nat i < 
         
         Search (_ = (_ / _) * _ + _)%Z. 
