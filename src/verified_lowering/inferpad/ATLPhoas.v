@@ -1263,6 +1263,59 @@ Proof.
     rewrite Forall_forall in Hx. apply consistent_mul. auto.
 Qed.
 
+Print sumr. Print sum_helper.
+Print bin. Check fold_right.
+
+Lemma sum_helper_is_fold_right_map {X} `{TensorElem X} n x (f : _ -> X) :
+  sum_helper n x f = fold_right bin null (map f (map (fun y => (x + Z.of_nat y)%Z) (seq 0 n))).
+Proof.
+  revert x f. induction n; intros x f; simpl.
+  - reflexivity.
+  - replace (x + 0)%Z with x by lia. f_equal. rewrite IHn. f_equal.
+    rewrite <- seq_shift. do 3 rewrite map_map.
+    apply map_ext. intros. f_equal. lia.
+Qed.
+
+Lemma sumr_is_fold_right_map {X} `{TensorElem X} min max (f : _ -> X) :
+  sumr min max f = fold_right bin null (map f (zrange min max)).
+Proof.
+  cbv [sumr]. rewrite sum_helper_is_fold_right_map.
+  rewrite zrange_seq. reflexivity.
+Qed.
+
+Lemma zrange_is_cons min max :
+  (min < max)%Z ->
+  zrange min max = min :: zrange (min + 1) max.
+Proof.
+  intros H. do 2 rewrite zrange_seq.
+  replace (Z.to_nat (max - min)) with (S (Z.to_nat (max - (min + 1)))) by lia.
+  simpl. f_equal.
+  - lia.
+  - rewrite map_seq. rewrite map_map. apply map_ext. intros. lia.
+Qed.
+
+Lemma fold_right_bin_fold_left {X} `{TensorElem X} x ys :
+  fold_right bin x ys = fold_left bin ys x.
+Proof.
+  symmetry. apply fold_symmetric.
+  - apply H.
+  - apply H.
+Qed.
+
+Lemma sumr_is_fold_right_map_zero {X} `{TensorElem X} sh min max (f : _ -> X) :
+  (forall i, consistent (f i) sh) ->
+  (min < max)%Z ->
+  sumr min max f = fold_right bin (scalar_mul 0 (f min)) (map f (zrange min max)).
+Proof.
+  intros. rewrite sumr_is_fold_right_map.
+  do 2 rewrite fold_right_bin_fold_left.
+  rewrite zrange_is_cons by lia.
+  simpl. f_equal.
+  rewrite bin_null_id_l.
+  erewrite bin_mul_0_id by eauto.
+  reflexivity.
+Qed.
+
 Lemma concat_is_app {X} `{TensorElem X} n m sh (x y : list X) :
   consistent x (n, sh) ->
   consistent y (m, sh) ->
@@ -1304,7 +1357,40 @@ Proof.
       erewrite get_is_nth_error by lia. f_equal. lia.
 Qed.
 
-Print eval_expr. Print concat.
+Lemma split_seq a b c :
+  c < b ->
+  seq a b = (seq a c ++ seq (a + c) (b - c))%list.
+Proof.
+  revert a c. induction b; intros a c H; simpl.
+  - lia.
+  - destruct c.
+    + simpl. replace (a + 0) with a by lia. reflexivity.
+    + simpl. f_equal. erewrite IHb.
+      -- f_equal. f_equal. lia.
+      -- lia.
+Qed.  
+
+Lemma split_zrange min mid max :
+  (min <= mid < max)%Z ->
+  zrange min max = (zrange min mid ++ zrange mid max)%list.
+Proof.
+  intros H. do 3 rewrite zrange_seq.
+  rewrite (split_seq 0 (Z.to_nat (max - min)) (Z.to_nat (mid - min))) by lia.
+  rewrite map_app. f_equal.
+  rewrite (map_seq (0 + _)). rewrite map_map.
+  replace (_ - _)%nat with (Z.to_nat (max - mid)) by lia.
+  apply map_ext. intros. lia.
+Qed.
+
+Lemma fold_right_id {A B} (x : B) (ys : list A) f :
+  Forall (fun y => f y x = x) ys ->
+  fold_right f x ys = x.
+Proof.
+  induction 1; simpl.
+  - reflexivity.
+  - rewrite IHForall. assumption.
+Qed.  
+
 Lemma flatten_is_concat {X} `{TensorElem X} n m sh (x : list (list X)) :
   consistent x (n, (m, sh)) ->
   Common.flatten x = List.concat x.
@@ -1313,16 +1399,55 @@ Proof.
   rewrite (map_nth_seq null (List.concat _)). rewrite zrange_seq.
   invert Hx. invert H2.
   cbn [length]. rewrite get_0_cons. cbn [length].
-  replace (Z.to_nat _) with (length (List.concat ((x :: xs0) :: xs))); cycle 1.
+  remember ((x :: xs0) :: xs) as l eqn:El.
+  replace (Z.to_nat _) with (S (length xs) * S (length xs0)) by lia.
+  assert (length (List.concat l) = S (length xs) * S (length xs0)) as Hlen.
   { erewrite length_concat.
-    2: { constructor; auto. eapply Forall_impl; [|eassumption].
+    2: { subst. constructor; auto. eapply Forall_impl; [|eassumption].
          simpl. intros a Ha. invert Ha. assumption. }
-    simpl. lia. }
+    subst. simpl. lia. }
+  rewrite Hlen.
   rewrite map_map. apply map_ext_in.
-  remember ((x :: xs0) :: xs) as l.
   intros i Hi. apply in_seq in Hi. cbv [nth_default].
   destruct (nth_error _ _) eqn:E.
   2: { apply nth_error_None in E. lia. }
+  cbv [sum]. erewrite sumr_is_fold_right_map_zero; try lia.
+  2: { intros. apply consistent_sumr. 1: lia.
+       intros. apply consistent_iverson.
+       eapply consistent_get. eapply consistent_get. subst. constructor; eauto.
+       constructor; eauto. }
+  rewrite split_zrange with (mid := (Z.of_nat i / Z.of_nat (length (x :: xs0)))%Z).
+  2: { split.
+       - apply Z_div_nonneg_nonneg; lia.
+       - cbn [length]. apply Zdiv_lt_upper_bound; lia. }
+  rewrite map_app. rewrite fold_right_app.
+  rewrite fold_right_id with (x := scalar_mul 0 _); cycle 1.
+  { apply Forall_map. rewrite zrange_seq. apply Forall_map.
+    apply Forall_forall. intros j Hj. apply in_seq in Hj.
+    erewrite sumr_is_fold_right_map_zero; try lia.
+    2: { intros. apply consistent_iverson. eapply consistent_get. eapply consistent_get.
+         subst. constructor; eauto. constructor; eauto. }
+    rewrite fold_right_id; cycle 1.
+    { apply Forall_map. rewrite zrange_seq. apply Forall_map.
+      apply Forall_forall. intros k Hk. apply in_seq in Hk.
+      replace (_ =? _)%Z with false; cycle 1.
+      { symmetry. apply Z.eqb_neq. cbn [length] in *. Fail lia.
+        match goal with
+        | |- ?a <> ?b => enough (a < b)%Z by lia
+        end.
+        repeat rewrite Nat.add_0_l in *. repeat rewrite Z.add_0_l in *.
+        remember (Z.of_nat (S (length xs))) as l1.
+        remember (length xs0) as l2. Search ((_ + _) * _)%Z.
+        rewrite Z.mul_add_distr_r. Search Common.flatten. Search sum.
+        enough (Z.of_nat i < 
+        
+        Search (_ = (_ / _) * _ + _)%Z. 
+        Search (_ < _ * _).
+      Search (_ / _ < _)%Z. cbn [apply Z.div_lt.
+         simpl.
+  Search zrange.
+  fold_right bin null xs = fold_right bin (filter 
+  Search sumr.
   Search sum.
   
     Search List.concat.
