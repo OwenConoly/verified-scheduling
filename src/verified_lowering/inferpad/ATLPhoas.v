@@ -1389,7 +1389,40 @@ Proof.
   induction 1; simpl.
   - reflexivity.
   - rewrite IHForall. assumption.
-Qed.  
+Qed.
+
+Lemma nth_error_concat {A} (l : list (list A)) n i :
+  Forall (fun x => length x = n) l ->
+      nth_error (List.concat l) i =
+        match nth_error l (i / n) with
+        | Some l' => nth_error l' (i mod n)
+        | None => None
+        end.
+Proof.
+  destruct n.
+  { intros.
+    destruct (nth_error _ _) eqn:E1.
+    - apply nth_error_In in E1. Search In List.concat. apply in_concat in E1.
+      destruct E1 as (l'&H1&H2). rewrite Forall_forall in H.
+      apply H in H1. destruct l'; try discriminate. contradiction.
+    - destruct (nth_error _ (_ / _)) eqn:E2; [|reflexivity].
+      apply nth_error_In in E2. rewrite Forall_forall in H.
+      apply H in E2. destruct l0; try discriminate. rewrite nth_error_nil.
+      reflexivity. }
+  intros H. revert i. induction H; intros i.
+  - simpl. do 2 rewrite nth_error_nil. reflexivity.
+  - cbn [nth_error List.concat]. rewrite <- H in *.
+    assert (i < length x \/ length x <= i) as [Hn|Hn] by lia.
+    + rewrite nth_error_app1 by lia. rewrite Nat.div_small by lia.
+      rewrite Nat.mod_small by lia. reflexivity.
+    + rewrite nth_error_app2 by lia. rewrite IHForall.
+      remember (_ - _).
+      replace i with ((i - length x) + 1 * length x) by lia.
+      rewrite Nat.div_add by lia.
+      rewrite Nat.mod_add by lia.
+      Search (_ + 1). rewrite Nat.add_1_r.
+      simpl. subst. reflexivity.
+Qed.
 
 Lemma flatten_is_concat {X} `{TensorElem X} n m sh (x : list (list X)) :
   consistent x (n, (m, sh)) ->
@@ -1506,7 +1539,7 @@ Proof.
   rewrite split_zrange with (mid := (Z.of_nat i mod Z.of_nat (length (x :: xs0)))%Z).
   2: { split.
        - apply mod_nonneg. simpl. lia.
-       - cbn [length].Search (_ mod _ < _)%Z. apply Z.mod_pos_bound. lia. }
+       - apply Z.mod_pos_bound. lia. }
   rewrite map_app. rewrite fold_right_bin_fold_left. rewrite fold_left_app.
   do 2 rewrite <- fold_right_bin_fold_left.
   rewrite fold_right_id with (x := scalar_mul 0 _); cycle 1.
@@ -1565,55 +1598,40 @@ Proof.
     end.
     rewrite <- (div_mod_eq (Z.of_nat i) (Z.of_nat (S l2))) by lia.
     lia. }
-  unfold iverson at 1. eapply bin_mul_0_id.
-  - eapply consistent_get. eapply consistent_get. subst.
-    constructor; eauto. constructor; eauto.
-  - apply consistent_mul. apply consistent_iverson.
-    eapply consistent_get. eapply consistent_get. subst.
-    constructor; eauto. constructor; eauto.
-  - reflexivity. 
-  
-    eapply bin_mul_0_id.
-      - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
-        constructor; eauto. constructor; eauto.
-      - apply consistent_mul. apply consistent_sumr. 1: lia.
-        intros. apply consistent_iverson.
-        eapply consistent_get. eapply consistent_get. subst.
-        constructor; eauto. constructor; eauto.
-      - reflexivity. }
-  
-  eapply bin_mul_0_id.
-  - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
-    constructor; eauto. constructor; eauto.
-  - apply consistent_mul. apply consistent_sumr. 1: lia.
-    intros. apply consistent_iverson.
-    eapply consistent_get. eapply consistent_get. subst.
-    constructor; eauto. constructor; eauto.
-  - reflexivity.
-  
-  
-  
-    
-  replace (_ =? _)%Z with true.
-    cbn [Nat.add] in *. simpl in *. Search (_ < _ * _). lia.
-  - 
-        
-      erewrite bin_mul_0_id; [reflexivity|
-        Print Common.flatten.
-        Search Common.flatten. Search sum.
-        enough (Z.of_nat i < 
-        
-        Search (_ = (_ / _) * _ + _)%Z. 
-        Search (_ < _ * _).
-      Search (_ / _ < _)%Z. cbn [apply Z.div_lt.
-         simpl.
-  Search zrange.
-  fold_right bin null xs = fold_right bin (filter 
-  Search sumr.
-  Search sum.
-  
-    Search List.concat.
-  
+  unfold iverson at 1.
+  rewrite bin_comm. rewrite bin_assoc. erewrite bin_mul_0_id; cycle 1.
+  { apply consistent_sumr. 1: lia. intros.
+    apply consistent_iverson. eapply consistent_get. eapply consistent_get.
+    subst. constructor; eauto. constructor; auto. }
+  { apply consistent_mul. eapply consistent_get. eapply consistent_get.
+    subst. constructor; eauto. constructor; auto. }
+  { reflexivity. }
+  rewrite bin_comm. erewrite bin_mul_0_id; cycle 1.
+  { apply consistent_iverson. eapply consistent_get. eapply consistent_get.
+    subst. constructor; eauto. constructor; auto. }
+  { apply consistent_mul. eapply consistent_get. eapply consistent_get.
+    subst. constructor; eauto. constructor; auto. }
+  { reflexivity. }
+  erewrite nth_error_concat in E; cycle 1.
+  { subst. constructor; auto. eapply Forall_impl; [|eassumption].
+    simpl. intros ? H'. invert H'. assumption. }
+  rewrite <- (Nat2Z.id (_ / _)) in E.
+  rewrite get_is_nth_error in E.
+  2: { split; [lia|].
+       cbn [length].
+       enough (i / S (length xs0) < length l) by lia. subst.
+       assert (i < S (length xs0) * S (length xs)) as Hi' by lia.
+       apply Nat.Div0.div_lt_upper_bound in Hi'. cbn [length].
+       lia. }
+  rewrite <- (Nat2Z.id (_ mod _)) in E.
+  rewrite get_is_nth_error in E.
+  2: { split; [lia|].
+       cbn [length] in *.
+       apply nth_error_Some in E. lia. }
+  rewrite mul_1_id.
+  rewrite <- Nat2Z.inj_div. rewrite <- Nat2Z.inj_mod.
+  invert E. reflexivity.
+Qed.
 
 Fixpoint tuple_of_list (sh : list nat) : (@shape (dim_n (length sh)) _) :=
   match sh return (@shape (dim_n (length sh)) _) with
