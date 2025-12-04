@@ -502,21 +502,8 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
   | SIZR x => IZR (interp_pZexpr x)
   end.
-Print interp_pZexpr.
-(*this shouldnnt be seaprate defn, sbouut be paremetericzed over intepr_var*)
 
-Print sound_sizeof.
-
-(*copied from coqutil... would be nice to just have coqutil as a dependency; if not, could just copy-paste idk *)
-(*also, how is this not in the standard library.  or maybe i should just use list_eq_dec?*)
-Definition list_eqb {A: Type} (aeqb : A -> A -> bool) (x y : list A) : bool :=
-  ((length x =? length y)%nat && forallb (fun xy => aeqb (fst xy) (snd xy)) (combine x y))%bool.
-
-Lemma list_eqb_sound {A : Type} (aeqb : A -> A -> bool) x y :
-  (forall x y, aeqb x y = true -> x = y) ->
-  list_eqb aeqb x y = true -> x = y.
-Proof. Admitted.
-
+Check list_eq_dec.
 Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : option (list nat) :=
   match e with
   | Gen lo hi body =>
@@ -542,7 +529,7 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
   | Concat x y =>
       match sound_sizeof dummy x, sound_sizeof dummy y with
       | Some (nx :: restx), Some (ny :: resty) =>
-          if list_eqb Nat.eqb restx resty then
+          if list_eq_dec Nat.eq_dec restx resty then
             Some (nx + ny :: restx)
           else
             None
@@ -1151,9 +1138,6 @@ Proof.
     invs';
     try solve [constructor; eauto];
     repeat match goal with
-      | H: list_eqb Nat.eqb _ _ = true |- _ =>
-          apply list_eqb_sound in H;
-          [subst|intros; apply Nat.eqb_eq; solve[auto] ]
       | H: (_ <? _)%nat = true |- _ =>
           apply Nat.ltb_lt in H
       | H: (_ <=? _)%nat = true |- _ =>
@@ -1840,9 +1824,6 @@ Proof.
     repeat (destruct_one_match_hyp; simpl in *; try congruence; []); invs';
     simpl in *; eauto;
     repeat match goal with
-      | H: list_eqb Nat.eqb _ _ = true |- _ =>
-          apply list_eqb_sound in H;
-          [subst|intros; apply Nat.eqb_eq; solve[auto] ]
       | H: (_ <? _)%nat = true |- _ =>
           apply Nat.ltb_lt in H
       | H: (_ <=? _)%nat = true |- _ =>
@@ -2300,41 +2281,6 @@ Proof.
   simpl. intros a Ha. eauto.
 Qed.
 
-Opaque tensor_has_size'.
-(*I think i do not need to prove this*)
-(* Lemma sound_sizeof_interp_pATLexpr {n} dummy (e : pATLexpr _ n) var2 ctx e2 sh : *)
-(*   (forall t, var2 t) -> *)
-(*   wf_ATLexpr interp_type var2 ctx n e e2 -> *)
-(*   sound_sizeof dummy e = Some sh -> *)
-(*   tensor_has_size' sh (interp_pATLexpr e). *)
-(* Proof. *)
-(*   intros dummy2 H. revert sh. induction H; intros sh Hsh; simpl in *; *)
-(*     repeat (destruct_one_match_hyp; try congruence; []); *)
-(*     repeat match goal with *)
-(*       | H: list_eqb Nat.eqb _ _ = true |- _ => *)
-(*           apply list_eqb_sound in H; *)
-(*           [subst|intros; apply Nat.eqb_eq; solve[auto] ] *)
-(*       end; *)
-(*     invs'. *)
-(*   - rewrite genr_is_map. cbn [tensor_has_size']. *)
-(*     rewrite length_map, length_zrange. *)
-(*     do 2 erewrite sizeof_pZexpr_interp_pZexpr by eassumption. *)
-(*     split; [reflexivity|]. *)
-(*     rewrite Forall_Forall'. apply Forall_map. *)
-(*     apply Forall_forall. intros. eapply H2; eauto. prove_sound_sizeof. *)
-(*   - Search sumr. admit. *)
-(*   - destruct (interp_pBexpr _); cbv [iverson]. *)
-(*     + apply tensor_has_size_mul. auto. *)
-(*     + apply tensor_has_size_mul. auto. *)
-(*   - apply H1; auto. prove_sound_sizeof. *)
-(*   - specialize (IHwf_ATLexpr1 _ eq_refl). specialize (IHwf_ATLexpr2 _ eq_refl). *)
-(*     apply sound_sizeof_nz in E, E1. simpl in *. *)
-(*     erewrite concat_is_app' by eauto. cbn [tensor_has_size']. split. *)
-(*     + rewrite length_app. cbn [tensor_has_size'] in *. invs'. reflexivity. *)
-(*     + cbn [tensor_has_size'] in *. invs'. rewrite Forall_Forall' in *. *)
-(*       apply Forall_app. auto. *)
-(*   - Abort. *)
-
 Ltac specialize' H :=
   let hyp := fresh "hyp" in
   eassert _ as hyp;
@@ -2604,9 +2550,6 @@ Proof.
     repeat (destruct_one_match_hyp; try congruence; []);
     invs';
     repeat match goal with
-      | H: list_eqb Nat.eqb _ _ = true |- _ =>
-          apply list_eqb_sound in H;
-          [subst|intros; apply Nat.eqb_eq; solve[auto] ]      
       | IH : _ |- _ => specialize (IH _ eq_refl ltac:(eauto) ltac:(eauto))
       end;
     repeat (destruct_one_match_hyp; try congruence; []);
@@ -2803,7 +2746,7 @@ Proof.
   - erewrite <- Zexprs_corresp_same by eassumption. reflexivity.
     Unshelve.
     all: exact dummy_result || exact 0%Z || exact (dummy_result _).
-Qed.
+Abort.
 
 Opaque stringvar_S.
 Hint Resolve dummy_result : core.
@@ -3008,7 +2951,7 @@ Proof.
   - pose proof stringvar_S_correct as H'.
     epose proof (H' _ _ _ _ _) as H'.
     specialize (H' ltac:(eassumption)).
-    specialize H' with (2 := E0).
+    specialize H' with (2 := E1).
     specialize (H' ltac:(constructor; eauto) ltac:(simpl; eauto)).
     simpl in H'.
     invs'. constructor. assumption.
