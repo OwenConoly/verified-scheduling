@@ -580,6 +580,97 @@ Proof.
       reflexivity.
 Qed.
 
+Lemma split_result_length_helper T k x0 l0 (x : T) :
+  0 < k ->
+  x0 < Datatypes.length l0 //n k ->
+  k =
+  length
+    (firstn k
+       (skipn (k * x0)
+          (l0 ++
+           repeat x ((k - Datatypes.length l0 mod k) mod k)))).
+Proof.
+  rewrite skipn_app. rewrite firstn_app.
+  rewrite length_skipn. rewrite skipn_repeat.
+  rewrite firstn_repeat. cbn [length]. 
+  rewrite length_app. rewrite length_firstn. 
+  rewrite length_skipn. rewrite repeat_length.
+  simpl length.
+  remember (length l0) as q. clear Heqq.
+  
+  intros H H2.
+  cases (q mod k).
+  - rewrite sub_0_r. rewrite Div0.mod_same by lia. rewrite sub_0_l.
+    rewrite min_0_l. rewrite add_0_r.
+    pose proof Heq. eapply Div0.div_exact in Heq.
+    rewrite Heq. rewrite <- mul_sub_distr_l.
+    pose proof H0.
+    rewrite mod_0_iff_ceil_eq_floor_0 in H0 by lia.
+    rewrite H0 in H2. pose proof H1.
+    cases (q / k - x0). lia.
+    rewrite min_l. reflexivity.
+    rewrite mul_comm. simpl. eapply le_add_r.
+  - cases (q //n k - q / k).
+    + eapply mod_0_iff_ceil_sub_floor_0 in Heq0. lia. lia.
+    + pose proof (ceil_sub_floor_le_1 q k).
+      assert (n0 = 0) by lia. subst.
+      assert (x0 = q / k \/
+                x0 < q / k) by lia.
+      invert H1.
+      * rewrite <- Div0.mod_eq by lia.
+        rewrite min_r.
+        2: { pose proof (Nat.mod_upper_bound q k).
+             lia. }
+        replace (k * (q / k) - q) with 0.
+        2: { pose proof (Div0.mul_div_le q k). lia. }
+        rewrite sub_0_r. rewrite Heq.
+        rewrite min_l.
+        2: { eapply Div0.mod_le. }
+        rewrite <- Heq.
+
+        unfold modulo. unfold modulo in Heq. cases k. lia.
+        pose proof (divmod_spec q k 0 k).
+        cases (divmod q k 0 k).
+        assert (k<=k) by lia. propositional.
+        rewrite mul_0_r in *. rewrite add_0_r in *.
+        rewrite sub_diag in *. rewrite add_0_r in *.
+        simpl. simpl in Heq. rewrite Heq. simpl.
+        f_equal.
+        pose proof (divmod_spec (k - n) k 0 k).
+        cases (divmod (k - n) k 0 k). propositional. simpl.
+        rewrite sub_diag in *. rewrite mul_0_r in *.
+        repeat rewrite add_0_r in *.
+        assert (k - (k-n3) = n ->k = n + (k - n3)). lia.
+        apply H6.
+        rewrite sub_sub_distr by lia.
+        rewrite sub_diag. simpl. clear H6.
+        assert (Datatypes.S k * n2 + (k - n3) <= k) by lia.
+        pose proof H6. eapply le_add_le_sub_r in H8.
+        assert (k - (k-n3) <= k) by lia.
+        assert (Datatypes.S k * n2 <= k) by lia.
+        cases n2.
+        2: { remember (Datatypes.S k). rewrite mul_comm in H10.
+             simpl in H10. subst. lia. }
+        rewrite mul_0_r in H4. simpl in H4. lia.
+      * erewrite (Nat.div_mod_eq q k).
+        rewrite add_sub_swap.
+        2: { eapply mul_le_mono_l. lia. }
+        rewrite <- mul_sub_distr_l.
+        rewrite min_l.
+        2: { cases (q / k - x0).
+             lia. rewrite mul_comm. simpl.
+             rewrite <- add_assoc. eapply le_add_r. }
+        repeat rewrite sub_add_distr.
+        rewrite <- mul_sub_distr_l.
+        cases (x0 - q / k).
+        2: lia. rewrite mul_0_r. rewrite sub_0_l. rewrite sub_0_r.
+        replace k with (k*1) at 5 by lia.
+        rewrite <- mul_sub_distr_l.
+        replace (1 - (q / k - x0)) with 0 by lia.
+        rewrite mul_0_r. rewrite sub_0_l.
+        rewrite min_0_r. lia.
+Qed.
+
 Lemma result_has_shape_split_result : forall l k n sh,
     0 < k ->
     result_has_shape (V l) (n :: sh) ->
@@ -590,11 +681,6 @@ Proof.
     rewrite div_small by lia. simpl. econstructor.
   - unfold split_result. remember sub. simpl. invert H0.
     rewrite app_comm_cons.
-    erewrite map_nat_range_extensionality.
-    2: { intros. rewrite skipn_app. rewrite firstn_app.
-         rewrite length_skipn. rewrite skipn_repeat.
-         rewrite firstn_repeat. simpl length.
-         reflexivity. }
     eapply forall_result_has_shape.
     2: { rewrite length_map. unfold nat_range.
          rewrite length_nat_range_rec. reflexivity. }
@@ -603,83 +689,14 @@ Proof.
     eapply in_map_iff in H0. invs.
     eapply In_nat_range in H2.
     eapply forall_result_has_shape.
-    2: { rewrite length_app. rewrite length_firstn. 
-         rewrite length_skipn. rewrite repeat_length.
-         simpl length.
-         cases (Datatypes.S (Datatypes.length l) mod k).
-         - rewrite sub_0_r. rewrite Div0.mod_same by lia. rewrite sub_0_l.
-           rewrite min_0_l. rewrite add_0_r.
-           pose proof Heq. eapply Div0.div_exact in Heq. 
-           rewrite Heq. rewrite <- mul_sub_distr_l.
-           pose proof H0.
-           rewrite mod_0_iff_ceil_eq_floor_0 in H0 by lia.
-           rewrite H0 in H2. pose proof H1.
-           cases (Datatypes.S (Datatypes.length l) / k - x0). lia.
-           rewrite min_l. reflexivity.
-           rewrite mul_comm. simpl. eapply le_add_r.
-         - cases (Datatypes.S (length l) //n k - Datatypes.S (length l) / k).
-           + eapply mod_0_iff_ceil_sub_floor_0 in Heq0. lia. lia.
-           + pose proof (ceil_sub_floor_le_1 (Datatypes.S (length l)) k).
-             assert (n0 = 0) by lia. subst.
-             assert (x0 = Datatypes.S (Datatypes.length l) / k \/
-                       x0 < Datatypes.S (Datatypes.length l) / k) by lia.
-             invert H1.
-             * rewrite <- Div0.mod_eq by lia.
-               rewrite min_r.
-               2: { pose proof (Nat.mod_upper_bound
-                                  (Datatypes.S (Datatypes.length l)) k).
-                    lia. }
-               replace (k * (Datatypes.S (length l) / k) -
-                          Datatypes.S (length l)) with 0.
-               2: { pose proof (Div0.mul_div_le
-                                  (Datatypes.S (length l)) k). lia. }
-               rewrite sub_0_r. rewrite Heq.
-               rewrite min_l.
-               2: { eapply Div0.mod_le. }
-               rewrite <- Heq.
-
-               unfold modulo. unfold modulo in Heq. cases k. lia.
-               pose proof (divmod_spec(Datatypes.S (Datatypes.length l)) k 0 k).
-               cases (divmod (Datatypes.S (Datatypes.length l)) k 0 k).
-               assert (k<=k) by lia. propositional.
-               rewrite mul_0_r in *. rewrite add_0_r in *.
-               rewrite sub_diag in *. rewrite add_0_r in *.
-               simpl. simpl in Heq. rewrite Heq. simpl.
-               f_equal.
-               pose proof (divmod_spec (k - n) k 0 k).
-               cases (divmod (k - n) k 0 k). propositional. simpl.
-               rewrite sub_diag in *. rewrite mul_0_r in *.
-               repeat rewrite add_0_r in *.
-               assert (k - (k-n3) = n ->k = n + (k - n3)). lia.
-               apply H8.
-               rewrite sub_sub_distr by lia.
-               rewrite sub_diag. simpl. clear H8.
-               assert (Datatypes.S k * n2 + (k - n3) <= k) by lia.
-               pose proof H8. eapply le_add_le_sub_r in H10.
-               assert (k - (k-n3) <= k) by lia.
-               assert (Datatypes.S k * n2 <= k) by lia.
-               cases n2.
-               2: { remember (Datatypes.S k). rewrite mul_comm in H12.
-                    simpl in H12. subst. lia. }
-               rewrite mul_0_r in H4. simpl in H4. lia.
-             * erewrite (Nat.div_mod_eq (Datatypes.S (length l)) k).
-               rewrite add_sub_swap.
-               2: { eapply mul_le_mono_l. lia. }
-               rewrite <- mul_sub_distr_l.
-               rewrite min_l.
-               2: { cases (Datatypes.S (Datatypes.length l) / k - x0).
-                    lia. rewrite mul_comm. simpl.
-                    rewrite <- add_assoc. eapply le_add_r. }
-               repeat rewrite sub_add_distr.
-               rewrite <- mul_sub_distr_l.
-               cases (x0 - Datatypes.S (Datatypes.length l) / k).
-               2: lia. rewrite mul_0_r. rewrite sub_0_l. rewrite sub_0_r.
-               replace k with (k*1) at 5 by lia.
-               rewrite <- mul_sub_distr_l.
-               replace (1 - (Datatypes.S (length l) / k - x0)) with 0 by lia.
-               rewrite mul_0_r. rewrite sub_0_l.
-               rewrite min_0_r. lia.
-    }
+    2: { remember (a :: l) as l0.
+         replace (Datatypes.S _) with (length l0) in * by (subst; reflexivity).
+         clear Heql0. clear -H H2.
+         apply split_result_length_helper; auto. }
+    rewrite skipn_app. rewrite firstn_app.
+    rewrite length_skipn. rewrite skipn_repeat.
+    rewrite firstn_repeat. cbn [length]. 
+    
     rewrite Forall_app. split.
     eapply forall_firstn. eapply forall_skipn. econstructor; eauto.
     eapply Forall_repeat.
@@ -1734,7 +1751,7 @@ Proof.
     cases v. invert H7. lia.
     cases k. simpl. rewrite min_0_r. reflexivity.
     rewrite <- succ_min_distr.
-    unfold nat_range. simpl nat_range_rec. rewrite map_cons.
+    unfold nat_range. simpl seq. rewrite map_cons.
     simpl firstn. pose proof H7.
     eapply result_has_shape_length in H. cases m. lia. invert H.
     f_equal. erewrite IHm0.
@@ -1758,7 +1775,7 @@ Lemma skipn_transpose_result_list : forall m0 l k n m sh,
     m0 <= m ->
     skipn k (transpose_result_list l m0) =
       map (fun x => V (get_col l x))
-          (nat_range_rec (m0-k) (m-m0+k)).
+          (seq (m-m0+k) (m0-k)).
 Proof.
   induct m0; intros.
   - simpl. rewrite skipn_nil. reflexivity.
@@ -1769,7 +1786,7 @@ Proof.
     pose proof H7. eapply result_has_shape_length in H. invert H.
     cases k.
     + simpl skipn. rewrite add_0_r. rewrite sub_0_r.
-      simpl nat_range_rec. rewrite map_cons. f_equal.
+      simpl seq. rewrite map_cons. f_equal.
       specialize IHm0 with (k:=0).
       simpl in *|-. erewrite IHm0.
       rewrite add_0_r in *. rewrite sub_0_r in *.
@@ -1819,7 +1836,7 @@ Proof.
       rewrite succ_nat_range_rec_app_end. rewrite add_0_r.
       rewrite map_app.
       simpl map at 2. rewrite sub_0_r. f_equal.
-      replace (nat_range_rec m0 0) with (nat_range m0) by auto.
+      replace (seq 0 m0) with (nat_range m0) by auto.
       replace m0 with (min m0 k) at 2 by lia.
       erewrite <- IHm0.
       2: econstructor; eauto.
@@ -2343,7 +2360,7 @@ Lemma flatten_result_split_nat_range_rec_gen : forall n k l a sh c,
            repeat (gen_pad sh)
              (min (Datatypes.length l mod k - (k * (x-c) - Datatypes.length l))
                 (k - (Datatypes.length l - k * (x-c))))))
-       (nat_range_rec n c)) = 
+       (seq c n)) = 
   firstn (n * k) l.
 Proof.
   induct n; intros.
@@ -2355,7 +2372,7 @@ Proof.
     replace (k - Datatypes.S (Datatypes.length l)) with 0 by lia.
     rewrite min_0_r. simpl repeat at 1. rewrite app_nil_r.
     f_equal.
-    erewrite <- IHn with (sh:=sh) (c:=c+1).
+    erewrite <- IHn with (sh:=sh) (c:=Datatypes.S c).
     rewrite length_skipn. simpl length.
     2: lia.
     2: { simpl in *. rewrite length_skipn. simpl length in *. lia. }
@@ -2363,7 +2380,7 @@ Proof.
          invert H1. econstructor. eauto. eauto. reflexivity. }
     f_equal. eapply map_nat_range_rec_extensionality.
     intros. f_equal. rewrite skipn_skipn.
-    replace (k * (x - (c + 1)) + k) with (k * (Datatypes.S (x - (c + 1))))
+    replace (k * (x - (Datatypes.S c)) + k) with (k * (Datatypes.S (x - (c + 1))))
       by lia.
     f_equal. f_equal. f_equal.
     rewrite sub_add_distr. f_equal. lia.
@@ -2381,13 +2398,11 @@ Proof.
          rewrite Div0.add_mod by lia. symmetry. rewrite Div0.add_mod by lia.
          rewrite Nat.mul_comm. rewrite Div0.mod_mul.
          rewrite Nat.mul_comm. rewrite Div0.mod_mul. reflexivity. }
-    rewrite sub_add_distr.
     f_equal. f_equal. f_equal.
-    repeat rewrite mul_sub_distr_l. rewrite mul_1_r.
-    lia.
+    repeat rewrite mul_sub_distr_l. lia.
     symmetry.
     rewrite <- sub_add_distr.
-    replace (k + k * (x - c - 1)) with (k * (x - c - 1 + 1)) by lia.
+    replace (k + k * (x - Datatypes.S c)) with (k * (x - c - 1 + 1)) by lia.
     f_equal. f_equal. f_equal. lia.
 Qed.
 
@@ -2573,11 +2588,11 @@ Qed.
 Lemma flatten_result_nat_range_rec : forall a n l k,
     flatten_result
       (map (fun x => V (firstn k (skipn (k * x) l)))
-           (nat_range_rec a n)) = firstn (a*k) (skipn (n*k) l).
+           (seq n a)) = firstn (a*k) (skipn (n*k) l).
 Proof.
   induct a; intros.
   - simpl. reflexivity.
-  - simpl. rewrite Nat.add_comm. rewrite firstn_add.
+  - simpl. rewrite firstn_add.
     f_equal. rewrite mul_comm. reflexivity.
     rewrite IHa. simpl. rewrite skipn_skipn. reflexivity.
 Qed.

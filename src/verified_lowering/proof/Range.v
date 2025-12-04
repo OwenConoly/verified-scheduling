@@ -24,13 +24,7 @@ Fixpoint zrange' lo range :=
 
 Definition zrange lo hi := zrange' lo (Z.to_nat (hi-lo)%Z).
 
-Fixpoint nat_range_rec k x :=
-  match k with
-  | 0 => []
-  | Datatypes.S n => x::(nat_range_rec n (x+1))
-  end.
-
-Definition nat_range k := nat_range_rec k 0.
+Definition nat_range k := seq 0 k.
 
 Lemma map_zrange'_shift_1 {X} : forall k lo (f : Z -> X),
     map f (zrange' (lo+1)%Z k) =
@@ -118,22 +112,18 @@ Proof.
 Qed.
 
 Lemma succ_nat_range_rec_app_end : forall n k,
-    nat_range_rec (Datatypes.S n) k = ((nat_range_rec n k) ++  [n+k])%list.
+    seq k (Datatypes.S n) = ((seq k n) ++  [n+k])%list.
 Proof.
-  induct n; intros.
-  - reflexivity.
-  - simpl in *. f_equal.
-    rewrite IHn. f_equal. f_equal. lia.
+  intros. rewrite seq_S. f_equal. f_equal. lia.
 Qed.
 
 Lemma map_nat_range_rec_extensionality {X} : forall n k (f g : nat -> X),
-    (forall x, k <= x < n + k-> f x = g x) ->
-    map f (nat_range_rec n k) = map g (nat_range_rec n k).
+    (forall x, k <= x < n + k -> f x = g x) ->
+    map f (seq k n) = map g (seq k n).
 Proof.
-  induct n; intros.
-  - reflexivity.
-  - simpl. f_equal. eapply H. lia.
-    eapply IHn. intros. eapply H. lia.
+  intros ? ? ? ? H. apply map_ext_in.
+  intros i Hi. apply in_seq in Hi.
+  apply H. lia.
 Qed.
 
 Lemma map_nat_range_extensionality {X} : forall n (f g : nat -> X),
@@ -153,11 +143,9 @@ Proof.
 Qed.
 
 Lemma length_nat_range_rec : forall n k,
-    length (nat_range_rec n k) = n.
+    length (seq k n) = n.
 Proof.
-  induct n; intros.
-  - reflexivity.
-  - simpl. rewrite IHn. lia.
+  intros. apply length_seq.
 Qed.
 
 Lemma no_dup_map2_cons_concat : forall a l,
@@ -202,26 +190,20 @@ Proof.
 Qed.
 
 Lemma range_nat_range_rec : forall k n x,
-  In x (nat_range_rec k n) ->
+  In x (seq n k) ->
   n <= x < n + k.
 Proof.
-  induct k; intros.
-  - simpl in *. propositional.
-  - simpl in *. propositional.
-    + lia.
-    + subst. lia.
-    + eapply IHk in H0. lia.
-    + eapply IHk in H0. lia.
+  apply in_seq.
 Qed.
 
 Lemma zrange'_nat_range_rec : forall n k,
     (0 <= k)%Z ->
-    zrange' k n  = map Z.of_nat (nat_range_rec n (Z.to_nat k)).
+    zrange' k n  = map Z.of_nat (seq (Z.to_nat k) n).
 Proof.
   induct n; intros.
   - reflexivity.
   - simpl. f_equal. lia.
-    replace (Z.to_nat k + 1) with (Z.to_nat (k+1))%Z by lia.
+    replace (S (Z.to_nat k)) with (Z.to_nat (k+1))%Z by lia.
     eapply IHn. lia.
 Qed.
 
@@ -237,7 +219,7 @@ Qed.
 
 Lemma eq_zrange'_nat_range_rec : forall x y,
     x = y ->
-    zrange' 0 x = map Z.of_nat (nat_range_rec y 0).
+    zrange' 0 x = map Z.of_nat (seq 0 y).
 Proof.
   induct x; propositional; subst.
   - reflexivity.
@@ -286,23 +268,12 @@ Qed.
 
 Lemma In_nat_range_rec :
   forall n k x,
-    In x (nat_range_rec n k) <->
+    In x (seq k n) <->
       k <= x < n + k.
 Proof.
-  induct n; intros; split; intros.
-  - invert H.
-  - lia.
-  - rewrite succ_nat_range_rec_app_end in *.
-    eapply in_app_or in H.
-    simpl in *. invert H.
-    + eapply IHn in H0. lia.
-    + invert H0. 2: contradiction.
-      lia.
-  - rewrite succ_nat_range_rec_app_end in *.
-    eapply in_or_app. simpl.
-    assert (n + k = x \/ n + k <> x) by lia. invert H0.
-    + propositional.
-    + left. eapply IHn. lia.
+  split; intros H.
+  - apply in_seq in H. lia.
+  - apply in_seq. lia.
 Qed.
   
 Lemma In_nat_range :
@@ -317,7 +288,7 @@ Proof.
 Qed.  
 
 Lemma map_nat_range_rec_shift {X} : forall n k (f : nat -> X),
-    map f (nat_range_rec n k) =
+    map f (seq k n) =
       map (fun x => f (x+k)) (nat_range n).
 Proof.
   induct n; intros.
@@ -327,7 +298,7 @@ Proof.
 Qed.
 
 Lemma skipn_rev_nat_range_rec : forall n k c,    
-    skipn c (rev (nat_range_rec n k)) = rev (nat_range_rec (n-c) k).
+    skipn c (rev (seq k n)) = rev (seq k (n-c)).
 Proof.
   induct n; intros.
   - simpl. rewrite skipn_nil. reflexivity.
@@ -339,8 +310,8 @@ Proof.
 Qed.
 
 Lemma firstn_nat_range_rec : forall n k c,
-    firstn c (nat_range_rec n k) =
-      nat_range_rec (min c n) k.
+    firstn c (seq k n) =
+      seq k (min c n).
 Proof.
   induct n; intros.
   - simpl. rewrite firstn_nil. rewrite min_0_r. reflexivity.
@@ -351,8 +322,7 @@ Proof.
 Qed.
 
 Lemma skipn_nat_range_rec : forall n k c,
-    skipn c (nat_range_rec n k) =
-      nat_range_rec (n-c) (k+c).
+    skipn c (seq k n) = seq (k+c) (n-c).
 Proof.
   induct n; intros.
   - simpl. rewrite skipn_nil. reflexivity.
@@ -362,8 +332,7 @@ Proof.
 Qed.
 
 Lemma skipn_nat_range : forall n c,
-    skipn c (nat_range n) =
-      nat_range_rec (n-c) c.
+    skipn c (nat_range n) = seq c (n-c).
 Proof.
   unfold nat_range. intros. rewrite skipn_nat_range_rec. reflexivity.
 Qed.
@@ -386,8 +355,8 @@ Proof.
 Qed.
 
 Lemma firstn_rev_nat_range_rec : forall n k c,
-    firstn k (rev (nat_range_rec n c)) =
-      rev (nat_range_rec (min k n) (c+(n-k))).
+    firstn k (rev (seq c n)) =
+      rev (seq (c+(n-k)) (min k n)).
 Proof.
   induct n; intros.
   - simpl. rewrite min_0_r. rewrite firstn_nil. reflexivity.
@@ -407,7 +376,7 @@ Qed.
 
 Lemma nth_error_nat_range_rec : forall n k x,
     x < n ->
-    nth_error (nat_range_rec n k) x = Some (k+x).
+    nth_error (seq k n) x = Some (k+x).
 Proof.
   induct n; intros.
   - lia.

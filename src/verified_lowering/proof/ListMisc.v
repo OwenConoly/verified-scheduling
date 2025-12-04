@@ -23,6 +23,15 @@ Fixpoint filter_until l k :=
   | _ => []
   end.
 
+Lemma filter_until_not_in l k :
+  ~In k l ->
+  filter_until l k = l.
+Proof.
+  induction l as [|a l]; intros Hk; [reflexivity|].
+  simpl. simpl in Hk. assert (a <> k) as H by auto.
+  apply Nat.eqb_neq in H. rewrite H. f_equal. apply IHl. auto.
+Qed.
+
 Lemma Forall_repeat {X} : forall n a (P : X -> Prop),
     P a ->
     Forall P (repeat a n).
