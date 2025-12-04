@@ -139,90 +139,6 @@ Fixpoint sizeof (e : ATLexpr) : list Zexpr :=
     []
   end.
 
-(*copied from coqutil, which i should maybe just add as a dependency?*)
-Definition list_eqb {A: Type} (aeqb : A -> A -> bool) (x y : list A) : bool :=
-  ((length x =? length y)%nat && forallb (fun xy => aeqb (fst xy) (snd xy)) (combine x y))%bool.
-
-Lemma list_eqb_sound {A : Type} (aeqb : A -> A -> bool) x y :
-  (forall x y, aeqb x y = true -> x = y) ->
-  list_eqb aeqb x y = true -> x = y.
-Proof. Admitted.  
-
-(*i want this for reification.  probably, all uses of sizeof could be replaced with
-  sound_sizeof, but i will not bother.*)
-(*this is actually stronger than size_of.  it's like "hereditarily size_of"*)
-Fixpoint sound_sizeof (e : ATLexpr) : option (list nat) :=
-  match e with
-  | Gen i lo hi body =>
-      match sound_sizeof body, eval_Zexpr_Z $0 (ZMinus hi lo) with
-      | Some sz, Some n => Some (Z.to_nat n :: sz)
-      | _, _ => None
-      end
-  | Sum i lo hi body =>
-      sound_sizeof body
-  | Guard p body =>
-      sound_sizeof body
-  | Lbind x e1 e2 =>
-      match sound_sizeof e1 with
-      | Some _ => sound_sizeof e2
-      | _ => None
-      end
-  | Concat x y =>
-      match sound_sizeof x, sound_sizeof y with
-      | Some (nx :: restx), Some (ny :: resty) =>
-          if list_eqb Nat.eqb restx resty then
-            Some (nx + ny :: restx)
-          else
-            None
-      | _, _ => None
-      end
-  | Flatten e =>
-      match sound_sizeof e with
-      | Some (a::b::rest) => Some (a * b :: rest)
-      | _ => None
-      end
-  | Split k e =>
-      match sound_sizeof e, eval_Zexpr_Z $0 k with
-      | Some (a::rest), Some kz =>
-          if (0 <? kz)%Z then
-            Some (a //n (Z.to_nat kz) :: Z.to_nat kz :: rest)
-          else None
-      | _, _ => None
-      end
-  | Transpose e =>
-      match sound_sizeof e with
-      | Some (a::b::rest) => Some (b::a::rest)
-      | _ => None
-      end
-  | Truncr n e =>
-      match sound_sizeof e, eval_Zexpr_Z $0 n with
-      | Some (m::rest), Some nz =>
-          if (Z.to_nat nz <=? m)%nat then
-            Some (m - Z.to_nat nz ::rest)
-          else None
-      | _, _ => None
-      end
-  | Truncl n e =>
-      match sound_sizeof e, eval_Zexpr_Z $0 n with
-      | Some (m::rest), Some nz =>
-          if (Z.to_nat nz <=? m)%nat then
-            Some (m - Z.to_nat nz :: rest)
-          else None
-      | _, _ => None
-      end           
-  | Padr n e =>
-      match sound_sizeof e, eval_Zexpr_Z $0 n with
-      | Some (m :: rest), Some nz => Some (m + Z.to_nat nz :: rest)
-      | _, _ => None
-      end         
-  | Padl n e =>
-      match sound_sizeof e, eval_Zexpr_Z $0 n with
-      | Some (m :: rest), Some nz => Some (m + Z.to_nat nz :: rest)
-      | _, _ => None
-      end                  
-  | Scalar s => Some []
-  end.
-
 Definition flat_sizeof e :=
   match sizeof e with
   | [] => | 0 |%z
@@ -684,27 +600,6 @@ Ltac destruct_one_match_hyp :=
       let E := fresh "E" in
       destruct e eqn:E
   end.
-
-Lemma sound_sizeof_size_of e sz :
-  sound_sizeof e = Some sz ->
-  size_of e sz.
-Proof.
-  revert sz. induction e; simpl; intros;
-    repeat (destruct_one_match_hyp; try congruence);
-    invs';
-    repeat match goal with
-      | H: eval_Zexpr_Z _ _ = Some _ |- _ =>
-          apply eval_Zexpr_Z_eval_Zexpr in H
-      | H: list_eqb Nat.eqb _ _ = true |- _ =>
-          apply list_eqb_sound in H;
-          [subst|intros; apply Nat.eqb_eq; solve[auto] ]
-      | H: (_ <? _)%Z = true |- _ =>
-          apply Z.ltb_lt in H
-      | H: (_ <=? _)%nat = true |- _ =>
-          apply Nat.leb_le in H
-      end;
-    eauto.
-Qed.
 
 Theorem dom_alloc_array_in_heap : forall h x l,
     l <> [] ->
