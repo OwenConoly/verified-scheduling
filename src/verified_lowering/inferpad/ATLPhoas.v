@@ -21,6 +21,8 @@ From Lower Require Import Zexpr Bexpr Array Range Sexpr ListMisc
   WellFormedEnvironment ATLDeep Result.
 Notation S := Datatypes.S.
 
+Open Scope list_scope.
+
 (*where did this come from?  did i put it here?*)
 Set Default Proof Mode "Classic".
 
@@ -1336,7 +1338,7 @@ Qed.
 Lemma concat_is_app {X} `{TensorElem X} n m sh (x y : list X) :
   consistent x (n, sh) ->
   consistent y (m, sh) ->
-  x <++> y = (x ++ y)%list.
+  x <++> y = x ++ y.
 Proof.
   intros Hx Hy. cbv [concat]. cbv [gen]. rewrite genr_is_map. rewrite zrange_seq.
   rewrite map_map. replace (Z.to_nat _) with (length x + length y) by lia.
@@ -1376,7 +1378,7 @@ Qed.
 
 Lemma split_seq a b c :
   c < b ->
-  seq a b = (seq a c ++ seq (a + c) (b - c))%list.
+  seq a b = seq a c ++ seq (a + c) (b - c).
 Proof.
   revert a c. induction b; intros a c H; simpl.
   - lia.
@@ -1389,7 +1391,7 @@ Qed.
 
 Lemma split_zrange min mid max :
   (min <= mid < max)%Z ->
-  zrange min max = (zrange min mid ++ zrange mid max)%list.
+  zrange min max = zrange min mid ++ zrange mid max.
 Proof.
   intros H. do 3 rewrite zrange_seq.
   rewrite (split_seq 0 (Z.to_nat (max - min)) (Z.to_nat (mid - min))) by lia.
@@ -2263,7 +2265,7 @@ Lemma concat_is_app' n m d sh (x y : dim_n (S d)) :
   ~In 0 sh ->
   n <> 0 ->
   m <> 0 ->
-  x <++> y = (x ++ y)%list.
+  x <++> y = x ++ y.
 Proof.
   intros Hx Hy Hsh Hn Hm.
   pose proof Hx as Hx'.
@@ -2524,6 +2526,66 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma pad_l_is_app_pad m n sh k (v : dim_n (S m)) :
+  ~In 0 (n :: sh) ->
+  tensor_has_size' (n :: sh) v ->
+  pad_l k v = repeat (tensor_of_result (gen_pad sh)) k ++ v.
+Proof.
+  intros Hnz Hsz. cbv [pad_l]. cbv [gen]. rewrite genr_is_map.
+  pose proof Hnz as Hnz'. eapply tensor_has_size'_dim in Hnz; eauto.
+  simpl in Hnz. invert Hnz.
+  rewrite zrange_seq. rewrite map_map.
+  replace (Z.to_nat _) with (k + length v) by lia.
+  rewrite seq_app. rewrite map_app. f_equal.
+  - erewrite map_ext_in.
+    + rewrite map_const. rewrite length_seq. reflexivity.
+    + simpl. intros i Hi. apply in_seq in Hi. destruct (_ <=? _)%Z eqn:E.
+      -- apply Z.leb_le in E. lia.
+      -- cbv [iverson]. cbn [tensor_has_size'] in Hsz. destruct Hsz as [? Hsz]. subst.
+         destruct v; [simpl in Hnz'; exfalso; auto|]. rewrite get_neg_null by lia.
+         cbv [iverson]. rewrite mul_0_idemp. erewrite scalar_mul_0_is_0.
+         ++ reflexivity.
+         ++ auto.
+         ++ rewrite Forall_Forall' in Hsz. invert Hsz. assumption.
+  - remember (map _ _). rewrite (map_nth_seq null v). subst.
+    rewrite map_seq. rewrite map_map. apply map_ext_in.
+    intros i Hi. apply in_seq in Hi. destruct (_ <=? _)%Z eqn:E; cycle 1.
+    { apply Z.leb_nle in E. lia. }
+    cbv [iverson]. rewrite mul_1_id.
+    rewrite get_is_nth_error by lia. f_equal. lia.
+Qed.
+
+Lemma pad_r_is_app_pad m n sh k (v : dim_n (S m)) :
+  ~In 0 (n :: sh) ->
+  tensor_has_size' (n :: sh) v ->
+  pad_r k v = v ++ repeat (tensor_of_result (gen_pad sh)) k.
+Proof.
+  intros Hnz Hsz. cbv [pad_r]. cbv [gen]. rewrite genr_is_map.
+  pose proof Hnz as Hnz'. eapply tensor_has_size'_dim in Hnz; eauto.
+  simpl in Hnz. invert Hnz.
+  rewrite zrange_seq. rewrite map_map.
+  replace (Z.to_nat _) with (length v + k) by lia.
+  rewrite seq_app. rewrite map_app. f_equal.
+  - remember (map _ _). rewrite (map_nth_seq null v). subst.
+    rewrite map_seq at 2. rewrite map_map. apply map_ext_in.
+    intros i Hi. apply in_seq in Hi. destruct (_ <? _)%Z eqn:E; cycle 1.
+    { apply Z.ltb_nlt in E. lia. }
+    cbv [iverson]. rewrite mul_1_id.
+    rewrite get_is_nth_error by lia. f_equal. lia.
+  - erewrite map_ext_in.
+    + rewrite map_const. rewrite length_seq. reflexivity.
+    + simpl. intros i Hi. apply in_seq in Hi. destruct (_ <? _)%Z eqn:E.
+      { apply Z.ltb_lt in E. lia. }
+      cbv [iverson]. cbn [tensor_has_size'] in Hsz. destruct Hsz as [? Hsz]. subst.
+      destruct v; [simpl in Hnz'; exfalso; auto|].
+      rewrite get_znlt_null.
+      2: { cbn [length] in *. Fail lia. cbv [dim_n] in *. lia. }
+      cbv [iverson]. rewrite mul_0_idemp. erewrite scalar_mul_0_is_0.
+      ++ reflexivity.
+      ++ auto.
+      ++ rewrite Forall_Forall' in Hsz. invert Hsz. assumption.
+Qed.
+
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
   wf_ATLexpr interp_type interp_type_result ctx n e_shal e_res ->
   sound_sizeof dummy_shal e_shal = Some sh ->
@@ -2705,7 +2767,36 @@ Proof.
     rewrite truncl_is_skipn.
     rewrite <- skipn_map.
     reflexivity.
+  - specialize (IHwf_ATLexpr ltac:(assumption)).
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    destruct (result_of_pATLexpr x2); [invert0 E' |].
+    pose proof E as E''. apply sound_sizeof_nz in E''.
+    rewrite <- IHwf_ATLexpr. cbv [sizeof].
+    eassert (sound_sizeof _ _ = Some _) as -> by prove_sound_sizeof.
+    simpl. erewrite pad_l_is_app_pad; eauto.
+    + rewrite map_app, map_repeat. reflexivity.
+    + invert E'. cbn [tensor_has_size']. rewrite length_map. split; [reflexivity|].
+      apply Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
+      intros. apply tensor_of_result_size; auto. apply sound_sizeof_gives_dim in E.
+      simpl in E. lia.
+  - specialize (IHwf_ATLexpr ltac:(assumption)).
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    destruct (result_of_pATLexpr x2); [invert0 E' |].
+    pose proof E as E''. apply sound_sizeof_nz in E''.
+    rewrite <- IHwf_ATLexpr. cbv [sizeof].
+    eassert (sound_sizeof _ _ = Some _) as -> by prove_sound_sizeof.
+    simpl. erewrite pad_r_is_app_pad; eauto.
+    + rewrite map_app, map_repeat. reflexivity.
+    + invert E'. cbn [tensor_has_size']. rewrite length_map. split; [reflexivity|].
+      apply Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
+      intros. apply tensor_of_result_size; auto. apply sound_sizeof_gives_dim in E.
+      simpl in E. lia.
+  - congruence.
   - 
+      simpl. simpl.
+    
     cbv [truncl_list].
     Print transpose_result_list. Print get_col.
 
