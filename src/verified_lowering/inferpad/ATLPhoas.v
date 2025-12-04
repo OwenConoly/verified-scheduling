@@ -2792,27 +2792,18 @@ Proof.
       simpl in E. lia.
   - congruence.
   - rewrite <- IHwf_ATLexpr. admit.
-  - apply sound_sizeof_gives_dim in E, E0.
-    destruct l, l0; try discriminate. clear E E0.
+  - pose proof E as E'. pose proof E0 as E0'.
+    eapply sound_sizeof_gives_dim in E', E0'; eauto.
+    destruct l, l0; try discriminate. clear E' E0'.
+    eapply sound_sizeof_tensor_has_size in E, E0; eauto.
     rewrite <- IHwf_ATLexpr1, <- IHwf_ATLexpr2.
-    destruct (result_of_pATLexpr x2), (result_of_pATLexpr y2); try reflexivity.
-    specialize (IHwf_ATLexpr1 _ eq_refl ltac:(assumption) ltac:(eassumption)).
-    Search result_of_pATLexpr.
-    pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto.
-    destruct (result_of_pATLexpr x2); [|invert E'].
-    2: { 
-
-    Search eval_get'.
-    pose proof eval_get_eval_get' as H'.
-    
-    specialize (H' 
-      simpl. simpl.
-    
-    cbv [truncl_list].
-    Print transpose_result_list. Print get_col.
-
-Abort.
+    destruct (result_of_pATLexpr x2); [|invert0 E].
+    destruct (result_of_pATLexpr y2); [|invert0 E0].
+    destruct o, z, z0; reflexivity.
+  - erewrite <- Zexprs_corresp_same by eassumption. reflexivity.
+    Unshelve.
+    all: exact dummy_result || exact 0%Z || exact (dummy_result _).
+Qed.
 
 Opaque stringvar_S.
 Hint Resolve dummy_result : core.
