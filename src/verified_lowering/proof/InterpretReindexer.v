@@ -73,7 +73,7 @@ Proof.
     eapply not_In_empty_map2_cons in H; propositional.
     unfold interpret_reindexer.
     unfold shape_to_vars.
-    simpl length. unfold nat_range. simpl nat_range_rec.
+    simpl length. unfold nat_range. simpl seq.
     rewrite map_cons.
     rewrite shape_to_index_cons.
     rewrite index_to_function_alt_vars_cons; eauto with reindexers.
@@ -308,7 +308,7 @@ Proof.
   - repeat decomp_index.
     unfold partial_interpret_reindexer.
     unfold shape_to_vars.
-    simpl length. unfold nat_range. simpl nat_range_rec.
+    simpl length. unfold nat_range. simpl seq.
     rewrite map_cons.
     rewrite shape_to_index_cons.
     rewrite index_to_partial_function_vars_cons; eauto with reindexers.

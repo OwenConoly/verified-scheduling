@@ -1425,10 +1425,11 @@ Proof.
       simpl. subst. reflexivity.
 Qed.
 
-Lemma flatten_is_concat {X} `{TensorElem X} n m sh (x : list (list X)) :
-  consistent x (n, (m, sh)) ->
+Lemma flatten_is_concat {X} `{TensorElem X} sh (x : list (list X)) :
+  consistent x sh ->
   Common.flatten x = List.concat x.
 Proof.
+  destruct sh as [n [m sh] ].
   intros Hx. cbv [Common.flatten]. cbv [gen]. rewrite genr_is_map.
   rewrite (map_nth_seq null (List.concat _)). rewrite zrange_seq.
   invert Hx. invert H2.
@@ -2328,6 +2329,20 @@ Definition dummy_shal t : interp_type t :=
   | tensor_n (S _) => []
   end.
 
+Lemma scalar_mul_0_is_0 n sz v :
+  n = length sz ->
+  tensor_has_size' (n := n) sz v ->
+  scalar_mul 0 v = tensor_of_result (gen_pad sz).
+Proof.
+  intro. subst.
+  induction sz; intros H; simpl.
+  - ring.
+  - simpl in v. simpl in H. cbn [tensor_has_size'] in H.
+    destruct H as [? H]. subst.
+    rewrite <- map_constant_repeat. rewrite map_map. apply map_ext_in.
+    rewrite Forall_Forall' in *. rewrite Forall_forall in *. eauto.
+Qed.
+
 Lemma scalar_mul_0_tensor_of_result n sz r :
   n = length sz ->
   result_has_shape' sz r ->
@@ -2405,6 +2420,68 @@ Proof.
     apply map_ext_in. intros [x y] Hx. pose proof Hx as Hy.
     apply in_combine_l in Hx. apply in_combine_r in Hy. rewrite Forall_forall in *.
     eauto.
+Qed.
+
+Lemma result_has_shape'_2d m n sh v :
+  result_has_shape' (m :: n :: sh) (V v) ->
+  exists v', v = map Result.V v'.
+Proof.
+  intros H. exists (map (fun w =>
+                      match w with
+                      | Result.V u => u
+                      | Result.S _ => []
+                      end) v).
+  rewrite map_map. rewrite <- map_id at 1. apply map_ext_in.
+  intros r Hr. invert H. rewrite Forall_forall in *.
+  apply H4 in Hr. invert Hr. reflexivity.
+Qed.
+
+Lemma tile_is_split k m n sh (v : dim_n (S n)) :
+  ~In 0 (m :: sh) ->
+  tensor_has_size' (m :: sh) v ->
+  tile v k = map (fun i =>
+                    firstn k (skipn (k * i)
+                                (v ++ repeat (tensor_of_result (gen_pad sh))
+                                   ((k - Datatypes.length v mod k) mod k))))
+               (seq O (Datatypes.length v //n k)).
+Proof.
+  cbn [tensor_has_size']. intros Hm [? H].
+  subst. rewrite Forall_Forall' in H.
+  cbv [tile]. cbv [gen]. rewrite genr_is_map. rewrite zrange_seq.
+  replace (Z.to_nat _) with (length v //n k).
+  2: { rewrite Z.sub_0_r. rewrite znat_id_distr. f_equal; lia. }
+  rewrite map_map. apply map_ext_in. intros i Hi. apply in_seq in Hi.
+  rewrite genr_is_map. Check map_nth_seq.
+  erewrite (map_nth_seq _ (firstn _ _)).
+  assert (k = 0 \/ k <> 0) as [Hk|Hk] by lia.
+  { subst. simpl. reflexivity. }
+  rewrite <- split_result_length_helper by lia.
+  rewrite zrange_seq. rewrite map_map.
+  replace (Z.to_nat _) with k by lia.
+  apply map_ext_in.
+  intros j Hj. apply in_seq in Hj.
+  cbv [nth_default].
+  rewrite nth_error_firstn_elim by lia. rewrite nth_error_skipn.
+  destruct (_ <? _)%Z eqn:E.
+  - apply Z.ltb_lt in E. cbv [iverson]. rewrite mul_1_id.
+    rewrite nth_error_app1 by lia. rewrite <- (Nat2Z.id (k * i + j)). 
+    rewrite get_is_nth_error by lia. f_equal. lia.
+  - apply Z.ltb_nlt in E. cbv [iverson]. rewrite nth_error_app2 by lia.
+    rewrite nth_error_repeat.
+    2: { (*gross*)
+         pose proof split_result_length_helper as H'.
+         specialize (H' _ k i v (dummy_shal (tensor_n _)) ltac:(lia) ltac:(lia)).
+         rewrite length_firstn, length_skipn, length_app, repeat_length in H'.
+         lia. }
+    destruct v.
+    { simpl in Hm. exfalso. auto. }
+    rewrite get_znlt_null by assumption.
+    cbv [iverson]. Search scalar_mul tensor_of_result. Search result_has_shape' tensor_has_size'. Search scalar_mul 0%R. rewrite mul_0_idemp. erewrite scalar_mul_0_is_0.
+    + reflexivity.
+    + invert H. apply tensor_has_size'_dim in H2; auto. simpl in Hm. auto.
+    + invert H. assumption.
+      Unshelve.
+      exact (dummy_shal (tensor_n _)).
 Qed.
 
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
@@ -2515,7 +2592,47 @@ Proof.
     + auto.
     + assumption.
     + assumption.
-  - erewrite flatten_is_concat. all: admit.
+  - specialize (IHwf_ATLexpr ltac:(assumption)).
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    destruct (result_of_pATLexpr x2); [invert0 E' |].
+    rewrite <- IHwf_ATLexpr. clear IHwf_ATLexpr.
+    erewrite flatten_is_concat; cycle 1.
+    { apply consistent_of_tensor_has_size' with (sh := (n0 :: n1 :: l1)) (n := S (S _)).
+      (*wow why so slow*)
+      - cbn [tensor_has_size']. rewrite length_map. invert E'. split; [reflexivity|].
+        apply Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
+        intros r Hr. invert Hr. rewrite length_map. split; [reflexivity|].
+        apply Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
+        intros r Hr. apply tensor_of_result_size.
+        + apply sound_sizeof_gives_dim in E. simpl in E. lia.
+        + assumption.
+      - apply sound_sizeof_nz in E. assumption. }
+    apply result_has_shape'_2d in E'. invs'.
+    rewrite flatten_result_map_V, map_id.
+    rewrite map_map. Search map List.concat.
+    rewrite concat_map. reflexivity.
+  - specialize (IHwf_ATLexpr ltac:(assumption)).
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    destruct (result_of_pATLexpr x2); [invert0 E' |].
+    rewrite <- IHwf_ATLexpr. Print split_result.
+    cbv [split_result]. rewrite map_map. Search result_has_shape result_shape_nat.
+    apply result_has_shape'_iff in E'.
+    erewrite result_has_shape_result_shape_nat by eassumption.
+    pose proof E as E''. apply sound_sizeof_nz in E''.
+    rewrite filter_until_not_in by assumption. simpl.
+    erewrite tile_is_split; cycle 1.
+    + eassumption.
+    + apply result_has_shape'_iff in E'.
+      eapply tensor_of_result_size in E'; eauto. simpl in E'.
+      apply sound_sizeof_gives_dim in E. simpl in E. invert E.
+      apply E'.
+    + rewrite length_map. cbv [nat_range]. apply map_ext. intros i.
+      rewrite <- firstn_map. rewrite <- skipn_map. rewrite map_app.
+      rewrite map_repeat. reflexivity.
+  - 
+
 Abort.
 
 Opaque stringvar_S.
