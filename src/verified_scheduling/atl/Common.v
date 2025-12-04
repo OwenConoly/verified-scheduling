@@ -393,30 +393,6 @@ Proof.
   eapply mul_0_absorb; eauto.
 Qed.
 
-Lemma get_znlt_null : forall i (X : Type) (H: TensorElem X) (v : list X) x,
-    ~ (i < Z.of_nat (length (x::v)))%Z->
-    (x::v) _[ i ] = (|[ false ]| x).
-Proof.
-  intros. generalize dependent i.
-  induction v; destruct i; intros; try reflexivity; unfold get; simpl.
-  - simpl in H0. lia.
-  - posnat.
-    simpl in *.
-    destruct pn; reflexivity.
-  - simpl in H0. zify. lia.
-  - posnat. simpl.
-    simpl length in *.
-    destruct pn.
-    simpl. zify. lia.
-    simpl.
-    specialize (IHv (Z.of_nat (S pn))).
-    assert (~ (Z.of_nat (S pn) < Z.of_nat (S (length v)))%Z). zify. lia.
-    apply IHv in H1.
-    unfold get in H1. simpl in H1.
-    rewrite SuccNat2Pos.id_succ in H1. simpl in H1.
-    assumption.
-Qed.
-
 Lemma get_znlt_null_shape : forall i (X : Type) (H: TensorElem X)
                                    (v : list X) s e n,
     ~ (i < Z.of_nat (length v))%Z->
