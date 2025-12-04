@@ -1967,7 +1967,6 @@ Fixpoint sum_bounds_good {n} (e : pATLexpr interp_type n) :=
           (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
           sum_bounds_good (body i)
   | Guard p body =>
-      interp_pBexpr p = true ->
       sum_bounds_good body
   | Lbind e1 e2 =>
       sum_bounds_good e1 /\ (forall x, sum_bounds_good (e2 x))
@@ -2340,9 +2339,73 @@ Proof.
     rewrite map_map. apply map_ext_in. rewrite Forall_forall in *. eauto.
 Qed.
 
-Lemma fold_right_map f g x ys :
+(*want something like this*)
+Fail Lemma fold_right_map f g x ys :
   f (fold_right g x ys) = fold_right g (f x) (map f ys).
 
+(*chatgpt tries*)
+Fail Lemma fold_right_map_distr
+  {A B : Type}
+  (f : A -> B)
+  (g : A -> A -> A)
+  (x : A)
+  (ys : list A)
+  (H : forall a b, f (g a b) = g (f a) (f b)) :
+  f (fold_right g x ys)
+  = fold_right g (f x) (map f ys).
+
+Lemma fold_right_map' {A B} (f : A -> B) g1 g2 x ys P :
+  P x ->
+  Forall P ys ->
+  (forall x y, P x -> P y -> P (g1 x y)) ->
+  (forall x y, P x -> P y -> f (g1 x y) = g2 (f x) (f y)) ->
+  P (fold_right g1 x ys) /\
+    f (fold_right g1 x ys) = fold_right g2 (f x) (map f ys).
+Proof.
+  intros Hx Hys H1 H2.
+  induction Hys; simpl; auto.
+  destruct IHHys as [IH1 IH2]. split; auto.
+  rewrite H2 by auto. rewrite IH2. reflexivity.
+Qed.
+
+Lemma fold_right_map {A B} (f : A -> B) g1 g2 x ys P :
+  P x ->
+  Forall P ys ->
+  (forall x y, P x -> P y -> P (g1 x y)) ->
+  (forall x y, P x -> P y -> f (g1 x y) = g2 (f x) (f y)) ->
+  f (fold_right g1 x ys) = fold_right g2 (f x) (map f ys).
+Proof.
+  intros Hx Hys H1 H2. epose proof fold_right_map' as H'. epose_dep H'.
+  specialize (H' Hx). repeat (specialize (H' ltac:(eassumption))).
+  destruct H'. assumption.
+Qed.  
+
+Lemma tensor_add_is_map2_bin n (xs ys : dim_n (S n)) :
+  length xs = length ys ->
+  tensor_add xs ys = map2 bin xs ys.
+Proof.
+  revert ys. induction xs; intros ys Hlen; destruct ys as [|y ys]; try discriminate.
+  - reflexivity.
+  - simpl in Hlen. Search tensor_add. rewrite tensor_add_step by lia.
+    simpl. f_equal. apply IHxs. lia.
+Qed.
+
+Lemma tensor_of_result_add_result' sz n x y :
+  n = length sz ->
+  result_has_shape' sz x ->
+  result_has_shape' sz y ->
+  tensor_of_result (add_result' x y) = tensor_of_result (n := n) x <+> tensor_of_result y.
+Proof.
+  intro. subst.
+  revert x y. induction sz; intros x y Hx Hy.
+  - invert Hx. invert Hy. simpl. destruct s, s0; simpl; ring.
+  - invert Hx. invert Hy. simpl.
+    rewrite tensor_add_is_map2_bin by (do 2 rewrite length_map; lia).
+    rewrite map_map2. rewrite map2_map. do 2 rewrite map2_is_map_combine.
+    apply map_ext_in. intros [x y] Hx. pose proof Hx as Hy.
+    apply in_combine_l in Hx. apply in_combine_r in Hy. rewrite Forall_forall in *.
+    eauto.
+Qed.
 
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
   wf_ATLexpr interp_type interp_type_result ctx n e_shal e_res ->
@@ -2383,14 +2446,35 @@ Proof.
       -- apply sound_sizeof_nz in Hsz. assumption.
     + assumption.
     + cbv [sum_with_sz].
-      Search fold_right map.
-      Lemma fun_of_fold_right :
-        Forall2 (fun y1 y2 => 
-        x2 = f x1 ->
-        f (fold_right g1 x1 ys1) = fold_right g2 x2 ys2.
+      rewrite fold_right_map with (f := tensor_of_result) (g2 := @bin (dim_n n) _) (P := fun x => result_has_shape' sz x).
+      f_equal.
+      -- erewrite <- H2.
+         ++ erewrite scalar_mul_0_tensor_of_result.
+            --- reflexivity.
+            --- apply sound_sizeof_gives_dim in Hsz. auto.
+            --- eapply sound_sizeof_tensor_has_size; eauto.
+         ++ prove_sound_sizeof.
+         ++ constructor; eauto. simpl. reflexivity.
+         ++ apply H4. lia.
+      -- rewrite map_map.
+         erewrite <- (Zexprs_corresp_same _ _ lo2) by eassumption.
+         erewrite <- (Zexprs_corresp_same _ _ hi2) by eassumption.
+         apply map_ext_in. intros i Hi. apply In_zrange in Hi. eapply H2.
+         ++ prove_sound_sizeof.
+         ++ constructor; eauto. simpl. reflexivity.
+         ++ auto.
+      -- apply result_has_shape'_iff. apply result_has_shape_gen_pad.
+      -- apply Forall_map. apply Forall_forall. intros i _.
+         eapply sound_sizeof_tensor_has_size; eauto.
+      -- intros x y Hx Hy.
+         pose proof (add_result_add_result' _ _ _ Hx Hy) as Hxy.
+         rewrite result_has_shape'_iff in *.
+         eapply result_has_shape_add_result; eauto.
+      -- intros. eapply tensor_of_result_add_result'; eauto.
+         apply sound_sizeof_gives_dim in Hsz. auto.
   - erewrite <- Bexprs_corresp_same by eauto. destruct (interp_pBexpr _); simpl.
     + cbv [iverson]. rewrite mul_1_id. eauto.
-    + cbv [iverson]. erewrite <- IHwf_ATLexpr by eassumption.
+    + cbv [iverson]. erewrite <- IHwf_ATLexpr by eauto.
       pose proof sound_sizeof_tensor_has_size as H'.
       specialize H' with (1 := H0) (2 := Hsz).
       cbv [sizeof].
@@ -2401,7 +2485,9 @@ Proof.
       -- assumption.
   - cbv [let_binding]. eapply H1.
     + prove_sound_sizeof.
-    + constructor; [|assumption]. simpl. auto.
+    + constructor; [|assumption]. simpl.
+      Fail solve[auto]. symmetry. solve[auto 2].
+    + auto.
   - pose proof sound_sizeof_tensor_has_size as Hx.
     specialize Hx with (1 := H) (2 := E).
     pose proof sound_sizeof_tensor_has_size as Hy.
@@ -2427,6 +2513,8 @@ Proof.
     + auto.
     + auto.
     + auto.
+    + assumption.
+    + assumption.
   - erewrite flatten_is_concat. all: admit.
 Abort.
 
