@@ -1019,7 +1019,7 @@ Qed.
 Lemma result_has_shape_truncl_list :
   forall l k x xs,
     result_has_shape (V l) (x::xs) ->
-    result_has_shape (V (truncl_list k l)) (x -k::xs).
+    result_has_shape (V (skipn k l)) (x -k::xs).
 Proof.
   induct l; intros; cases x.
   - rewrite truncl_list_empty. econstructor.
@@ -1031,7 +1031,7 @@ Proof.
       eapply Forall_impl. 2: eassumption.
       simpl. intros.
       auto.
-    + simpl truncl_list. simpl Nat.sub.
+    + simpl skipn. simpl Nat.sub.
       eapply IHl.
       cases l.
       * simpl in *. invert H. simpl. econstructor.
@@ -1123,7 +1123,7 @@ Proof.
 Qed.
 
 Lemma truncl_list_gen_pad_id : forall k x l,
-    truncl_list k (gen_pad_list (k :: l) ++ x) = x.
+    skipn k (gen_pad_list (k :: l) ++ x) = x.
 Proof.
   induct k; intros.
   - reflexivity.
@@ -1163,7 +1163,7 @@ Qed.
 Lemma result_lookup_Z_truncl :
   forall z x1 k l,
     (0 <= z)%Z ->
-  result_lookup_Z_option (z :: x1) (V (truncl_list k l)) =
+  result_lookup_Z_option (z :: x1) (V (skipn k l)) =
     result_lookup_Z_option ((z + Z.of_nat k)%Z :: x1) (V l).
 Proof.
   intros. simpl. rewrite nth_error_truncl.
@@ -1178,7 +1178,7 @@ Qed.
 Lemma result_lookup_Z_truncr :
   forall z x0 k l,
     Z.to_nat z < Datatypes.length l - k ->
-    result_lookup_Z_option (z :: x0) (V (rev (truncl_list k (rev l)))) =
+    result_lookup_Z_option (z :: x0) (V (rev (skipn k (rev l)))) =
       result_lookup_Z_option (z :: x0) (V l).    
 Proof.
   intros. simpl.

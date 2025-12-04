@@ -689,12 +689,12 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       end
   | Truncr k x =>
       match result_of_pATLexpr x with
-      | V xs => V (rev (truncl_list k (rev xs)))
+      | V xs => V (rev (skipn k (rev xs)))
       | _ => V []
       end
   | Truncl k x =>
       match result_of_pATLexpr x with
-      | V xs => V (truncl_list k xs)
+      | V xs => V (skipn k xs)
       | _ => V []
       end
   | Padl k x =>
@@ -1053,7 +1053,7 @@ Proof.
   cbv [genr]. rewrite gen_helper_is_map. rewrite zrange_seq. reflexivity.
 Qed.
 
-Lemma get_is_nth_error {X} `{TensorElem X} (v : list X) i :
+Lemma nth_error_is_get {X} `{TensorElem X} (v : list X) i :
   (0 <= i < Z.of_nat (length v))%Z ->
   nth_error v (Z.to_nat i) = Some (get v i).
 Proof.
@@ -1062,6 +1062,22 @@ Proof.
   - reflexivity.
   - destruct (nth_error _ _) eqn:E; [reflexivity|].
     apply nth_error_None in E. simpl in *. lia.
+Qed.
+
+Definition dummy_shal t : interp_type t :=
+  match t with
+  | tZ => 0%Z
+  | tB => false
+  | tensor_n O => 0%R
+  | tensor_n (S _) => []
+  end.
+
+Lemma get_is_nth_error {X} `{TensorElem X} (v : list X) i :
+  (0 <= i < Z.of_nat (length v))%Z ->
+  get v i = nth_default null v (Z.to_nat i).
+Proof.
+  intros H'. cbv [nth_default]. rewrite nth_error_is_get by assumption.
+  reflexivity.
 Qed.
 
 Ltac size_of_constr :=
@@ -1334,12 +1350,12 @@ Proof.
     simpl. cbv [iverson]. rewrite mul_1_id.
     erewrite get_out_of_bounds_id; eauto; cycle 1.
     + apply tensor_consistent_forall_consistent in Hx. rewrite Forall_forall in Hx.
-      pose proof get_is_nth_error as H''.
+      pose proof nth_error_is_get as H''.
       specialize (H'' x (Z.of_nat i) ltac:(lia)). apply nth_error_In in H''.
       apply Hx. assumption.
     + lia.
     + cbv [nth_default]. replace i with (Z.to_nat (Z.of_nat i)) by lia.
-      erewrite get_is_nth_error by lia. f_equal. lia.
+      erewrite nth_error_is_get by lia. f_equal. lia.
   - remember (map _ _). rewrite (map_nth_seq null y). subst.
     rewrite (map_seq (_ + _)), map_map.
     apply map_ext_in. intros i Hi. apply in_seq in Hi.
@@ -1350,12 +1366,12 @@ Proof.
     simpl. cbv [iverson]. rewrite mul_1_id.
     rewrite bin_comm. erewrite get_out_of_bounds_id; eauto; cycle 1.
     + apply tensor_consistent_forall_consistent in Hy. rewrite Forall_forall in Hy.
-      pose proof get_is_nth_error as H''.
+      pose proof nth_error_is_get as H''.
       specialize (H'' y (Z.of_nat i) ltac:(lia)). apply nth_error_In in H''.
       apply Hy. eassert ((_ - _)%Z = _) as ->; [|eassumption]. lia.
     + lia.
     + cbv [nth_default]. replace i with (Z.to_nat (Z.of_nat i)) by lia.
-      erewrite get_is_nth_error by lia. f_equal. lia.
+      erewrite nth_error_is_get by lia. f_equal. lia.
 Qed.
 
 Lemma split_seq a b c :
@@ -1618,7 +1634,7 @@ Proof.
   { subst. constructor; auto. eapply Forall_impl; [|eassumption].
     simpl. intros ? H'. invert H'. assumption. }
   rewrite <- (Nat2Z.id (_ / _)) in E.
-  rewrite get_is_nth_error in E.
+  rewrite nth_error_is_get in E.
   2: { split; [lia|].
        cbn [length].
        enough (i / S (length xs0) < length l) by lia. subst.
@@ -1626,7 +1642,7 @@ Proof.
        apply Nat.Div0.div_lt_upper_bound in Hi'. cbn [length].
        lia. }
   rewrite <- (Nat2Z.id (_ mod _)) in E.
-  rewrite get_is_nth_error in E.
+  rewrite nth_error_is_get in E.
   2: { split; [lia|].
        cbn [length] in *.
        apply nth_error_Some in E. lia. }
@@ -2321,14 +2337,6 @@ Ltac epose_dep H :=
   | forall _, _ => epose proof (H _) as H
   end.
 
-Definition dummy_shal t : interp_type t :=
-  match t with
-  | tZ => 0%Z
-  | tB => false
-  | tensor_n O => 0%R
-  | tensor_n (S _) => []
-  end.
-
 Lemma scalar_mul_0_is_0 n sz v :
   n = length sz ->
   tensor_has_size' (n := n) sz v ->
@@ -2465,7 +2473,7 @@ Proof.
   destruct (_ <? _)%Z eqn:E.
   - apply Z.ltb_lt in E. cbv [iverson]. rewrite mul_1_id.
     rewrite nth_error_app1 by lia. rewrite <- (Nat2Z.id (k * i + j)). 
-    rewrite get_is_nth_error by lia. f_equal. lia.
+    rewrite nth_error_is_get by lia. f_equal. lia.
   - apply Z.ltb_nlt in E. cbv [iverson]. rewrite nth_error_app2 by lia.
     rewrite nth_error_repeat.
     2: { (*gross*)
@@ -2482,6 +2490,38 @@ Proof.
     + invert H. assumption.
       Unshelve.
       exact (dummy_shal (tensor_n _)).
+Qed.
+
+Lemma truncr_is_rev_skipn_rev k n (l : dim_n (S n)) :
+  truncr k l = rev (skipn k (rev l)).
+Proof.
+  cbv [truncr]. cbv [gen]. rewrite genr_is_map.
+  rewrite skipn_rev. rewrite rev_involutive.
+  erewrite (map_nth_seq _ (firstn _ _)).
+  rewrite zrange_seq. rewrite length_firstn.
+  replace (Z.to_nat _) with (length l - k) by lia.
+  replace (min _ _) with (length l - k) by lia.
+  rewrite map_map. apply map_ext_in.
+  intros i Hi. apply in_seq in Hi. cbv [nth_default].
+  rewrite get_is_nth_error by lia.
+  replace (Z.to_nat _) with i by lia.
+  rewrite nth_error_firstn_elim by lia.
+  reflexivity.
+Qed.
+
+Lemma truncl_is_skipn k n (l : dim_n (S n)) :
+  truncl k l = skipn k l.
+Proof.
+  cbv [truncl]. cbv [gen]. rewrite genr_is_map.
+  erewrite (map_nth_seq _ (skipn _ _)).
+  rewrite zrange_seq. rewrite length_skipn.
+  replace (Z.to_nat _) with (length l - k) by lia.
+  rewrite map_map. apply map_ext_in.
+  intros i Hi. apply in_seq in Hi. cbv [nth_default].
+  rewrite get_is_nth_error by lia.
+  rewrite nth_error_skipn.
+  replace (Z.to_nat _) with (k + i) by lia.
+  reflexivity.
 Qed.
 
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
@@ -2631,7 +2671,43 @@ Proof.
     + rewrite length_map. cbv [nat_range]. apply map_ext. intros i.
       rewrite <- firstn_map. rewrite <- skipn_map. rewrite map_app.
       rewrite map_repeat. reflexivity.
+  - specialize (IHwf_ATLexpr ltac:(assumption)).
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    destruct (result_of_pATLexpr x2); [invert0 E' |].
+    pose proof E as E''. apply sound_sizeof_nz in E''.
+    rewrite <- IHwf_ATLexpr. cbv [sizeof].
+    eassert (sound_sizeof _ _ = Some _) as -> by prove_sound_sizeof.
+    simpl.
+    erewrite result_has_shape_row_length.
+    2: { invert E'. simpl in E''. destruct v; try congruence.
+         exfalso. simpl in E''. auto. }
+    2: { apply result_has_shape'_iff. eassumption. }
+    erewrite pad_list_result_shape_id.
+    2: { apply result_has_shape'_iff. eassumption. }
+    2: { enough (0 <> n0) by lia. simpl in E''. auto. }
+    admit.
+  - specialize (IHwf_ATLexpr ltac:(assumption)).
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    destruct (result_of_pATLexpr x2); [invert0 E' |].
+    pose proof E as E''. apply sound_sizeof_nz in E''.
+    rewrite <- IHwf_ATLexpr.
+    rewrite truncr_is_rev_skipn_rev.
+    rewrite map_rev. rewrite <- skipn_map. rewrite map_rev.
+    reflexivity.
+  - specialize (IHwf_ATLexpr ltac:(assumption)).
+    pose proof E as E'.
+    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    destruct (result_of_pATLexpr x2); [invert0 E' |].
+    pose proof E as E''. apply sound_sizeof_nz in E''.
+    rewrite <- IHwf_ATLexpr.
+    rewrite truncl_is_skipn.
+    rewrite <- skipn_map.
+    reflexivity.
   - 
+    cbv [truncl_list].
+    Print transpose_result_list. Print get_col.
 
 Abort.
 
