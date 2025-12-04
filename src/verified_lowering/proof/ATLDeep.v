@@ -532,11 +532,11 @@ Inductive eval_expr :
     eval_Zexpr_Z v k = Some kz ->
     eval_expr v ec e (V l) ->
     eval_expr v ec (Truncr k e)
-              (V (List.rev (truncl_list (Z.to_nat kz) (List.rev l))))
+              (V (List.rev (skipn (Z.to_nat kz) (List.rev l))))
 | EvalTruncl : forall e v ec k kz l,
     eval_Zexpr_Z v k = Some kz ->
     eval_expr v ec e (V l) ->
-    eval_expr v ec (Truncl k e) (V (truncl_list (Z.to_nat kz) l))
+    eval_expr v ec (Truncl k e) (V (skipn (Z.to_nat kz) l))
 | EvalPadr : forall e v ec l s n k kz,
     eval_Zexpr_Z v k = Some kz ->
     size_of v e (n::s) ->
