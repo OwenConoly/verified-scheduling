@@ -259,6 +259,14 @@ Proof.
   simpl. f_equal. eauto.
 Qed.
 
+Lemma map2_map {X1 X2 X1' X2' Y} l1 l2 (f1 : X1 -> X1') (f2 : X2 -> X2') (g : _ -> _ -> Y) :
+  map2 g (map f1 l1) (map f2 l2) = map2 (fun x1 x2 => g (f1 x1) (f2 x2)) l1 l2.
+Proof.
+  revert l2.
+  induction l1; intros; cases l2; try reflexivity.
+  simpl. f_equal. eauto.
+Qed.
+
 Lemma map2_map_l1 {X Y Z K} : forall (l1 : list X) (l2 : list Y)
                                    (f : Z -> Y -> K) (g : X -> Z),
     map2 (fun a b => f (g a) b) l1 l2 = map2 f (map g l1) l2.
