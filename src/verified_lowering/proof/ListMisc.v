@@ -800,18 +800,9 @@ Proof.
     simpl. rewrite Z2Nat.id by lia. f_equal. eauto.
 Qed.    
 
-Fixpoint truncl_list {X} n (l : list X) :=
-  match n with
-  | Datatypes.S n' => match l with
-            | x::xs => truncl_list n' xs
-            | _ => l
-            end
-  | _ => l
-  end.
-
 Lemma truncl_list_empty {X} : forall k,
-    truncl_list k (@nil X) = [].
-Proof. induct k; propositional. Qed.
+    skipn k (@nil X) = [].
+Proof. apply skipn_nil. Qed.
 
 Lemma filter_idempotent {X} : forall (l : list X) f,
     filter f (filter f l) =  filter f l.
@@ -846,22 +837,10 @@ Qed.
 
 Lemma nth_error_truncl {X} :
   forall (l : list X) k z,
-    nth_error (truncl_list k l) z =
+    nth_error (skipn k l) z =
       nth_error l (z + k).
 Proof.
-  induct l; intros.
-  - rewrite truncl_list_empty.
-    repeat rewrite nth_error_empty. auto.
-  - simpl. cases (z + k).
-    + simpl. assert (z = 0) by lia. subst. simpl.
-      assert (k = 0) by lia. subst. simpl. reflexivity.
-    + simpl. cases z.
-      * simpl. rewrite add_0_l in Heq. subst. simpl.
-        specialize (IHl n 0). simpl in *. auto.
-      * simpl in *. invert Heq.
-        cases k. simpl. f_equal. lia.
-        simpl. specialize (IHl k (Datatypes.S z)). simpl in *.
-        rewrite add_succ_r. simpl. auto.
+  intros. rewrite nth_error_skipn. f_equal. lia.
 Qed.
 
 Lemma rev_arg_empty {X} : forall (l : list X),
@@ -875,34 +854,24 @@ Qed.
 
 Lemma truncl_list_app {X} : forall k (l1 l2 : list X),
     k <= length l1 ->
-    truncl_list k (l1 ++ l2)%list = (truncl_list k l1 ++ l2)%list.
+    skipn k (l1 ++ l2)%list = (skipn k l1 ++ l2)%list.
 Proof.
-  induct k; intros.
-  - reflexivity.
-  - simpl.
-    cases l1. simpl in *. lia. simpl in *. eapply IHk. lia.
+  intros. rewrite skipn_app.
+  replace (_ - _) with 0 by lia. reflexivity.
 Qed.
 
 Lemma truncl_list_length_empty {X} : forall k (l : list X),
     length l <= k <->
-    truncl_list k l = [].
+    skipn k l = [].
 Proof.
-  induct k; intros; split; intros; cases l; simpl in *.
-  - reflexivity.
-  - lia.
-  - lia.
-  - discriminate.
-  - reflexivity.
-  - eapply IHk. lia.
-  - lia.
-  - eapply IHk in H. lia.
+  intros. apply skipn_all_iff.
 Qed.
 
 Lemma nth_error_truncr {X} :
   forall (l : list X) k z,
     z < length l - k ->
     nth_error (rev
-                 (truncl_list
+                 (skipn
                     k (rev l))) z =
       nth_error l z.
 Proof.
@@ -912,7 +881,7 @@ Proof.
     repeat rewrite nth_error_empty. auto.
   - simpl. cases z.
     + simpl.
-      cases (rev (truncl_list k (rev l ++ [a]))).
+      cases (rev (skipn k (rev l ++ [a]))).
       * erewrite rev_arg_empty in Heq.
         eapply truncl_list_length_empty in Heq.
         rewrite length_app in *. rewrite length_rev in *. simpl in Heq.
@@ -946,19 +915,14 @@ Qed.
 Lemma truncl_list_app_l {X} :
   forall k (l1 l2 : list X),
     k <= length l1 ->
-    truncl_list k (l1 ++ l2)%list = (truncl_list k l1 ++ l2)%list.
+    skipn k (l1 ++ l2)%list = (skipn k l1 ++ l2)%list.
 Proof.
-  induct k; intros.
-  - reflexivity.
-  - simpl.
-    cases l1. simpl in *. lia.
-    simpl in *.
-    rewrite IHk by lia.
-    reflexivity.
-Qed.    
+  intros. rewrite skipn_app.
+  replace (_ - _) with 0 by lia. reflexivity.
+Qed.
 
 Lemma truncl_list_repeat {X} : forall k (x : X) n,
-    truncl_list k (repeat x n) = repeat x (n-k).
+    skipn k (repeat x n) = repeat x (n-k).
 Proof.
   induct k; intros.
   - simpl. f_equal. lia.
@@ -1077,15 +1041,6 @@ Proof.
   - econstructor.
   - simpl in *. cases a. simpl in *. invert H. lia. simpl in *.
     econstructor. lia. eapply IHl. invert H. auto.
-Qed.
-
-Lemma truncl_list_skipn {X} : forall n (l : list X),
-    truncl_list n l = skipn n l.
-Proof.
-  induct n; intros.
-  - reflexivity.
-  - cases l. reflexivity.
-    simpl in *. eauto.
 Qed.
 
 Lemma forall_firstn_skipn {X} : forall y (l : list X) k P,
