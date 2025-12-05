@@ -2539,6 +2539,94 @@ Proof.
       ++ rewrite Forall_Forall' in Hsz. invert Hsz. assumption.
 Qed.
 
+Definition get_list_col {X} (d : X) (l : list (list X)) n :=
+  map (fun r => nth_default d r n) l.
+
+Definition transpose_list {X} (d : X) (l : list (list X)) n :=
+  map (fun i => get_list_col d l i) (seq O n).
+
+Lemma transpose_result_list_is_map_blah_seq' l n :
+  n <= row_length l ->
+  transpose_result_list l n =
+    map (fun i => V (get_col l i)) (seq (row_length l - n) n).
+Proof.
+  induction n; auto.
+  intros H.
+  simpl. f_equal. rewrite IHn by lia.
+  f_equal. f_equal. lia.
+Qed.
+
+Lemma transpose_result_list_is_map_blah_seq l :
+  transpose_result_list l (row_length l) =
+    map (fun i => V (get_col l i)) (seq O (row_length l)).
+Proof.
+  rewrite transpose_result_list_is_map_blah_seq' by lia.
+  f_equal. f_equal. lia.
+Qed.
+
+Definition list_row_length {A} (v : list (list A)) :=
+  match v with
+  | [] => 0
+  | a :: _ => length a
+  end.
+
+Lemma row_length_is_list_row_length v :
+  row_length (map V v) = list_row_length v.
+Proof. destruct v; reflexivity. Qed.
+
+Lemma get_col_is_get_list_col v i :
+  Forall (fun u => i < length u) v ->
+  get_col (map V v) i = get_list_col (V []) v i.
+Proof.
+  induction 1.
+  - reflexivity.
+  - simpl. cbv [nth_default]. destruct (nth_error _ _) eqn:E.
+    + f_equal. assumption.
+    + apply nth_error_None in E. lia.
+Qed.
+
+Lemma transpose_result_list_is_transpose_list v n :
+  Forall (fun u => length u = n) v ->
+  transpose_result_list (map V v) n = map V (transpose_list (V []) v n).
+Proof.
+  intros H. destruct v.
+  { simpl. cbv [transpose_list]. rewrite transpose_empty_result_list.
+    rewrite map_map. erewrite map_ext.
+    - rewrite map_constant_repeat. rewrite length_seq. reflexivity.
+    - simpl. reflexivity. }
+  invert H.
+  rewrite transpose_result_list_is_map_blah_seq.
+  cbv [transpose_list].
+  rewrite map_map. cbn [map row_length]. apply map_ext_in.
+  intros i Hi. apply in_seq in Hi. f_equal. rewrite <- map_cons.
+  apply get_col_is_get_list_col.
+  constructor. 1: lia. eapply Forall_impl; [|eassumption]. simpl. lia.
+Qed.
+
+Lemma transpose_is_transpose_list {X} `{TensorElem X} (v : list (list X)) :
+  Forall (fun u => length u = list_row_length v) v ->
+  transpose v = transpose_list null v (list_row_length v).
+Proof.
+  cbv [transpose]. cbv [gen]. rewrite genr_is_map. cbv [transpose_list].
+  intros Hlen. destruct v.
+  { reflexivity. }
+  cbn [list_row_length length]. cbn [get]. rewrite get_0_cons.
+  rewrite zrange_seq. replace (Z.to_nat _) with (length l) by lia.
+  rewrite map_map. apply map_ext_in. intros i Hi. apply in_seq in Hi.
+  rewrite genr_is_map. cbv [get_list_col].
+  remember (map _ _). erewrite (map_nth_seq null (l :: v)). subst.
+  rewrite map_map. rewrite zrange_seq. replace (Z.to_nat _) with (S (length v)) by lia.
+  cbn [length]. rewrite map_map. apply map_ext_in.
+  intros j Hj. apply in_seq in Hj. rewrite get_is_nth_error.
+  2: { simpl. split; [lia|]. rewrite get_is_nth_error by (simpl; lia).
+       cbv [nth_default]. destruct (nth_error _ _) eqn:E.
+       - apply nth_error_In in E. rewrite Forall_forall in Hlen. apply Hlen in E.
+         simpl in E. lia.
+       - apply nth_error_None in E. simpl in E. lia. }
+  rewrite get_is_nth_error by (simpl; lia).
+  f_equal; try lia. f_equal. lia.
+Qed.
+
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
   wf_ATLexpr interp_type interp_type_result ctx n e_shal e_res ->
   sound_sizeof dummy_shal e_shal = Some sh ->
@@ -2692,7 +2780,29 @@ Proof.
     erewrite pad_list_result_shape_id.
     2: { apply result_has_shape'_iff. eassumption. }
     2: { enough (0 <> n0) by lia. simpl in E''. auto. }
-    admit.
+    pose proof E' as E'''.
+    apply result_has_shape'_2d in E'''. invs'.
+    rewrite map_map.
+    invert E'. rewrite Forall_map in H4.
+    rewrite transpose_result_list_is_transpose_list; cycle 1.
+    { eapply Forall_impl; [|eassumption].
+      simpl. invert 1. reflexivity. }
+    rewrite map_map.
+    rewrite transpose_is_transpose_list; cycle 1.
+    { apply Forall_map. eapply Forall_impl; [|eassumption].
+      simpl. invert 1. rewrite length_map. destruct x.
+      - exfalso. simpl in E''. auto.
+      - simpl. rewrite length_map. invert H4. invert H2. assumption. }
+    replace (list_row_length _) with n1.
+    + cbv [transpose_list]. rewrite map_map. apply map_ext_in.
+      intros i Hi. cbv [get_list_col]. rewrite map_map. rewrite map_map.
+      apply map_ext_in. intros u Hu. cbv [nth_default]. rewrite nth_error_map.
+      destruct (nth_error _ _) eqn:Ei; [reflexivity|]. simpl.
+      rewrite Forall_forall in H4. apply H4 in Hu. invert Hu.
+      apply in_seq in Hi. apply nth_error_None in Ei. lia.
+    + destruct x.
+      -- exfalso. simpl in E''. auto.
+      -- simpl. rewrite length_map. invert H4. invert H2. reflexivity.
   - pose proof E as E'.
     eapply sound_sizeof_tensor_has_size in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
