@@ -17,16 +17,63 @@ Import ListNotations.
 From ATL Require Import ATL Tactics Common CommonTactics Div Reshape.
 From Codegen Require Import IdentParsing NatToString IntToString CodeGen Normalize CheckSafe.
 From Examples Require Import GatherScatter Convolution Im2col Blur TensorAdd Matmul.
-From Inferpad Require Import Reify.
-From Lower Require Import Zexpr ATLDeep Bexpr Sexpr.
+From Inferpad Require Import Reify ATLPhoas.
+From Lower Require Import Zexpr ATLDeep Bexpr Sexpr ATLDeep.
+From ATL Require Import FrapWithoutSets.
 
 Open Scope string_scope.
 
 Set Default Proof Mode "Classic".
 
+Record arb_dim_tensor := { dim: nat; val: dim_n dim }.
+
+Fixpoint ec_of_vars (names_vals : list (string * Result.result)) :=
+  match names_vals with
+  | [] => $0
+  | (n, v) :: names_vals' => ec_of_vars names_vals' $+ (n, v)
+  end.
+
+Definition is_reification {n} (vars : list (string * arb_dim_tensor)) e_string (e_shal : dim_n n) :=
+  exists r,
+  forall inps,
+    Forall2 (fun t r => tensor_of_result r = t.(val)) (map snd vars) inps ->
+    eval_expr $0 (ec_of_vars (combine (map fst vars) inps)) e_string r /\
+      tensor_of_result r = e_shal.
+
+Search pATLexpr.
+
+Lemma reify_is_reification {n} (e : pATLExpr n) name' e_string vars :
+  stringvar_ATLexpr O (e _) = Some (name', e_string) ->
+  is_reification vars e_string (interp_pATLexpr (e _)).
+Abort.
+
+Derive reified_matmul in
+  (forall A B C m1 m2,
+    is_reification (n := S (S O))
+      [("m1", {| dim := 2; val:= m1 |}); ("m2", {| dim := 2; val := m2 |})]
+      (reified_matmul A B C)
+      (matmul A B C m1 m2))
+    as reified_matmul_correct.
+Proof.
+Abort.
+
+Fixpoint arrows (var : type -> Type) ts ret :=
+  match ts with
+  | [] => ret
+  | t :: ts' => var t -> arrows var ts' ret
+  end.
+
+Definition arrows_wf ts n (e : forall var, arrows var ts (pATLexpr var n)) : Prop.
+Admitted.
+
 Goal matmul = matmul.
   cbv [matmul].
   Reify_lhs reified_matmul.
+  
+  
+    
+  Lemma arrows_wf ts
+  
 Abort.
 
 Definition pATLExpr n := forall var, pATLexpr var n.
