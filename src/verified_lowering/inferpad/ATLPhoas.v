@@ -2993,7 +2993,11 @@ Proof.
     all: try exact 0%Z || exact dummy_result || exact (fun _ => 0%nat) || exact (Result.S Result.SX).
 Qed.
 
-Fail Fail Lemma stringvar_ATLexpr_eval_shal n (e : pATLExpr n) e_string ctx sz name name' :
+Check stringvar_ATLexpr_correct.
+Check result_of_pATLexpr_correct.
+Print Wf_ATLExpr.
+Search Wf_ATLExpr.
+Lemma stringvar_ATLexpr_eval_shal n (e : pATLExpr n) e_string ctx sz name name' :
   Wf_ATLExpr e ->
   NoDup (map fst_ctx_elt ctx) ->
   (forall name'', In name'' (map fst_ctx_elt ctx) -> name'' < name) ->
@@ -3002,3 +3006,4 @@ Fail Fail Lemma stringvar_ATLexpr_eval_shal n (e : pATLExpr n) e_string ctx sz n
   idxs_in_bounds (e _) ->
   eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr (e _)) /\
     tensor_of_result (result_of_pATLexpr (e _)) = interp_pATLexpr (e _).
+Abort.

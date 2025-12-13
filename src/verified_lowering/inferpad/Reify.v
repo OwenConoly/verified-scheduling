@@ -18,7 +18,7 @@ Set Warnings "-omega-is-deprecated,-deprecated".
 From Codegen Require Import IdentParsing NatToString IntToString Normalize CodeGen.
 From Lower Require Import ATLDeep Sexpr Zexpr Bexpr.
 From ATL Require Import ATL Common CommonTactics Div.
-From Inferpad Require Import PHOASDeep.
+From Inferpad Require Import ATLPhoas.
 
 Open Scope string_scope.
 
@@ -72,7 +72,7 @@ Definition pairs_to_reify :=
      : pair_to_reify (fun var => forall n, var tZ -> var tZ -> (var tZ -> var (tensor_n n)) -> var (tensor_n n));
    (let_nm, fun var => (fun n m x f => @Lbind var n m x (fun x0 => f (@Var var n x0))))
      : pair_to_reify (fun var => forall n m, var (tensor_n n) -> (var (tensor_n n) -> var (tensor_n m)) -> var (tensor_n m));
-   (@gget, fun var => @Get var)
+   (@gget_R, fun var => @Get var)
      : pair_to_reify (fun var => forall n, var (tensor_n n) -> list (var tZ) -> var (tensor_n O));
    (iverson_n, fun var => @Guard var)
      : pair_to_reify (fun var => forall n, var tB -> var (tensor_n n) -> var (tensor_n n));
@@ -191,7 +191,7 @@ Ltac pattern_shallows x :=
  interp_type (tensor_n n) ->
  (interp_type (tensor_n n) -> interp_type (tensor_n m)) -> interp_type (tensor_n m))
 )
-,( @gget :
+,( @gget_R :
 (forall n : nat,
  interp_type (tensor_n n) -> list (interp_type tZ) -> interp_type (tensor_n 0))
 )
@@ -247,8 +247,8 @@ Ltac make_types_reifiable_in x :=
   change RTensorElem with (dim_n_TensorElem O) in x;
   repeat change (@TensorTensorElem _ (dim_n_TensorElem ?n)) with
     (dim_n_TensorElem (S n)) in x;
-  repeat change (@get _ _ ?v ?i) with (@gget (S O) v [i]) in x;
-  repeat change (@gget ?n (@get _ _ ?v ?idx) ?idxs) with (@gget (S n) v (idx :: idxs)) in x;
+  repeat change (@get _ _ ?v ?i) with (@gget_R (S O) v [i]) in x;
+  repeat change (@gget_R ?n (@get _ _ ?v ?idx) ?idxs) with (@gget_R (S n) v (idx :: idxs)) in x;
   change Z with (interp_type tZ) in x;
   cbv [gen sum Common.Truncr] in x;
   (*Z's are not allowed to be used as constants;
