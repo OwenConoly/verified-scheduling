@@ -33,38 +33,31 @@ Fixpoint ec_of_vars (names_vals : list (string * Result.result)) :=
   | (n, v) :: names_vals' => ec_of_vars names_vals' $+ (n, v)
   end.
 
-Definition is_reification {n} (vars : list (string * arb_dim_tensor)) e_string (e_shal : dim_n n) :=
-  exists r,
-  forall inps,
-    Forall2 (fun t r => tensor_of_result r = t.(val)) (map snd vars) inps ->
-    eval_expr $0 (ec_of_vars (combine (map fst vars) inps)) e_string r /\
-      tensor_of_result r = e_shal.
+Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor) * dim_n n) :=
+  forall x,
+    let '(vars, e_shal) := f x in
+    exists r,
+    forall inps,
+      Forall2 (fun t r => tensor_of_result r = t.(val)) (map snd vars) inps ->
+      eval_expr $0 (ec_of_vars (combine (map fst vars) inps)) (e_string x) r /\
+        tensor_of_result r = e_shal.
 
-Search pATLexpr.
-
-Lemma reify_is_reification {n} (e : pATLExpr n) name' e_string vars :
-  stringvar_ATLexpr O (e _) = Some (name', e_string) ->
-  is_reification vars e_string (interp_pATLexpr (e _)).
+Lemma reify_is_reification {n T} (e : T -> forall var, pATLexpr var n) name' e_string vars :
+  (forall x, stringvar_ATLexpr O ((e x) _) = Some (name', e_string x)) ->
+  is_reification e_string (fun x => (vars x, interp_pATLexpr ((e x) _))).
+Proof.
+  intros H. cbv [is_reification]. intros x. Search tensor_of_result.
+  
 Abort.
 
 Derive reified_matmul in
-  (forall A B C m1 m2,
-    is_reification (n := S (S O))
-      [("m1", {| dim := 2; val:= m1 |}); ("m2", {| dim := 2; val := m2 |})]
-      (reified_matmul A B C)
-      (matmul A B C m1 m2))
+  (is_reification (n := 2)
+     reified_matmul
+     (fun '(A, B, C, m1, m2) => ([("m1", {| dim := 2; val:= m1 |}); ("m2", {| dim := 2; val := m2 |})], matmul A B C m1 m2)))
     as reified_matmul_correct.
 Proof.
+  
 Abort.
-
-Fixpoint arrows (var : type -> Type) ts ret :=
-  match ts with
-  | [] => ret
-  | t :: ts' => var t -> arrows var ts' ret
-  end.
-
-Definition arrows_wf ts n (e : forall var, arrows var ts (pATLexpr var n)) : Prop.
-Admitted.
 
 Goal matmul = matmul.
   cbv [matmul].
