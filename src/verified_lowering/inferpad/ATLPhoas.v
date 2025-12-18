@@ -2997,13 +2997,61 @@ Check stringvar_ATLexpr_correct.
 Check result_of_pATLexpr_correct.
 Print Wf_ATLExpr.
 Search Wf_ATLExpr.
-Lemma stringvar_ATLexpr_eval_shal n (e : pATLExpr n) e_string ctx sz name name' :
-  Wf_ATLExpr e ->
-  NoDup (map fst_ctx_elt ctx) ->
-  (forall name'', In name'' (map fst_ctx_elt ctx) -> name'' < name) ->
-  stringvar_ATLexpr name (e _) = Some (name', e_string) ->
-  sound_sizeof (fun _ => tt) (e _) = Some sz ->
-  idxs_in_bounds (e _) ->
-  eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr (e _)) /\
-    tensor_of_result (result_of_pATLexpr (e _)) = interp_pATLexpr (e _).
+Print wf_ATLexpr. Print ctx_elt.
+
+Print type.
+Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
+Proof.
+  destruct t1, t2; try (left; reflexivity); try (right; congruence).
+  destruct (Nat.eq_dec n n0).
+  - subst. left. reflexivity.
+  - right. congruence.
+Qed.
+
+Definition zip_ctx_elts {var1 var2} (e1 : ctx_elt var1) (e2 : ctx_elt var2) : option (ctx_elt2 var1 var2) :=
+  match e1, e2 with
+  | {| ctx_elt_t0 := t1; ctx_elt0 := x1 |}, {| ctx_elt_t0 := t2; ctx_elt0 := x2 |} =>
+      match type_eq_dec t1 t2 with
+      | left pf =>
+          match pf in (_ = q) return var1 t1 -> var2 q -> option (ctx_elt2 var1 var2) with
+          | Logic.eq_refl => fun x1 x2 => Some {| ctx_elt_t := t1; ctx_elt_p1 := x1; ctx_elt_p2 := x2 |}
+          end x1 x2
+      | right _ => None
+      end
+  end.
+
+Fixpoint zip_ctxs {var1 var2} (l1 : list (ctx_elt var1)) (l2 : list (ctx_elt var2)) : list (ctx_elt2 var1 var2) :=
+  match l1, l2 with
+  | x1 :: l1', x2 :: l2' =>
+      match zip_ctx_elts x1 x2 with
+      | Some x => x :: zip_ctxs l1' l2'
+      | None => zip_ctxs l1' l2'
+      end
+  | _, _ => []
+  end.
+
+Check wf_ATLexpr.
+Lemma stringvar_ATLexpr_eval_shal n T (tin : forall var, (forall t, var t) -> T var)
+  (vars : forall var, T var -> list (ctx_elt var))
+  (e : forall var, T var -> pATLexpr var n) e_string ctx sz name name' (names : T (fun _ => nat)) :
+  (forall var1 var2 x1 x2, wf_ATLexpr var1 var2 (zip_ctxs (vars var1 x1) (vars var2 x2)) n (e var1 x1) (e var2 x2)) ->
+  NoDup (vars _ names) ->
+  (forall name'', In name'' (vars _ names) -> name''.(ctx_elt0 _) < name) ->
+  stringvar_ATLexpr name (e _ names) = Some (name', e_string) ->
+  sound_sizeof (fun _ => tt) (e _ (tin _ (fun _ => tt))) = Some sz ->
+  idxs_in_bounds (e _ (tin _ dummy_result)) ->
+  forall x,
+  eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr (e _ x)) /\
+    tensor_of_result (result_of_pATLexpr (e _ x)) = interp_pATLexpr (e _ x).
+Proof.
+  intros. split.
+  - eapply stringvar_ATLexpr_correct; eauto.
+    + admit.
+    + erewrite sound_sizeof_wf. 1: eassumption. admit.
+  - eapply result_of_pATLexpr_correct.
+    + admit.
+    + erewrite sound_sizeof_wf. 1: eassumption. admit.
+    + admit.
+    + assumption.
+    + admit.
 Abort.
