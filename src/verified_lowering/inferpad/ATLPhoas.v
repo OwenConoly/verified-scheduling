@@ -3086,7 +3086,7 @@ Proof.
       -- simpl. apply subseq_skip. auto.
 Qed.
 
-Lemma stringvar_ATLexpr_eval_shal n T (tin : forall var, (forall t, var t) -> T var)
+Lemma stringvar_ATLexpr_eval_shal' n T (tin : forall var, (forall t, var t) -> T var)
   (vars : forall var, T var -> list (ctx_elt var))
   (e : forall var, T var -> pATLexpr var n) e_string sz name name' (names : T (fun _ => nat)) :
   (forall var1 var2 x1 x2, wf_ATLexpr var1 var2 (zip_ctxs (vars var1 x1) (vars var2 x2)) n (e var1 x1) (e var2 x2)) ->
@@ -3112,4 +3112,70 @@ Proof.
     + erewrite sound_sizeof_wf. 1: eassumption. apply H.
   - eapply result_of_pATLexpr_correct; eauto.
     erewrite sound_sizeof_wf. 1: eassumption. auto.
+Qed.
+
+Lemma snd_zip_elt_id var1 var2 (x : ctx_elt var1) (y : ctx_elt var2) :
+  x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _) ->
+  exists z,
+    zip_ctx_elts x y = Some z /\
+      ctx2 z = y.
+Proof.
+  intros H. destruct x, y. simpl in H. subst. simpl.
+  destruct (type_eq_dec _ _); try congruence.
+  (*TODO i don't completely understand this*) revert ctx_elt1 ctx_elt3. destruct e.
+  eauto.
+Qed.
+
+Lemma fst_zip_elt_id var1 var2 (x : ctx_elt var1) (y : ctx_elt var2) :
+  x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _) ->
+  exists z,
+    zip_ctx_elts x y = Some z /\
+      ctx1 z = x.
+Proof.
+  intros H. destruct x, y. simpl in H. subst. simpl.
+  destruct (type_eq_dec _ _); try congruence.
+  (*TODO i don't completely understand this*) revert ctx_elt1 ctx_elt3. destruct e.
+  eauto.
+Qed.
+
+Lemma snd_zip_id var1 var2 (vars1 : list (ctx_elt var1)) (vars2 : list (ctx_elt var2)) :
+  Forall2 (fun x y => x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _)) vars1 vars2 ->
+  map ctx2 (zip_ctxs vars1 vars2) = vars2.
+Proof.
+  induction 1; simpl.
+  - reflexivity.
+  - apply snd_zip_elt_id in H. invs'. rewrite H. simpl. f_equal. auto.
+Qed.
+
+Lemma fst_zip_id var1 var2 (vars1 : list (ctx_elt var1)) (vars2 : list (ctx_elt var2)) :
+  Forall2 (fun x y => x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _)) vars1 vars2 ->
+  map ctx1 (zip_ctxs vars1 vars2) = vars1.
+Proof.
+  induction 1; simpl.
+  - reflexivity.
+  - apply fst_zip_elt_id in H. invs'. rewrite H. simpl. f_equal. auto.
+Qed.
+
+Lemma stringvar_ATLexpr_eval_shal n T (tin : forall var, (forall t, var t) -> T var)
+  (vars : forall var, T var -> list (ctx_elt var))
+  (e : forall var, T var -> pATLexpr var n) e_string sz name name' (names : T (fun _ => nat)) :
+  (forall var1 var2 (x1 : T var1) (x2 : T var2), Forall2 (fun x y => x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _)) (vars _ x1) (vars _ x2)) ->
+  (forall var x, e var x = unnatify (vars var x) (e _ names)) ->
+  NoDup (map (ctx_elt0 (fun _ => nat)) (vars _ names)) ->
+  (forall name'', In name'' (vars _ names) -> name''.(ctx_elt0 _) < name) ->
+  stringvar_ATLexpr name (e _ names) = Some (name', e_string) ->
+  sound_sizeof (fun _ => tt) (e _ (tin _ (fun _ => tt))) = Some sz ->
+  forall xr xt,
+    idxs_in_bounds (e _ xr(*(tin _ dummy_result)*)) ->
+    sum_bounds_good (e interp_type xt) ->
+    Forall res_tensor_corresp (zip_ctxs (vars _ xt) (vars _ xr)) ->
+    eval_expr (valuation_of (zip_ctxs (vars _ names) (vars _ xr))) (ec_of (zip_ctxs (vars _ names) (vars _ xr))) e_string (result_of_pATLexpr (e _ xr)) /\
+      tensor_of_result (result_of_pATLexpr (e _ xr)) = interp_pATLexpr (e _ xt).
+Proof.
+  intros. eapply stringvar_ATLexpr_eval_shal'; eauto.
+  { intros. eassert (e var1 _ = _) as ->.
+    2: { eassert (e var2 _ = _) as ->.
+         2: { apply wf_unnatify. }
+         rewrite snd_zip_id; eauto. }
+    rewrite fst_zip_id; eauto. }
 Qed.
