@@ -3030,28 +3030,86 @@ Fixpoint zip_ctxs {var1 var2} (l1 : list (ctx_elt var1)) (l2 : list (ctx_elt var
   | _, _ => []
   end.
 
-Check wf_ATLexpr.
+Inductive subseq {T : Type} : list T -> list T -> Prop :=
+| subseq_nil l :
+  subseq [] l
+| subseq_keep a l1 l2 :
+  subseq l1 l2 ->
+  subseq (a :: l1) (a :: l2)
+| subseq_skip a l1 l2 :
+  subseq l1 l2 ->
+  subseq l1 (a :: l2).
+
+(*written by gemini*)
+Lemma subseq_incl : forall (T : Type) (l1 l2 : list T),
+  subseq l1 l2 -> incl l1 l2.
+Proof.
+  intros T l1 l2 H.
+  induction H.
+  - unfold incl. intros a HIn. inversion HIn.
+  - unfold incl. intros x HIn.
+    inversion HIn; subst.
+    + apply in_eq.
+    + apply in_cons. apply IHsubseq. assumption.
+  - unfold incl. intros x HIn.
+    apply in_cons.
+    apply IHsubseq.
+    assumption.
+Qed.
+
+(*also from gemini*)
+Lemma subseq_NoDup : forall (T : Type) (l1 l2 : list T),
+  subseq l1 l2 -> NoDup l2 -> NoDup l1.
+Proof.
+  intros T l1 l2 H.
+  induction H; intros HND.
+  - constructor.
+  - inversion HND; subst.
+    constructor.
+    + intro HIn.
+      apply H2.
+      eapply subseq_incl; eauto.
+    + apply IHsubseq. assumption.
+  - inversion HND; subst.
+    apply IHsubseq. assumption.
+Qed.
+
+Lemma subseq_fst_zip var1 var2 (ctx1 : list (ctx_elt (fun _ => var1))) (ctx2 : list (ctx_elt var2)) :
+  subseq (map fst_ctx_elt (zip_ctxs ctx1 ctx2)) (map (ctx_elt0 (fun _ => var1)) ctx1).
+Proof.
+  revert ctx2. induction ctx1; intros ctx2.
+  - simpl. apply subseq_nil.
+  - simpl. destruct ctx2; simpl.
+    + apply subseq_nil.
+    + destruct a, c. cbv [zip_ctx_elts]. destruct (type_eq_dec _ _).
+      -- subst. simpl. apply subseq_keep. auto.
+      -- simpl. apply subseq_skip. auto.
+Qed.
+
 Lemma stringvar_ATLexpr_eval_shal n T (tin : forall var, (forall t, var t) -> T var)
   (vars : forall var, T var -> list (ctx_elt var))
-  (e : forall var, T var -> pATLexpr var n) e_string ctx sz name name' (names : T (fun _ => nat)) :
+  (e : forall var, T var -> pATLexpr var n) e_string sz name name' (names : T (fun _ => nat)) :
   (forall var1 var2 x1 x2, wf_ATLexpr var1 var2 (zip_ctxs (vars var1 x1) (vars var2 x2)) n (e var1 x1) (e var2 x2)) ->
-  NoDup (vars _ names) ->
+  NoDup (map (ctx_elt0 (fun _ => nat)) (vars _ names)) ->
   (forall name'', In name'' (vars _ names) -> name''.(ctx_elt0 _) < name) ->
   stringvar_ATLexpr name (e _ names) = Some (name', e_string) ->
   sound_sizeof (fun _ => tt) (e _ (tin _ (fun _ => tt))) = Some sz ->
-  idxs_in_bounds (e _ (tin _ dummy_result)) ->
-  forall x,
-  eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr (e _ x)) /\
-    tensor_of_result (result_of_pATLexpr (e _ x)) = interp_pATLexpr (e _ x).
+  forall xr xt,
+    idxs_in_bounds (e _ xr(*(tin _ dummy_result)*)) ->
+    sum_bounds_good (e interp_type xt) ->
+    Forall res_tensor_corresp (zip_ctxs (vars _ xt) (vars _ xr)) ->
+    eval_expr (valuation_of (zip_ctxs (vars _ names) (vars _ xr))) (ec_of (zip_ctxs (vars _ names) (vars _ xr))) e_string (result_of_pATLexpr (e _ xr)) /\
+      tensor_of_result (result_of_pATLexpr (e _ xr)) = interp_pATLexpr (e _ xt).
 Proof.
   intros. split.
   - eapply stringvar_ATLexpr_correct; eauto.
-    + admit.
-    + erewrite sound_sizeof_wf. 1: eassumption. admit.
-  - eapply result_of_pATLexpr_correct.
-    + admit.
-    + erewrite sound_sizeof_wf. 1: eassumption. admit.
-    + admit.
-    + assumption.
-    + admit.
-Abort.
+    + eapply subseq_NoDup.
+      -- apply subseq_fst_zip.
+      -- assumption.
+    + intros. eapply subseq_incl in H7. 2: apply subseq_fst_zip.
+      apply in_map_iff in H7. invs'.
+      apply H1 in H9. assumption.
+    + erewrite sound_sizeof_wf. 1: eassumption. apply H.
+  - eapply result_of_pATLexpr_correct; eauto.
+    erewrite sound_sizeof_wf. 1: eassumption. auto.
+Qed.
