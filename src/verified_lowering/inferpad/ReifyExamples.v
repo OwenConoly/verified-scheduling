@@ -42,13 +42,13 @@ Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor
       eval_expr $0 (ec_of_vars (combine (map fst vars) inps)) (e_string x) r /\
         tensor_of_result r = e_shal.
 
-Lemma reify_is_reification {n T} (e : T -> forall var, pATLexpr var n) name' e_string vars :
+Print ctx_elt.
+Lemma reify_is_reification {n T} (e : forall var, T var -> list ctx_elt var * pATLexpr var n) name' e_string vars f :
   (forall x, stringvar_ATLexpr O ((e x) _) = Some (name', e_string x)) ->
-  is_reification e_string (fun x => (vars x, interp_pATLexpr ((e x) _))).
+  is_reification e_string f.
 Proof.
-  intros H. cbv [is_reification]. intros x. Search tensor_of_result.
-  
-Abort.
+  intros H. cbv [is_reification]. intros x.
+Admitted.
 
 Derive reified_matmul in
   (is_reification (n := 2)
@@ -56,6 +56,39 @@ Derive reified_matmul in
      (fun '(A, B, C, m1, m2) => ([("m1", {| dim := 2; val:= m1 |}); ("m2", {| dim := 2; val := m2 |})], matmul A B C m1 m2)))
     as reified_matmul_correct.
 Proof.
+  eapply reify_is_reification with (vars := fun '(_, _, _, _, _) => _).
+  2: { intros x. repeat (destruct x as [x ?]). simpl. reflexivity. }
+  2: { intros x. repeat (destruct x as [x ?]). simpl.
+       rename z into z1. cbv [matmul]. Print Reify_lhs.
+       lazymatch goal with
+       | |- ?x = _ => set (y := x)
+       end.
+       make_types_reifiable_in y. subst y.
+       Print Ltac Reify.
+       match goal with
+       | |- ?x = _ =>
+           set (y := x); pattern_shallows y
+       end.
+         (let rx := lazymatch goal with
+              | y:=?y':_ |- _ => get_fun y'
+              end in
+    set (z := rx);
+     (let w := constr:((fun var => apply_to_all var (z (pExpr_type var)))) in
+      let w := eval cbv[apply_to_all z] in w in
+      set (name := w); subst y; subst z; simpl))
+       match goal with
+       | |- ?x = _ => Reify x name
+       end.
+       Print Reify_lhs.
+  end
+       reified_matmul'.
+  f_equal. idtac. simpl.
+  match goal with
+  | |- is_reification _ ?x => eassert (x = fun '(_, _, _, _, _) => _) as ->; cycle 1
+  end.
+  1: eapply reify_is_reification.
+  
+  idtac.
   
 Abort.
 
