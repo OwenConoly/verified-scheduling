@@ -368,6 +368,20 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 .
 Arguments pATLexpr : clear implicits.
 
+Inductive fvar_pATLexpr {var : type -> Type} : list type -> nat -> Type :=
+| no_fvar n : pATLexpr var n -> fvar_pATLexpr [] n
+| with_fvar t ts n : (var t -> fvar_pATLexpr ts n) -> fvar_pATLexpr (t :: ts) n.
+Arguments fvar_pATLexpr : clear implicits.
+
+Fixpoint fvar_type var ts n :=
+  match ts with
+  | [] => var (tensor_n n)
+  | t :: ts' => var t -> fvar_type var ts' n
+  end.
+
+Definition lam var t ts n (f : var t -> fvar_type var ts n) (x : var t) :=
+  f x.
+
 Section well_formed.
   Context (var1 var2 : type -> Type).
 Record ctx_elt2 :=
@@ -464,13 +478,21 @@ Inductive wf_ATLexpr : list ctx_elt2 -> forall n, pATLexpr var1 n -> pATLexpr va
 | wf_SIZR ctx x1 x2 :
   wf_Zexpr ctx x1 x2 ->
   wf_ATLexpr ctx _ (SIZR x1) (SIZR x2)
-. 
+.
+
+Inductive wf_fvar_ATLexpr : list ctx_elt2 -> forall ts n, fvar_pATLexpr var1 ts n -> fvar_pATLexpr var2 ts n -> Prop :=
+| wf_no_fvar ctx n e1 e2 :
+  wf_ATLexpr ctx n e1 e2 ->
+  wf_fvar_ATLexpr ctx [] n (no_fvar n e1) (no_fvar n e2)
+| wf_with_fvar ctx t ts n e1 e2 :
+  (forall x1 x2, wf_fvar_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) ts n (e1 x1) (e2 x2)) ->
+  wf_fvar_ATLexpr ctx (t :: ts) n (with_fvar t ts n e1) (with_fvar t ts n e2).
 End well_formed.
 
-Definition pATLExpr n := forall var, pATLexpr var n.
+Definition fvar_pATLExpr ts n := forall var, fvar_pATLexpr var ts n.
 
-Definition Wf_ATLExpr {n} (e : pATLExpr n) :=
-  forall var1 var2, wf_ATLexpr var1 var2 [] _ (e var1) (e var2).
+Definition Wf_fvar_ATLExpr {ts n} (e : fvar_pATLExpr ts n) :=
+  forall var1 var2, wf_fvar_ATLexpr var1 var2 [] _ _ (e var1) (e var2).
 
 Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_n n) :=
   match e with
@@ -492,6 +514,13 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   | Get x idxs => gget_R (interp_pATLexpr x) (map interp_pZexpr idxs)
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
   | SIZR x => IZR (interp_pZexpr x)
+  end.
+
+Fixpoint interp_fvar_pATLexpr ts n (e : fvar_pATLexpr interp_type ts n) : fvar_type interp_type ts n :=
+  match e with
+  | no_fvar n e0 => interp_pATLexpr e0
+  | with_fvar t ts' n e' =>
+      lam interp_type t ts' n (fun x => interp_fvar_pATLexpr ts' n (e' x))
   end.
 
 Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : option (list nat) :=
@@ -783,6 +812,12 @@ Fixpoint unnatify {var n} (ctx : list (ctx_elt var)) (e : pATLexpr (fun _ => nat
   | SIZR x => SIZR (unnatify_Z ctx x)
   end.
 
+Fixpoint fvar_unnatify {var n ts} (ctx : list (ctx_elt var)) (e : fvar_pATLexpr (fun _ => nat) ts n) : fvar_pATLexpr var ts n :=
+  match e with
+  | no_fvar _ e0 => no_fvar _ (unnatify ctx e0)
+  | with_fvar _ _ _ e' => with_fvar _ _ _ (fun x => fvar_unnatify ({|ctx_elt0 := x|} :: ctx) (e' (length ctx)))
+  end.
+
 Definition ctx1 {var1 var2} (x : ctx_elt2 var1 var2) :=
   {| ctx_elt0 := x.(ctx_elt_p1 _ _) |}.
 Definition ctx2 {var1 var2} (x : ctx_elt2 var1 var2) :=
@@ -825,12 +860,20 @@ Proof.
     subst. apply nth_error_In in E. apply in_rev in E. auto.
   - induction l; simpl; eauto.
 Qed.
+Hint Resolve wf_unnatify : core.
 
-Lemma WfByUnnatify n (E : pATLExpr n) :
-  E = (fun var => unnatify nil (E (fun _ => nat))) ->
-  Wf_ATLExpr E.
+Hint Constructors wf_fvar_ATLexpr : core.
+Lemma wf_fvar_unnatify ts n var1 var2 ctx e :
+  wf_fvar_ATLexpr var1 var2 ctx ts n (fvar_unnatify (map ctx1 ctx) e) (fvar_unnatify (map ctx2 ctx) e).
 Proof.
-  intros H. rewrite H. cbv [Wf_ATLExpr]. intros. apply wf_unnatify.
+  revert ctx. induction e; intros; simpl; repeat rewrite length_map; eauto.
+Qed.
+
+Lemma WfByUnnatify ts n (E : fvar_pATLExpr ts n) :
+  E = (fun var => fvar_unnatify nil (E (fun _ => nat))) ->
+  Wf_fvar_ATLExpr E.
+Proof.
+  intros H. rewrite H. cbv [Wf_fvar_ATLExpr]. intros. apply wf_fvar_unnatify.
 Qed.
 
 Local Notation "[[ x , y ]] <- a ; f" := (match a with Some (x, y) => f | None => None end)
@@ -2993,13 +3036,32 @@ Proof.
     all: try exact 0%Z || exact dummy_result || exact (fun _ => 0%nat) || exact (Result.S Result.SX).
 Qed.
 
-Check stringvar_ATLexpr_correct.
-Check result_of_pATLexpr_correct.
-Print Wf_ATLExpr.
-Search Wf_ATLExpr.
-Print wf_ATLexpr. Print ctx_elt.
+Fixpoint stringvar_fvar_ATLexpr {ts n} name (e : fvar_pATLexpr (fun _ => nat) ts n) : option ATLexpr :=
+  match e with
+  | no_fvar n e0 =>
+      match stringvar_ATLexpr name e0 with
+      | Some (_, e_string) => Some e_string
+      | None => None
+      end
+  | with_fvar t ts' n e' =>
+      stringvar_fvar_ATLexpr (S name) (e' name)
+  end.
 
-Print type.
+Fixpoint fvar_sound_sizeof {var ts n} (dummy : forall t : type, var t) 
+  (e : fvar_pATLexpr var ts n) : option (list nat) :=
+  match e with
+  | no_fvar _ e0 => sound_sizeof dummy e0
+  | with_fvar _ _ _ e' => fvar_sound_sizeof dummy (e' (dummy _))
+  end.
+
+Fixpoint fvar_idxs_in_bounds {ts n} (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
+  match e with
+  | no_fvar _ e0 => idxs_in_bounds e0
+  | with_fvar _ _ _ e' => forall r, fvar_idxs_in_bounds (e' r)
+  end.
+
+Print result_of_pATLexpr. Print interp_type_result. Print ctx_elt.
+
 Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
 Proof.
   destruct t1, t2; try (left; reflexivity); try (right; congruence).
@@ -3008,174 +3070,33 @@ Proof.
   - right. congruence.
 Qed.
 
-Definition zip_ctx_elts {var1 var2} (e1 : ctx_elt var1) (e2 : ctx_elt var2) : option (ctx_elt2 var1 var2) :=
-  match e1, e2 with
-  | {| ctx_elt_t0 := t1; ctx_elt0 := x1 |}, {| ctx_elt_t0 := t2; ctx_elt0 := x2 |} =>
-      match type_eq_dec t1 t2 with
-      | left pf =>
-          match pf in (_ = q) return var1 t1 -> var2 q -> option (ctx_elt2 var1 var2) with
-          | Logic.eq_refl => fun x1 x2 => Some {| ctx_elt_t := t1; ctx_elt_p1 := x1; ctx_elt_p2 := x2 |}
-          end x1 x2
-      | right _ => None
+Fixpoint result_of_fvar_pATLexpr {ts n} (e : fvar_pATLexpr interp_type_result ts n) (args : list (ctx_elt interp_type_result)) : result :=
+  match e with
+  | no_fvar _ e0 => result_of_pATLexpr e0
+  | with_fvar t _ _ e' =>
+      
+      match args with
+      | {| ctx_elt_t0 := t'; ctx_elt0 := arg|} :: args' =>
+          match type_eq_dec t t' with
+          | left pf =>
+              match pf in (_ = q) return interp_type_result q -> _ with
+              | Logic.eq_refl => fun arg => result_of_fvar_pATLexpr (e' arg) args'
+              end arg
+          | right _ => dummy_result (tensor_n 0)
+          end
+      | nil => dummy_result (tensor_n 0)
       end
   end.
 
-Fixpoint zip_ctxs {var1 var2} (l1 : list (ctx_elt var1)) (l2 : list (ctx_elt var2)) : list (ctx_elt2 var1 var2) :=
-  match l1, l2 with
-  | x1 :: l1', x2 :: l2' =>
-      match zip_ctx_elts x1 x2 with
-      | Some x => x :: zip_ctxs l1' l2'
-      | None => zip_ctxs l1' l2'
-      end
-  | _, _ => []
-  end.
+Lemma stringvar_fvar_ATLexpr_correct ctx sz ts n e_nat e_shal name name' e_string :
+  wf_fvar_ATLexpr (fun _ => nat) interp_type_result ctx ts n e_nat e_shal ->
+  NoDup (map fst_ctx_elt ctx) ->
+  (forall name'', In name'' (map fst_ctx_elt ctx) -> name'' < name) ->
+  stringvar_fvar_ATLexpr name e_nat = Some e_string ->
+  fvar_sound_sizeof (fun _ => O) e_nat = Some sz ->
+  fvar_idxs_in_bounds e_shal ->
+  eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_fvar_pATLexpr e_shal).
 
-Inductive subseq {T : Type} : list T -> list T -> Prop :=
-| subseq_nil l :
-  subseq [] l
-| subseq_keep a l1 l2 :
-  subseq l1 l2 ->
-  subseq (a :: l1) (a :: l2)
-| subseq_skip a l1 l2 :
-  subseq l1 l2 ->
-  subseq l1 (a :: l2).
 
-(*written by gemini*)
-Lemma subseq_incl : forall (T : Type) (l1 l2 : list T),
-  subseq l1 l2 -> incl l1 l2.
-Proof.
-  intros T l1 l2 H.
-  induction H.
-  - unfold incl. intros a HIn. inversion HIn.
-  - unfold incl. intros x HIn.
-    inversion HIn; subst.
-    + apply in_eq.
-    + apply in_cons. apply IHsubseq. assumption.
-  - unfold incl. intros x HIn.
-    apply in_cons.
-    apply IHsubseq.
-    assumption.
-Qed.
-
-(*also from gemini*)
-Lemma subseq_NoDup : forall (T : Type) (l1 l2 : list T),
-  subseq l1 l2 -> NoDup l2 -> NoDup l1.
-Proof.
-  intros T l1 l2 H.
-  induction H; intros HND.
-  - constructor.
-  - inversion HND; subst.
-    constructor.
-    + intro HIn.
-      apply H2.
-      eapply subseq_incl; eauto.
-    + apply IHsubseq. assumption.
-  - inversion HND; subst.
-    apply IHsubseq. assumption.
-Qed.
-
-Lemma subseq_fst_zip var1 var2 (ctx1 : list (ctx_elt (fun _ => var1))) (ctx2 : list (ctx_elt var2)) :
-  subseq (map fst_ctx_elt (zip_ctxs ctx1 ctx2)) (map (ctx_elt0 (fun _ => var1)) ctx1).
-Proof.
-  revert ctx2. induction ctx1; intros ctx2.
-  - simpl. apply subseq_nil.
-  - simpl. destruct ctx2; simpl.
-    + apply subseq_nil.
-    + destruct a, c. cbv [zip_ctx_elts]. destruct (type_eq_dec _ _).
-      -- subst. simpl. apply subseq_keep. auto.
-      -- simpl. apply subseq_skip. auto.
-Qed.
-
-Lemma stringvar_ATLexpr_eval_shal' n T (tin : forall var, (forall t, var t) -> T var)
-  (vars : forall var, T var -> list (ctx_elt var))
-  (e : forall var, T var -> pATLexpr var n) e_string sz name name' (names : T (fun _ => nat)) :
-  (forall var1 var2 x1 x2, wf_ATLexpr var1 var2 (zip_ctxs (vars var1 x1) (vars var2 x2)) n (e var1 x1) (e var2 x2)) ->
-  NoDup (map (ctx_elt0 (fun _ => nat)) (vars _ names)) ->
-  (forall name'', In name'' (vars _ names) -> name''.(ctx_elt0 _) < name) ->
-  stringvar_ATLexpr name (e _ names) = Some (name', e_string) ->
-  sound_sizeof (fun _ => tt) (e _ (tin _ (fun _ => tt))) = Some sz ->
-  forall xr xt,
-    idxs_in_bounds (e _ xr(*(tin _ dummy_result)*)) ->
-    sum_bounds_good (e interp_type xt) ->
-    Forall res_tensor_corresp (zip_ctxs (vars _ xt) (vars _ xr)) ->
-    eval_expr (valuation_of (zip_ctxs (vars _ names) (vars _ xr))) (ec_of (zip_ctxs (vars _ names) (vars _ xr))) e_string (result_of_pATLexpr (e _ xr)) /\
-      tensor_of_result (result_of_pATLexpr (e _ xr)) = interp_pATLexpr (e _ xt).
-Proof.
-  intros. split.
-  - eapply stringvar_ATLexpr_correct; eauto.
-    + eapply subseq_NoDup.
-      -- apply subseq_fst_zip.
-      -- assumption.
-    + intros. eapply subseq_incl in H7. 2: apply subseq_fst_zip.
-      apply in_map_iff in H7. invs'.
-      apply H1 in H9. assumption.
-    + erewrite sound_sizeof_wf. 1: eassumption. apply H.
-  - eapply result_of_pATLexpr_correct; eauto.
-    erewrite sound_sizeof_wf. 1: eassumption. auto.
-Qed.
-
-Lemma snd_zip_elt_id var1 var2 (x : ctx_elt var1) (y : ctx_elt var2) :
-  x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _) ->
-  exists z,
-    zip_ctx_elts x y = Some z /\
-      ctx2 z = y.
-Proof.
-  intros H. destruct x, y. simpl in H. subst. simpl.
-  destruct (type_eq_dec _ _); try congruence.
-  (*TODO i don't completely understand this*) revert ctx_elt1 ctx_elt3. destruct e.
-  eauto.
-Qed.
-
-Lemma fst_zip_elt_id var1 var2 (x : ctx_elt var1) (y : ctx_elt var2) :
-  x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _) ->
-  exists z,
-    zip_ctx_elts x y = Some z /\
-      ctx1 z = x.
-Proof.
-  intros H. destruct x, y. simpl in H. subst. simpl.
-  destruct (type_eq_dec _ _); try congruence.
-  (*TODO i don't completely understand this*) revert ctx_elt1 ctx_elt3. destruct e.
-  eauto.
-Qed.
-
-Lemma snd_zip_id var1 var2 (vars1 : list (ctx_elt var1)) (vars2 : list (ctx_elt var2)) :
-  Forall2 (fun x y => x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _)) vars1 vars2 ->
-  map ctx2 (zip_ctxs vars1 vars2) = vars2.
-Proof.
-  induction 1; simpl.
-  - reflexivity.
-  - apply snd_zip_elt_id in H. invs'. rewrite H. simpl. f_equal. auto.
-Qed.
-
-Lemma fst_zip_id var1 var2 (vars1 : list (ctx_elt var1)) (vars2 : list (ctx_elt var2)) :
-  Forall2 (fun x y => x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _)) vars1 vars2 ->
-  map ctx1 (zip_ctxs vars1 vars2) = vars1.
-Proof.
-  induction 1; simpl.
-  - reflexivity.
-  - apply fst_zip_elt_id in H. invs'. rewrite H. simpl. f_equal. auto.
-Qed.
-
-Lemma stringvar_ATLexpr_eval_shal n T (tin : forall var, (forall t, var t) -> T var)
-  (vars : forall var, T var -> list (ctx_elt var))
-  (e : forall var, T var -> pATLexpr var n) e_string sz name name' (names : T (fun _ => nat)) :
-  (forall var1 var2 (x1 : T var1) (x2 : T var2), Forall2 (fun x y => x.(ctx_elt_t0 _) = y.(ctx_elt_t0 _)) (vars _ x1) (vars _ x2)) ->
-  (forall var x, e var x = unnatify (vars var x) (e _ names)) ->
-  NoDup (map (ctx_elt0 (fun _ => nat)) (vars _ names)) ->
-  (forall name'', In name'' (vars _ names) -> name''.(ctx_elt0 _) < name) ->
-  stringvar_ATLexpr name (e _ names) = Some (name', e_string) ->
-  sound_sizeof (fun _ => tt) (e _ (tin _ (fun _ => tt))) = Some sz ->
-  forall xr xt,
-    idxs_in_bounds (e _ xr(*(tin _ dummy_result)*)) ->
-    sum_bounds_good (e interp_type xt) ->
-    Forall res_tensor_corresp (zip_ctxs (vars _ xt) (vars _ xr)) ->
-    eval_expr (valuation_of (zip_ctxs (vars _ names) (vars _ xr))) (ec_of (zip_ctxs (vars _ names) (vars _ xr))) e_string (result_of_pATLexpr (e _ xr)) /\
-      tensor_of_result (result_of_pATLexpr (e _ xr)) = interp_pATLexpr (e _ xt).
-Proof.
-  intros. eapply stringvar_ATLexpr_eval_shal'; eauto.
-  { intros. eassert (e var1 _ = _) as ->.
-    2: { eassert (e var2 _ = _) as ->.
-         2: { apply wf_unnatify. }
-         rewrite snd_zip_id; eauto. }
-    rewrite fst_zip_id; eauto. }
-Qed.
+Check stringvar_ATLexpr_correct.
+Lemma stringvar_fvar_pATLexpr_correct ctx s

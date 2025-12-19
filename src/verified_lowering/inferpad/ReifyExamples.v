@@ -41,14 +41,14 @@ Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor
       Forall2 (fun t r => tensor_of_result r = t.(val)) (map snd vars) inps ->
       eval_expr $0 (ec_of_vars (combine (map fst vars) inps)) (e_string x) r /\
         tensor_of_result r = e_shal.
-
-Print ctx_elt.
-Lemma reify_is_reification {n T} (e : forall var, T var -> list ctx_elt var * pATLexpr var n) name' e_string vars f :
-  (forall x, stringvar_ATLexpr O ((e x) _) = Some (name', e_string x)) ->
-  is_reification e_string f.
-Proof.
-  intros H. cbv [is_reification]. intros x.
-Admitted.
+Check stringvar_ATLexpr_eval_shal.
+(* Print ctx_elt. *)
+(* Lemma reify_is_reification {n T} (e : forall var, T var -> list ctx_elt var * pATLexpr var n) name' e_string vars f : *)
+(*   (forall x, stringvar_ATLexpr O ((e x) _) = Some (name', e_string x)) -> *)
+(*   is_reification e_string f. *)
+(* Proof. *)
+(*   intros H. cbv [is_reification]. intros x. *)
+(* Admitted. *)
 
 Derive reified_matmul in
   (is_reification (n := 2)
@@ -56,6 +56,11 @@ Derive reified_matmul in
      (fun '(A, B, C, m1, m2) => ([("m1", {| dim := 2; val:= m1 |}); ("m2", {| dim := 2; val := m2 |})], matmul A B C m1 m2)))
     as reified_matmul_correct.
 Proof.
+  cbv [is_reification]. intros x. repeat (destruct x as [x ?]). eexists.
+  intros. eassert (ec_of_vars _ = _) as ->; cycle 1.
+  { 
+  Check stringvar_ATLexpr_eval_shal.
+Check string
   eapply reify_is_reification with (vars := fun '(_, _, _, _, _) => _).
   2: { intros x. repeat (destruct x as [x ?]). simpl. reflexivity. }
   2: { intros x. repeat (destruct x as [x ?]). simpl.
