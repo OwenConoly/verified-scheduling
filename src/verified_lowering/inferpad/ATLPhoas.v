@@ -523,10 +523,10 @@ Fixpoint interp_fvar_pATLexpr ts n (e : fvar_pATLexpr interp_type ts n) : fvar_t
       lam interp_type t ts' n (fun x => interp_fvar_pATLexpr ts' n (e' x))
   end.
 
-Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (size : forall n, var (tensor_n n) -> option (list nat)) (e : pATLexpr var n) : option (list nat) :=
+Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : option (list nat) :=
   match e with
   | Gen lo hi body =>
-      match sound_sizeof dummy size (body (dummy _)), sizeof_pZexpr lo, sizeof_pZexpr hi with
+      match sound_sizeof dummy (body (dummy _)), sizeof_pZexpr lo, sizeof_pZexpr hi with
       | Some sz, Some lo', Some hi' =>
           let n := Z.to_nat (hi' - lo') in
           (*for reasons described below (truncl case),
@@ -537,16 +537,16 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (size : forall n, var (t
       | _, _, _ => None
       end
   | Sum lo hi body =>
-    sound_sizeof dummy size (body (dummy _))
+    sound_sizeof dummy (body (dummy _))
   | Guard p body =>
-    sound_sizeof dummy size body
+    sound_sizeof dummy body
   | Lbind e1 e2 =>
-      match sound_sizeof dummy size e1 with
-      | Some _ => sound_sizeof dummy size (e2 (dummy _))
+      match sound_sizeof dummy e1 with
+      | Some _ => sound_sizeof dummy (e2 (dummy _))
       | None => None
       end
   | Concat x y =>
-      match sound_sizeof dummy size x, sound_sizeof dummy size y with
+      match sound_sizeof dummy x, sound_sizeof dummy y with
       | Some (nx :: restx), Some (ny :: resty) =>
           if list_eq_dec Nat.eq_dec restx resty then
             Some (nx + ny :: restx)
@@ -555,12 +555,12 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (size : forall n, var (t
       | _, _ => None
       end
   | Flatten e =>
-    match sound_sizeof dummy size e with
+    match sound_sizeof dummy e with
     | Some (a :: b :: rest) => Some (a * b :: rest)
     | _ => None
     end
   | Split k e =>
-    match sound_sizeof dummy size e with
+    match sound_sizeof dummy e with
     | Some (a :: rest) =>
         if (0 <? k)%nat then
           Some (a //n k :: k :: rest)
@@ -568,12 +568,12 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (size : forall n, var (t
     | _ => None
     end
   | Transpose e =>
-    match sound_sizeof dummy size e with
+    match sound_sizeof dummy e with
     | Some (a :: b :: rest) => Some (b :: a :: rest)
     | _ => None
     end
   | Truncr n e | Truncl n e =>
-    match sound_sizeof dummy size e with
+    match sound_sizeof dummy e with
     | Some (m :: rest) =>
         (*note: ATLDeep.size_of only requires n <=? m.
           here, we also check n <? m, because we want to
@@ -587,33 +587,33 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (size : forall n, var (t
     | _ => None
     end
   | Padr n e =>
-    match sound_sizeof dummy size e with
+    match sound_sizeof dummy e with
     | Some (m :: rest) => Some (m + n :: rest)
     | _ => None
     end
   | Padl n e =>
-    match sound_sizeof dummy size e with
+    match sound_sizeof dummy e with
     | Some (m :: rest) => Some (n + m :: rest)
     | _ => None
     end                  
-  | Var x => size _ x
+  | Var x => None (*should never happen*)
   | @Get _ n v idxs =>
       if (length idxs =? n)%nat then
-        match sound_sizeof dummy size v with
+        match sound_sizeof dummy v with
         | Some _ => Some []
         | None => None
         end
       else None
   | SBop _ x y =>
-      match sound_sizeof dummy size x, sound_sizeof dummy size y with
+      match sound_sizeof dummy x, sound_sizeof dummy y with
       | Some _, Some _ => Some []
       | _, _ => None
       end
   | SIZR _ => Some []
   end.
 
-Definition sizeof {var n} dummy size (e : pATLexpr var n) :=
-  match sound_sizeof dummy size e with
+Definition sizeof {var n} dummy (e : pATLexpr var n) :=
+  match sound_sizeof dummy e with
   | Some x => x
   | None => []
   end.
@@ -665,29 +665,6 @@ Fixpoint eval_get' x idxs :=
   | Result.S s, [] => s
   | _, _ => SX
   end.
-
-Check list_eq_dec.
-Fixpoint collapse {T} (T_eq_dec : forall x y, {x = y} + {x <> y}) (acc : option T) (l : list T) : option T :=
-  match l with
-  | [] => acc
-  | a :: l' =>
-      match acc with
-      | None => collapse T_eq_dec (Some a) l'
-      | Some a' => if T_eq_dec a a' then collapse T_eq_dec acc l' else None
-      end
-  end.
-
-Definition option_eq_dec {T} (T_eq_dec : forall (a b : T), {a = b} + {a <> b}) (a b : option T) : {a = b} + {a <> b}.
-Proof. destruct a, b; auto.
-
-Search option ({_} + {_}).
-Fixpoint shape_of_result (r : result) : option (list nat) :=
-  match r with
-  | V rs => collapse (list_eq_dec Nat.eq_dec) (map shape_of_result rs)
-  | Result.S _ => Some []
-  end.
-                   
-      
 
 Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.result :=
   match e in pATLexpr _ n with
@@ -3141,6 +3118,7 @@ Lemma stringvar_fvar_ATLexpr_correct ctx sz ts n e_nat e_shal name e_string args
   fvar_sound_sizeof (fun _ => O) e_nat = Some sz ->
   fvar_idxs_in_bounds e_shal ->
   eval_expr (join (valuation_of_args name args) (valuation_of ctx)) (join (ec_of_args name args) (ec_of ctx)) e_string (result_of_fvar_pATLexpr e_shal args).
+Proof.
 
 
 Check stringvar_ATLexpr_correct.
