@@ -3063,10 +3063,32 @@ Fixpoint fvar_sound_sizeof {var ts n} (dummy : forall t : type, var t)
   | with_fvar _ _ _ e' => fvar_sound_sizeof dummy (e' (dummy _))
   end.
 
-Fixpoint fvar_idxs_in_bounds {ts n} (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
-  match e with
-  | no_fvar _ e0 => idxs_in_bounds e0
-  | with_fvar _ _ _ e' => forall r, fvar_idxs_in_bounds (e' r)
+Variant arg_size :=
+  | sizeB
+  | sizeZ
+  | sizeT (n : nat) (sz : list nat).
+
+Definition arg_has_size (arg : ctx_elt interp_type_result) size :=
+  match arg, size with
+  | {| ctx_elt_t0 := tensor_n n; ctx_elt0 := x |}, sizeT n0 sh => n0 = n /\ result_has_shape' sh x
+  | {| ctx_elt_t0 := tZ; ctx_elt0 := _ |}, sizeZ => True
+  | {| ctx_elt_t0 := tB; ctx_elt0 := _ |}, sizeB => True
+  | _, _ => False
+  end.
+
+Fixpoint fvar_idxs_in_bounds {ts n} (sizes : list arg_size) (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
+  match e, sizes with
+  | no_fvar _ e0, [] => idxs_in_bounds e0
+  | with_fvar (tensor_n n) _ _ e', sizeT n0 size :: sizes' =>
+      n = n0 /\
+        forall r,
+          result_has_shape' size r ->
+          fvar_idxs_in_bounds sizes' (e' r)
+  | with_fvar tZ _ _ e', sizeZ :: sizes' => forall r,
+      fvar_idxs_in_bounds sizes' (e' r)           
+  | with_fvar tB _ _ e', sizeB :: sizes' => forall r,
+      fvar_idxs_in_bounds sizes' (e' r)           
+  | _, _ => False
   end.
 
 Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
@@ -3080,17 +3102,23 @@ Qed.
 Fixpoint result_of_fvar_pATLexpr {ts n} (e : fvar_pATLexpr interp_type_result ts n) (args : list (ctx_elt interp_type_result)) : result :=
   match e with
   | no_fvar _ e0 => result_of_pATLexpr e0
-  | with_fvar t _ _ e' =>
+  | with_fvar tZ _ _ e' =>
       match args with
-      | {| ctx_elt_t0 := t'; ctx_elt0 := arg|} :: args' =>
-          match type_eq_dec t t' with
-          | left pf =>
-              match pf in (_ = q) return interp_type_result q -> _ with
-              | Logic.eq_refl => fun arg => result_of_fvar_pATLexpr (e' arg) args'
-              end arg
-          | right _ => dummy_result (tensor_n 0)
-          end
-      | nil => dummy_result (tensor_n 0)
+      | {| ctx_elt_t0 := tZ; ctx_elt0 := arg|} :: args' =>
+          result_of_fvar_pATLexpr (e' arg) args'
+      | _ => dummy_result (tensor_n 0)
+      end
+  | with_fvar tB _ _ e' =>
+      match args with
+      | {| ctx_elt_t0 := tB; ctx_elt0 := arg|} :: args' =>
+          result_of_fvar_pATLexpr (e' arg) args'
+      | _ => dummy_result (tensor_n 0)
+      end
+  | with_fvar (tensor_n _) _ _ e' =>
+      match args with
+      | {| ctx_elt_t0 := tensor_n _; ctx_elt0 := arg|} :: args' =>
+          result_of_fvar_pATLexpr (e' arg) args'
+      | _ => dummy_result (tensor_n 0)
       end
   end.
 
@@ -3110,15 +3138,41 @@ Fixpoint valuation_of_args name (args : list (ctx_elt interp_type_result)) :=
   | [] => $0
   end.
 
-Lemma stringvar_fvar_ATLexpr_correct ctx sz ts n e_nat e_shal name e_string args :
+Lemma stringvar_fvar_ATLexpr_correct ctx sz ts n e_nat e_shal name e_string args sizes :
   wf_fvar_ATLexpr (fun _ => nat) interp_type_result ctx ts n e_nat e_shal ->
   NoDup (map fst_ctx_elt ctx) ->
   (forall name'', In name'' (map fst_ctx_elt ctx) -> name'' < name) ->
   stringvar_fvar_ATLexpr name e_nat = Some e_string ->
   fvar_sound_sizeof (fun _ => O) e_nat = Some sz ->
-  fvar_idxs_in_bounds e_shal ->
+  Forall2 arg_has_size args sizes ->
+  fvar_idxs_in_bounds sizes e_shal ->
   eval_expr (join (valuation_of_args name args) (valuation_of ctx)) (join (ec_of_args name args) (ec_of ctx)) e_string (result_of_fvar_pATLexpr e_shal args).
 Proof.
+  intros H. revert name e_string sz args sizes.
+  induction H; intros name e_string sz args sizes Hnd Hname H' Hsz Hargs Hidxs.
+  - destruct sizes; simpl in *; try contradiction.
+    invert Hargs. simpl. do 2 rewrite join_empty_l.
+    destruct (stringvar_ATLexpr _ _) as [(?&?)|] eqn:E; simpl in *; try congruence.
+    invs'.
+    eapply stringvar_ATLexpr_correct; eauto.
+  - destruct sizes as [|size sizes]; simpl in *.
+    { destruct t; simpl in *; contradiction. }
+    invert Hargs. destruct x as (tx&x). simpl in *.
+    destruct tx; destruct size; simpl in *; try contradiction;
+      destruct t; simpl in *; try contradiction.
+    + eassert ((_ $+ (_, _)) $++ _ = _) as ->; cycle 1.
+      { eapply H0. 3: eassumption. all: eauto.
+        - constructor; auto. intros Hname'. apply Hname in Hname'. lia.
+        - intros ? [Hname'|Hname']. 1: subst; lia. apply Hname in Hname'. lia.
+        - (*need fvar_sound_sizeof_wf lemma*) admit. }
+      Search e1. epose_dep H0. specialize H0 with (3 := H'). Search e1.
+      3: { simpl.
+    destruct t; simpl in *; try contradiction.
+    destruct size; simpl in *.
+    + destruct x as (tx&x). destruct tx; simpl in *; try contradiction.
+      Search t.
+b    + c
+
 
 
 Check stringvar_ATLexpr_correct.
