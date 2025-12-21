@@ -3243,6 +3243,12 @@ Proof.
   eapply lookup_None_dom. sets.
 Qed.
 
+Lemma join_empty_l {X} (v : fmap var X) :
+  $0 $++ v = v.
+Proof.
+  rewrite join_comm. 1: apply join_empty_r. rewrite dom_empty. sets.
+Qed.
+
 Lemma eval_Zexpr_partially_eval_Zexpr : forall e v x,
     eval_Zexpr $0 (partially_eval_Zexpr v e) x <->
       eval_Zexpr v e x.
