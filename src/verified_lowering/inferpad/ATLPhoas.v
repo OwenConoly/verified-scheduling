@@ -1149,6 +1149,13 @@ Proof.
   - eassert (-_ = _)%Z as ->. 2: eauto. lia.
 Qed.
 
+Ltac prove_sound_sizeof :=
+  eassumption ||
+    (erewrite sound_sizeof_wf by eauto; eassumption) ||
+    (erewrite <- sound_sizeof_wf by eauto; eassumption) ||
+    (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf by eauto; eassumption) ||
+    (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf by eauto; eassumption).
+
 Lemma sound_sizeof_size_of var2 (dummy2 : forall t, var2 t) dummy n e_nat ctx sz e e_string name name' :
   wf_ATLexpr (fun _ => nat) var2 ctx n e_nat e ->
   sound_sizeof dummy e_nat = Some sz ->
@@ -1178,16 +1185,13 @@ Proof.
     + apply sizeof_pZexpr_eval_Zexpr. assumption.
     + apply sizeof_pZexpr_eval_Zexpr. assumption.
     + eapply H2. 1: apply dummy2. 2: apply E.
-      erewrite sound_sizeof_wf with (dummy2 := dummy2). 2: apply H1.
-      erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
+      prove_sound_sizeof.
   - constructor.
     eapply H2. 1: apply dummy2. 2: apply E.
-    erewrite sound_sizeof_wf with (dummy2 := dummy2). 2: apply H1.
-    erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
+    prove_sound_sizeof.
   - constructor; eauto.
     eapply H1. 1: apply dummy2. 2: eassumption.
-    erewrite sound_sizeof_wf with (dummy2 := dummy2). 2: solve[eauto].
-    erewrite <- sound_sizeof_wf. 1: eassumption. eauto.
+    prove_sound_sizeof.
   - congruence.
     Unshelve.
     all: auto.
@@ -1827,9 +1831,7 @@ Proof.
       do 2 erewrite sizeof_pZexpr_interp_pZexpr by eassumption.
       reflexivity.
     + apply Forall_map. apply Forall_forall. intros x _.
-      eapply H2.
-      erewrite sound_sizeof_wf by eauto. erewrite <- sound_sizeof_wf by eauto.
-      eassumption.
+      eapply H2. prove_sound_sizeof.
   - destruct (interp_pBexpr _); auto.
   - congruence.
   - destruct (result_of_pATLexpr _); auto. destruct (result_of_pATLexpr _); auto.
@@ -2113,13 +2115,6 @@ Proof.
     rewrite map_length. split; [reflexivity|].
     rewrite Forall_Forall' in *. apply Forall_map. eapply Forall_impl; eauto.
 Qed.  
-
-Ltac prove_sound_sizeof :=
-  eassumption ||
-    (erewrite sound_sizeof_wf by eauto; eassumption) ||
-    (erewrite <- sound_sizeof_wf by eauto; eassumption) ||
-    (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf by eauto; eassumption) ||
-    (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf by eauto; eassumption).
 
 Lemma consistent_of_tensor_has_size' n sh (x : dim_n n) :
   tensor_has_size' sh x ->
@@ -2859,12 +2854,10 @@ Proof.
       eapply H2; try eassumption; try eauto.
       { constructor; auto. intros H'. apply Hctx2 in H'. lia. }
       { intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
-      erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
-      erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
+      prove_sound_sizeof.
   - eapply mk_eval_sum.
     + eapply sound_sizeof_size_of. 4: eassumption. all: eauto. 1: apply dummy_result.
-      erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
-      erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
+      prove_sound_sizeof.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
     + cbv [sizeof]. simpl. erewrite <- sound_sizeof_wf with (dummy1 := fun _ => 0).
@@ -2881,8 +2874,7 @@ Proof.
       eapply H2; try eassumption; try eauto.
       { constructor; auto. intros H'. apply Hctx2 in H'. lia. }
       { intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
-      erewrite sound_sizeof_wf with (dummy2 := dummy_result). 2: apply H1.
-      erewrite <- sound_sizeof_wf. 1: eassumption. apply H1.
+      prove_sound_sizeof.
   - destruct (interp_pBexpr _) eqn:Eb.
     + apply EvalGuardTrue; eauto.
       rewrite <- Eb. apply stringvar_B_correct; auto.
@@ -2911,8 +2903,7 @@ Proof.
     + eapply H1. 3: eassumption.
       -- constructor; auto. intros H'. apply Hctx2 in H'. lia.
       -- intros ? [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia.
-      -- erewrite sound_sizeof_wf by eauto. erewrite <- sound_sizeof_wf by eauto.
-         eassumption.
+      -- prove_sound_sizeof.
       -- auto.
   - pose proof E4 as E4'. pose proof E6 as E6'.
     apply name_gets_bigger in E4', E6'.
@@ -3138,7 +3129,34 @@ Fixpoint valuation_of_args name (args : list (ctx_elt interp_type_result)) :=
   | [] => $0
   end.
 
-Lemma stringvar_fvar_ATLexpr_correct ctx sz ts n e_nat e_shal name e_string args sizes :
+Lemma fvar_sound_sizeof_wf n ts var1 var2 dummy1 dummy2 e1 e2 ctx :
+  wf_fvar_ATLexpr var1 var2 ctx ts n e1 e2 ->
+  fvar_sound_sizeof dummy1 e1 = fvar_sound_sizeof dummy2 e2.
+Proof.
+  induction 1; simpl; eauto using sound_sizeof_wf.    
+Qed.
+
+Lemma dom_valuation_of_args name l :
+  dom (valuation_of_args name l) \subseteq constant (map nat_to_string (seq name (length l))).
+Proof.
+  revert name. induction l as [|a l]; intros name; simpl.
+  - rewrite dom_empty. sets.
+  - destruct a as [ [| |] ?].
+    + rewrite dom_add. sets.
+    + sets.
+    + sets.
+Qed.
+      
+Lemma dom_ec_of_args name l :
+  dom (ec_of_args name l) \subseteq constant (map nat_to_string (seq name (length l))).
+Proof.
+  revert name. induction l as [|a l]; intros name; simpl.
+  - rewrite dom_empty. sets.
+  - destruct a as [ [| |] ?]; try solve [sets].
+    rewrite dom_add. sets.
+Qed.
+      
+Lemma stringvar_fvar_ATLexpr_correct' ctx sz ts n e_nat e_shal name e_string args sizes :
   wf_fvar_ATLexpr (fun _ => nat) interp_type_result ctx ts n e_nat e_shal ->
   NoDup (map fst_ctx_elt ctx) ->
   (forall name'', In name'' (map fst_ctx_elt ctx) -> name'' < name) ->
@@ -3164,16 +3182,49 @@ Proof.
       { eapply H0. 3: eassumption. all: eauto.
         - constructor; auto. intros Hname'. apply Hname in Hname'. lia.
         - intros ? [Hname'|Hname']. 1: subst; lia. apply Hname in Hname'. lia.
-        - (*need fvar_sound_sizeof_wf lemma*) admit. }
-      Search e1. epose_dep H0. specialize H0 with (3 := H'). Search e1.
-      3: { simpl.
-    destruct t; simpl in *; try contradiction.
-    destruct size; simpl in *.
-    + destruct x as (tx&x). destruct tx; simpl in *; try contradiction.
-      Search t.
-b    + c
+        - erewrite fvar_sound_sizeof_wf by eauto.
+          erewrite <- fvar_sound_sizeof_wf by eauto.
+          eassumption. }
+      apply join_add_l.
+      intros Hname'. apply dom_valuation_of_args in Hname'.
+      cbv [constant] in Hname'. apply in_map_iff in Hname'.
+      destruct Hname' as (name'&Hname1&Hname2). apply nat_to_string_injective in Hname1.
+      subst. apply in_seq in Hname2. lia.
+    + eapply H0. 3: eassumption. all: eauto.
+      -- constructor; auto. intros Hname'. apply Hname in Hname'. lia.
+      -- intros ? [Hname'|Hname']. 1: subst; lia. apply Hname in Hname'. lia.
+      -- erewrite fvar_sound_sizeof_wf by eauto.
+         erewrite <- fvar_sound_sizeof_wf by eauto.
+         eassumption.
+    + invs'. eassert ((_ $+ (_, _)) $++ _ = _) as ->; cycle 1.
+      { eapply H0. 3: eassumption. all: eauto.
+        - constructor; auto. intros Hname'. apply Hname in Hname'. lia.
+        - intros ? [Hname'|Hname']. 1: subst; lia. apply Hname in Hname'. lia.
+        - erewrite fvar_sound_sizeof_wf by eauto.
+          erewrite <- fvar_sound_sizeof_wf by eauto.
+          eassumption. }
+      apply join_add_l.
+      intros Hname'. apply dom_ec_of_args in Hname'.
+      cbv [constant] in Hname'. apply in_map_iff in Hname'.
+      destruct Hname' as (name'&Hname1&Hname2). apply nat_to_string_injective in Hname1.
+      subst. apply in_seq in Hname2. lia.
+      Unshelve.
+      all: try exact 0%Z || exact dummy_result || exact (fun _ => 0%nat) || exact (Result.S Result.SX) || exact true.
+Qed.
 
-
-
-Check stringvar_ATLexpr_correct.
-Lemma stringvar_fvar_pATLexpr_correct ctx s
+Lemma stringvar_fvar_ATLexpr_correct sz ts n e_nat e_shal name e_string args sizes :
+  wf_fvar_ATLexpr (fun _ => nat) interp_type_result [] ts n e_nat e_shal ->
+  stringvar_fvar_ATLexpr name e_nat = Some e_string ->
+  fvar_sound_sizeof (fun _ => O) e_nat = Some sz ->
+  Forall2 arg_has_size args sizes ->
+  fvar_idxs_in_bounds sizes e_shal ->
+  eval_expr (valuation_of_args name args) (ec_of_args name args) e_string (result_of_fvar_pATLexpr e_shal args).
+Proof.
+  intros.
+  pose proof stringvar_fvar_ATLexpr_correct' as H'.
+  epose_dep H'. specialize (H' ltac:(eassumption)). simpl in H'.
+  specialize (H' ltac:(constructor)). specialize (H' ltac:(contradiction)).
+  repeat specialize (H' ltac:(eassumption)).
+  do 2 rewrite join_empty_r in H'.
+  exact H'.
+Qed.
