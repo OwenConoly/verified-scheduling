@@ -3232,7 +3232,7 @@ Proof.
   - simpl. rewrite IHl. reflexivity.
 Qed.
 
-Lemma join_empty_r {X} : forall (v : fmap var X),
+Lemma join_empty_r {X Y} : forall (v : fmap X Y),
     v $++ $0 = v.
 Proof.
   intros. eapply fmap_ext. intros.
@@ -3243,10 +3243,34 @@ Proof.
   eapply lookup_None_dom. sets.
 Qed.
 
-Lemma join_empty_l {X} (v : fmap var X) :
+Lemma join_empty_l {X Y} (v : fmap X Y) :
   $0 $++ v = v.
 Proof.
   rewrite join_comm. 1: apply join_empty_r. rewrite dom_empty. sets.
+Qed.
+
+Lemma join_add_l {X Y} m1 k v (m2 : fmap X Y) :
+  ~ k \in dom m1 ->
+  m1 $+ (k, v) $++ m2 = m1 $++ (m2 $+ (k, v)).
+Proof.
+  intros Hk.
+  apply fmap_ext. intros k0. Search ((_ $++ _) $? _).
+  assert (k0 \in dom m1 \/ ~k0 \in dom m1) as [H|H] by sets.
+  - rewrite lookup_join1; cycle 1.
+    { rewrite dom_add. sets. }
+    rewrite lookup_join1; cycle 1.
+    { sets. }
+    rewrite lookup_add_ne by sets.
+    reflexivity.
+  - assert (k = k0 \/ k <> k0) as [H'|H'] by sets.
+    + subst. rewrite lookup_join1 by (rewrite dom_add; sets).
+      rewrite lookup_join2 by sets.
+      do 2 rewrite lookup_add_eq by reflexivity.
+      reflexivity.
+    + rewrite lookup_join2 by (rewrite dom_add; sets).
+      rewrite lookup_join2 by sets.
+      rewrite lookup_add_ne by sets.
+      reflexivity.
 Qed.
 
 Lemma eval_Zexpr_partially_eval_Zexpr : forall e v x,
