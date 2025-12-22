@@ -3094,27 +3094,22 @@ Proof.
   destruct (Nat.eq_dec n n0).
   - subst. left. reflexivity.
   - right. congruence.
-Qed.
+Defined.
 
 Fixpoint result_of_fvar_pATLexpr {ts n} (e : fvar_pATLexpr interp_type_result ts n) (args : list (ctx_elt interp_type_result)) : result :=
   match e with
   | no_fvar _ e0 => result_of_pATLexpr e0
-  | with_fvar tZ _ _ e' =>
+  | with_fvar t _ _ e' =>
       match args with
-      | {| ctx_elt_t0 := tZ; ctx_elt0 := arg|} :: args' =>
-          result_of_fvar_pATLexpr (e' arg) args'
-      | _ => dummy_result (tensor_n 0)
-      end
-  | with_fvar tB _ _ e' =>
-      match args with
-      | {| ctx_elt_t0 := tB; ctx_elt0 := arg|} :: args' =>
-          result_of_fvar_pATLexpr (e' arg) args'
-      | _ => dummy_result (tensor_n 0)
-      end
-  | with_fvar (tensor_n _) _ _ e' =>
-      match args with
-      | {| ctx_elt_t0 := tensor_n _; ctx_elt0 := arg|} :: args' =>
-          result_of_fvar_pATLexpr (e' arg) args'
+      | {| ctx_elt_t0 := t'; ctx_elt0 := arg|} :: args' =>
+          match type_eq_dec t t' with
+          | left pf =>
+              match pf in (_ = q) return interp_type_result q -> _ with
+              | Logic.eq_refl => fun arg => result_of_fvar_pATLexpr (e' arg) args'
+
+              end arg
+          | right _ => dummy_result (tensor_n 0)
+          end
       | _ => dummy_result (tensor_n 0)
       end
   end.
@@ -3152,7 +3147,7 @@ Proof.
     + sets.
     + sets.
 Qed.
-      
+
 Lemma dom_ec_of_args name l :
   dom (ec_of_args name l) \subseteq constant (map nat_to_string (seq name (length l))).
 Proof.
@@ -3161,7 +3156,15 @@ Proof.
   - destruct a as [ [| |] ?]; try solve [sets].
     rewrite dom_add. sets.
 Qed.
-      
+
+Lemma nat_eq_dec_refl n :
+  Nat.eq_dec n n = left eq_refl.
+Proof.
+  induction n.
+  - reflexivity.
+  - simpl. rewrite IHn. reflexivity.
+Qed.    
+
 Lemma stringvar_fvar_ATLexpr_correct' ctx sz ts n e_nat e_shal name e_string args sizes :
   wf_fvar_ATLexpr (fun _ => nat) interp_type_result ctx ts n e_nat e_shal ->
   NoDup (map fst_ctx_elt ctx) ->
@@ -3185,7 +3188,7 @@ Proof.
     destruct tx; destruct size; simpl in *; try contradiction;
       destruct t; simpl in *; try contradiction.
     + eassert ((_ $+ (_, _)) $++ _ = _) as ->; cycle 1.
-      { eapply H0. 3: eassumption. all: eauto.
+      { simpl. eapply H0. 3: eassumption. all: eauto.
         - constructor; auto. intros Hname'. apply Hname in Hname'. lia.
         - intros ? [Hname'|Hname']. 1: subst; lia. apply Hname in Hname'. lia.
         - erewrite fvar_sound_sizeof_wf by eauto.
@@ -3194,7 +3197,8 @@ Proof.
       apply join_add_l.
       intros Hname'. apply dom_valuation_of_args in Hname'.
       cbv [constant] in Hname'. apply in_map_iff in Hname'.
-      destruct Hname' as (name'&Hname1&Hname2). apply nat_to_string_injective in Hname1.
+      destruct Hname' as (name'&Hname1&Hname2).
+      apply nat_to_string_injective in Hname1.
       subst. apply in_seq in Hname2. lia.
     + eapply H0. 3: eassumption. all: eauto.
       -- constructor; auto. intros Hname'. apply Hname in Hname'. lia.
@@ -3202,8 +3206,10 @@ Proof.
       -- erewrite fvar_sound_sizeof_wf by eauto.
          erewrite <- fvar_sound_sizeof_wf by eauto.
          eassumption.
-    + invs'. eassert ((_ $+ (_, _)) $++ _ = _) as ->; cycle 1.
-      { eapply H0. 3: eassumption. all: eauto.
+    + invs'. destruct (Nat.eq_dec _ _); try congruence.
+      cbv [eq_rec_r eq_rec eq_rect]. destruct e. simpl.
+      eassert ((_ $+ (_, _)) $++ _ = _) as ->; cycle 1.
+      { simpl. eapply H0. 3: eassumption. all: eauto.
         - constructor; auto. intros Hname'. apply Hname in Hname'. lia.
         - intros ? [Hname'|Hname']. 1: subst; lia. apply Hname in Hname'. lia.
         - erewrite fvar_sound_sizeof_wf by eauto.
@@ -3252,13 +3258,56 @@ Fixpoint appl_fvar_expr ts n (e : fvar_type interp_type ts n) (args : list (ctx_
                 end
   end e.
 
-Lemma result_of_fvar_pATLexpr_correct sizes ctx ts n e_shal e_res sh args :
+Lemma result_of_fvar_pATLexpr_correct' sizes ctx ts n e_shal e_res sh args :
   wf_fvar_ATLexpr interp_type interp_type_result ctx ts n e_shal e_res ->
   fvar_sound_sizeof dummy_shal e_shal = Some sh ->
   Forall res_tensor_corresp ctx ->
+  Forall res_tensor_corresp args ->
   fvar_idxs_in_bounds sizes e_res ->
   fvar_sum_bounds_good e_shal ->
-  tensor_of_result (result_of_fvar_pATLexpr e_res args) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n e_shal) (map ctx1 ctx).
+  Forall2 arg_has_size (map ctx2 args) sizes ->
+  tensor_of_result (result_of_fvar_pATLexpr e_res (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n e_shal) (map ctx1 args).
 Proof.
-  
-  
+  intros H. revert sizes args.
+  induction H; intros sizes args Hsize Hcorresp_ctx Hcorresp_args Hidxs Hsum Hsizes.
+  - simpl in *. destruct sizes; simpl in *; try contradiction.
+    eapply result_of_pATLexpr_correct; eauto.
+  - simpl in *. destruct sizes.
+    { destruct t; simpl in Hidxs; contradiction. }
+    simpl in Hidxs. destruct args.
+    { simpl in Hsizes. invert Hsizes. }
+    simpl in Hsizes. invert Hsizes. simpl.
+    destruct c as [tc c1 c2]. simpl in *. invert Hcorresp_args.
+    destruct t, tc, a; try contradiction.
+    + simpl. cbv [lam]. eapply H0; eauto.
+      erewrite fvar_sound_sizeof_wf by eauto.
+      erewrite <- fvar_sound_sizeof_wf by eauto.
+      eassumption.
+    + simpl. cbv [lam]. eapply H0; eauto.
+      erewrite fvar_sound_sizeof_wf by eauto.
+      erewrite <- fvar_sound_sizeof_wf by eauto.
+      eassumption.
+    + invs'. simpl. rewrite nat_eq_dec_refl. simpl.
+      simpl in *. subst.
+      eapply H0; eauto.
+      -- erewrite fvar_sound_sizeof_wf by eauto.
+         erewrite <- fvar_sound_sizeof_wf by eauto.
+         eassumption.
+      -- constructor; auto. simpl. reflexivity.
+
+         Unshelve.
+         all: try exact 0%Z || exact dummy_result || exact (fun _ => 0%nat) || exact (Result.S Result.SX) || exact true.
+Qed.
+
+Lemma result_of_fvar_pATLexpr_correct sizes ts n e_shal e_res sh args :
+  wf_fvar_ATLexpr interp_type interp_type_result [] ts n e_shal e_res ->
+  fvar_sound_sizeof dummy_shal e_shal = Some sh ->
+  Forall res_tensor_corresp args ->
+  fvar_idxs_in_bounds sizes e_res ->
+  fvar_sum_bounds_good e_shal ->
+  Forall2 arg_has_size (map ctx2 args) sizes ->
+  tensor_of_result (result_of_fvar_pATLexpr e_res (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n e_shal) (map ctx1 args).
+Proof.
+  intros.
+  eapply result_of_fvar_pATLexpr_correct'; eauto.
+Qed.
