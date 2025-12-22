@@ -41,7 +41,6 @@ Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor
       Forall2 (fun t r => tensor_of_result r = t.(val)) (map snd vars) inps ->
       eval_expr $0 (ec_of_vars (combine (map fst vars) inps)) (e_string x) r /\
         tensor_of_result r = e_shal.
-Check stringvar_ATLexpr_eval_shal.
 (* Print ctx_elt. *)
 (* Lemma reify_is_reification {n T} (e : forall var, T var -> list ctx_elt var * pATLexpr var n) name' e_string vars f : *)
 (*   (forall x, stringvar_ATLexpr O ((e x) _) = Some (name', e_string x)) -> *)
@@ -49,8 +48,19 @@ Check stringvar_ATLexpr_eval_shal.
 (* Proof. *)
 (*   intros H. cbv [is_reification]. intros x. *)
 (* Admitted. *)
+Check lam.
+Definition lam {A B} (f : A -> B) := f.
 
-Derive reified_matmul in
+Derive (reified_matmul : fvar_pATLExpr [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2) in
+  (interp_fvar_pATLexpr _ _ (reified_matmul _) = lam (fun A => lam (fun B => lam (fun C => lam (fun m1 => lam (fun m2 => matmul A B C m1 m2))))))
+    as reified_matmul_correct.
+Proof.
+  cbv [matmul].
+  symmetry. Reify_lhs rm.
+  pattern @lam in rm.
+  change (fun x => f x) with (lam _ _ _ _ ).
+  cbv [interp_fvar_pATLexpr]. simpl.
+  simpl.
   (is_reification (n := 2)
      reified_matmul
      (fun '(A, B, C, m1, m2) => ([("m1", {| dim := 2; val:= m1 |}); ("m2", {| dim := 2; val := m2 |})], matmul A B C m1 m2)))
