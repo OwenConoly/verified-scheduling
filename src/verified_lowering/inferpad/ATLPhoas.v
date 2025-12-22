@@ -3307,7 +3307,22 @@ Lemma result_of_fvar_pATLexpr_correct sizes ts n e_shal e_res sh args :
   fvar_sum_bounds_good e_shal ->
   Forall2 arg_has_size (map ctx2 args) sizes ->
   tensor_of_result (result_of_fvar_pATLexpr e_res (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n e_shal) (map ctx1 args).
+Proof. eauto using result_of_fvar_pATLexpr_correct'. Qed.
+
+Lemma stringvar_fvar_ATLexpr_really_correct' ts n (e : fvar_pATLExpr ts n) name e_string sz sizes args :
+  Wf_fvar_ATLExpr e ->
+  stringvar_fvar_ATLexpr name (e _) = Some e_string ->
+  fvar_sound_sizeof (fun _ : type => tt) (e _) = Some sz ->
+  Forall2 arg_has_size (map ctx2 args) sizes ->
+  Forall res_tensor_corresp args ->
+  fvar_idxs_in_bounds sizes (e _) ->
+  fvar_sum_bounds_good (e _) ->
+  eval_expr (valuation_of_args name (map ctx2 args)) (ec_of_args name (map ctx2 args)) e_string (result_of_fvar_pATLexpr (e _) (map ctx2 args)) /\
+    tensor_of_result (result_of_fvar_pATLexpr (e _) (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n (e _)) (map ctx1 args).
 Proof.
-  intros.
-  eapply result_of_fvar_pATLexpr_correct'; eauto.
+  intros. split.
+  - eapply stringvar_fvar_ATLexpr_correct; eauto.
+    erewrite fvar_sound_sizeof_wf by eauto. eassumption.
+  - eapply result_of_fvar_pATLexpr_correct; eauto.
+    erewrite fvar_sound_sizeof_wf by eauto. eassumption.
 Qed.
