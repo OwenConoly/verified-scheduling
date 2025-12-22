@@ -373,10 +373,10 @@ Inductive fvar_pATLexpr {var : type -> Type} : list type -> nat -> Type :=
 | with_fvar t ts n : (var t -> fvar_pATLexpr ts n) -> fvar_pATLexpr (t :: ts) n.
 Arguments fvar_pATLexpr : clear implicits.
 
-Fixpoint fvar_type var (ts : list type) T :=
+Fixpoint fvar_type var (ts : list type) n :=
   match ts with
-  | [] => T
-  | t :: ts' => var t -> fvar_type var ts' T
+  | [] => var (tensor_n n)
+  | t :: ts' => var t -> fvar_type var ts' n
   end.
 
 Definition lam var t ts n (f : var t -> fvar_type var ts n) (x : var t) :=
@@ -516,9 +516,9 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   | SIZR x => IZR (interp_pZexpr x)
   end.
 
-Fixpoint interp_fvar_pATLexpr ts n (e : fvar_pATLexpr interp_type ts n) : fvar_type interp_type ts (interp_type (tensor_n n)) :=
+Fixpoint interp_fvar_pATLexpr ts n (e : fvar_pATLexpr interp_type ts n) : fvar_type interp_type ts n :=
   match e with
-  | no_fvar n e0 => (interp_pATLexpr e0 : fvar_type interp_type [] _)
+  | no_fvar n e0 => interp_pATLexpr e0
   | with_fvar t ts' n e' =>
       lam interp_type t ts' _ (fun x => interp_fvar_pATLexpr ts' n (e' x))
   end.
@@ -3241,31 +3241,22 @@ Proof.
   exact H'.
 Qed.
 
-Fixpoint appl_fvar_expr ts T (dummy : T) (e : fvar_type interp_type ts T) (args : list (ctx_elt interp_type)) : T :=
-  match ts return fvar_type interp_type ts T -> T with
+Fixpoint appl_fvar_expr ts n (e : fvar_type interp_type ts n) (args : list (ctx_elt interp_type)) : dim_n n :=
+  match ts return fvar_type interp_type ts n -> dim_n n with
   | [] => fun e => e
   | t :: ts' => fun e =>
                 match args with
-                | [] => dummy
+                | [] => dummy_shal (tensor_n _)
                 | {| ctx_elt_t0 := t'; ctx_elt0 := x |} :: args' =>
                     match type_eq_dec t t' with
                     | left pf =>
                         match pf in (_ = q) return interp_type q -> _ with
-                        | Logic.eq_refl => fun x => appl_fvar_expr ts' T dummy (e x) args'
+                        | Logic.eq_refl => fun x => appl_fvar_expr ts' n (e x) args'
                         end x
-                    | right _ => dummy
+                    | right _ => dummy_shal (tensor_n _)
                     end
                 end
   end e.
-
-
-Print fvar_pATLexpr.
-Print fvar_type.
-Fixpoint fvars_pATLExpr_of var ts n (f : fvar_type var ts (pATLexpr var n)) : fvar_pATLexpr var ts n :=
-  match ts return fvar_type var ts _ -> _ with
-  | [] => fun f => no_fvar _ f
-  | t :: ts' => fun f => with_fvar t ts' n (fun x => fvars_pATLExpr_of var ts' n (f x))
-  end f.
 
 Hint Unfold res_tensor_corresp : core. Check interp_fvar_pATLexpr.
 Lemma result_of_fvar_pATLexpr_correct' sizes ctx ts n e_shal e_res sh args :
@@ -3276,7 +3267,7 @@ Lemma result_of_fvar_pATLexpr_correct' sizes ctx ts n e_shal e_res sh args :
   fvar_idxs_in_bounds sizes e_res ->
   fvar_sum_bounds_good e_shal ->
   args_have_size (map ctx2 args) sizes ->
-  tensor_of_result (result_of_fvar_pATLexpr e_res (map ctx2 args)) = appl_fvar_expr _ _ (dummy_shal _) (interp_fvar_pATLexpr ts n e_shal) (map ctx1 args).
+  tensor_of_result (result_of_fvar_pATLexpr e_res (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n e_shal) (map ctx1 args).
 Proof.
   intros H. revert sizes args.
   induction H; intros sizes args Hsize Hcorresp_ctx Hcorresp_args Hidxs Hsum Hsizes.
@@ -3323,7 +3314,7 @@ Lemma result_of_fvar_pATLexpr_correct sizes ts n e_shal e_res sh args :
   fvar_idxs_in_bounds sizes e_res ->
   fvar_sum_bounds_good e_shal ->
   args_have_size (map ctx2 args) sizes ->
-  tensor_of_result (result_of_fvar_pATLexpr e_res (map ctx2 args)) = appl_fvar_expr _ _ (dummy_shal _) (interp_fvar_pATLexpr ts n e_shal) (map ctx1 args).
+  tensor_of_result (result_of_fvar_pATLexpr e_res (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n e_shal) (map ctx1 args).
 Proof. eauto using result_of_fvar_pATLexpr_correct'. Qed.
 
 Lemma stringvar_fvar_ATLexpr_really_correct' ts n (e : fvar_pATLExpr ts n) name e_string sz sizes args :
@@ -3335,7 +3326,7 @@ Lemma stringvar_fvar_ATLexpr_really_correct' ts n (e : fvar_pATLExpr ts n) name 
   fvar_idxs_in_bounds sizes (e _) ->
   fvar_sum_bounds_good (e _) ->
   eval_expr (valuation_of_args name (map ctx2 args)) (ec_of_args name (map ctx2 args)) e_string (result_of_fvar_pATLexpr (e _) (map ctx2 args)) /\
-    tensor_of_result (result_of_fvar_pATLexpr (e _) (map ctx2 args)) = appl_fvar_expr _ _ (dummy_shal _) (interp_fvar_pATLexpr ts n (e _)) (map ctx1 args).
+    tensor_of_result (result_of_fvar_pATLexpr (e _) (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n (e _)) (map ctx1 args).
 Proof.
   intros. split.
   - eapply stringvar_fvar_ATLexpr_correct; eauto.
@@ -3354,7 +3345,7 @@ Lemma stringvar_fvar_ATLexpr_really_correct ts n (e : fvar_pATLExpr ts n) e_stri
   fvar_idxs_in_bounds sizes (e _) ->
   fvar_sum_bounds_good (e _) ->
   eval_expr (valuation_of_args O (map ctx2 args)) (ec_of_args O (map ctx2 args)) e_string (result_of_fvar_pATLexpr (e _) (map ctx2 args)) /\
-    tensor_of_result (result_of_fvar_pATLexpr (e _) (map ctx2 args)) = appl_fvar_expr _ _ (dummy_shal _) (interp_fvar_pATLexpr ts n (e _)) (map ctx1 args).
+    tensor_of_result (result_of_fvar_pATLexpr (e _) (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n (e _)) (map ctx1 args).
 Proof.
   intros.
   Print res_tensor_corresp.
