@@ -27,12 +27,32 @@ Set Default Proof Mode "Classic".
 
 Record arb_dim_tensor := { dim: nat; val: dim_n dim }.
 
-Fixpoint fvars_pATLExpr_of var ts n (f : fvar_type var ts (pATLexpr var n)) : fvar_pATLexpr var ts n :=
-  match ts return fvar_type var ts _ -> _ with
+Fixpoint rt var ts n :=
+  match ts with
+  | nil => pATLexpr var n
+  | t :: ts' => pExpr_type var t -> rt var ts' n
+  end.
+
+Definition Var' {t var} (x : var t) : pExpr_type var t :=
+  match t return var t -> pExpr_type var t with
+  | tZ => ATLPhoas.ZVar
+  | tB => fun _ => BBop BEq ZZ0 ZZ0
+  | tensor_n n => Var
+  end x.
+
+Fixpoint fvars_pATLexpr_of var ts n (f : rt var ts n) : fvar_pATLexpr var ts n :=
+  match ts return rt var ts n -> fvar_pATLexpr var ts n with
   | [] => fun f => no_fvar _ f
-  | t :: ts' => fun f => with_fvar t ts' n (fun x => fvars_pATLExpr_of var ts' n (f x))
+  | t :: ts' => fun f => with_fvar t ts' n (fun x => fvars_pATLexpr_of var ts' n (f (Var' x)))
   end f.
 
+
+Check interp_fvar_pATLexpr. Search fvar_type.
+Lemma fvars_pATLExpr_of_correct ts n f :
+  interp_fvar_pATLexpr ts n (fvars_pATLexpr_of _ ts n f) =
+    interp_fvar_pATLexpr ts n (fvars_pATLexpr_of _ ts n f). Set Printing All.
+Proof.  Abort.
+      
 Fixpoint ec_of_vars (names_vals : list (string * Result.result)) :=
   match names_vals with
   | [] => $0
@@ -54,15 +74,17 @@ Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor
 (* Proof. *)
 (*   intros H. cbv [is_reification]. intros x. *)
 (* Admitted. *)
-Check lam.
-Definition lam {A B} (f : A -> B) := f.
 
 Derive (reified_matmul : fvar_pATLExpr [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2) in
-  (interp_fvar_pATLexpr _ _ (reified_matmul _) = lam (fun A => lam (fun B => lam (fun C => lam (fun m1 => lam (fun m2 => matmul A B C m1 m2))))))
+  (interp_fvar_pATLexpr _ _ (reified_matmul _) = matmul)
     as reified_matmul_correct.
 Proof.
   cbv [matmul].
-  symmetry. Reify_lhs rm.
+  symmetry. Reify_lhs rm. Unset Printing All.
+  Fixpoint reification_spec ts n (r : fvar_pATLExpr ts n)
+  
+  
+  Check rt.
   pattern @lam in rm.
   change (fun x => f x) with (lam _ _ _ _ ).
   cbv [interp_fvar_pATLexpr]. simpl.
