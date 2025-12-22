@@ -3258,6 +3258,9 @@ Fixpoint appl_fvar_expr ts T (dummy : T) (e : fvar_type interp_type ts T) (args 
                 end
   end e.
 
+
+Print fvar_pATLexpr.
+Print fvar_type.
 Fixpoint fvars_pATLExpr_of var ts n (f : fvar_type var ts (pATLexpr var n)) : fvar_pATLexpr var ts n :=
   match ts return fvar_type var ts _ -> _ with
   | [] => fun f => no_fvar _ f

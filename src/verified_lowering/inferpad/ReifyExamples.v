@@ -51,18 +51,12 @@ Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor
 Check lam.
 Definition lam {A B} (f : A -> B) := f.
 
-(* Lemma fvars_pATLexpr_of_correct ts n f : *)
-(*   f = interp_fvar_pATLexpr ts n (fvars_pATLExpr_of interp_type ts n f). *)
-
-
 Derive (reified_matmul : fvar_pATLExpr [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2) in
   (interp_fvar_pATLexpr _ _ (reified_matmul _) = lam (fun A => lam (fun B => lam (fun C => lam (fun m1 => lam (fun m2 => matmul A B C m1 m2))))))
     as reified_matmul_correct.
 Proof.
   cbv [matmul].
-  symmetry. Reify_lhs rm. Check interp_fvar_pATLexpr.
-  (*want fvar_type interp_type ts (interp_type (tensor_n n))*)
-  Check fvars_pATLExpr_of.
+  symmetry. Reify_lhs rm.
   pattern @lam in rm.
   change (fun x => f x) with (lam _ _ _ _ ).
   cbv [interp_fvar_pATLexpr]. simpl.
