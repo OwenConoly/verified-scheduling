@@ -27,6 +27,12 @@ Set Default Proof Mode "Classic".
 
 Record arb_dim_tensor := { dim: nat; val: dim_n dim }.
 
+Fixpoint fvars_pATLExpr_of var ts n (f : fvar_type var ts (pATLexpr var n)) : fvar_pATLexpr var ts n :=
+  match ts return fvar_type var ts _ -> _ with
+  | [] => fun f => no_fvar _ f
+  | t :: ts' => fun f => with_fvar t ts' n (fun x => fvars_pATLExpr_of var ts' n (f x))
+  end f.
+
 Fixpoint ec_of_vars (names_vals : list (string * Result.result)) :=
   match names_vals with
   | [] => $0
