@@ -3082,6 +3082,12 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : list arg_size) (e : fvar_pATLexpr i
   | _, _ => False
   end.
 
+Fixpoint fvar_sum_bounds_good {ts n} (e : fvar_pATLexpr interp_type ts n) : Prop :=
+  match e with
+  | no_fvar _ e0 => sum_bounds_good e0
+  | with_fvar _ _ _ e' => forall r, fvar_sum_bounds_good (e' r)
+  end.
+
 Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
 Proof.
   destruct t1, t2; try (left; reflexivity); try (right; congruence).
@@ -3228,3 +3234,31 @@ Proof.
   do 2 rewrite join_empty_r in H'.
   exact H'.
 Qed.
+
+Fixpoint appl_fvar_expr ts n (e : fvar_type interp_type ts n) (args : list (ctx_elt interp_type)) : dim_n n :=
+  match ts return fvar_type interp_type ts n -> dim_n n with
+  | [] => fun e => e
+  | t :: ts' => fun e =>
+                match args with
+                | [] => dummy_shal (tensor_n n)
+                | {| ctx_elt_t0 := t'; ctx_elt0 := x |} :: args' =>
+                    match type_eq_dec t t' with
+                    | left pf =>
+                        match pf in (_ = q) return interp_type q -> _ with
+                        | Logic.eq_refl => fun x => appl_fvar_expr ts' n (e x) args'
+                        end x
+                    | right _ => dummy_shal (tensor_n n)
+                    end
+                end
+  end e.
+
+Lemma result_of_fvar_pATLexpr_correct sizes ctx ts n e_shal e_res sh args :
+  wf_fvar_ATLexpr interp_type interp_type_result ctx ts n e_shal e_res ->
+  fvar_sound_sizeof dummy_shal e_shal = Some sh ->
+  Forall res_tensor_corresp ctx ->
+  fvar_idxs_in_bounds sizes e_res ->
+  fvar_sum_bounds_good e_shal ->
+  tensor_of_result (result_of_fvar_pATLexpr e_res args) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n e_shal) (map ctx1 ctx).
+Proof.
+  
+  
