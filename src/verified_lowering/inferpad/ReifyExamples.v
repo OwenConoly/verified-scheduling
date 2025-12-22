@@ -50,7 +50,7 @@ Fixpoint fvars_pATLexpr_of var ts n (f : rt var ts n) : fvar_pATLexpr var ts n :
 Check interp_fvar_pATLexpr. Search fvar_type.
 Lemma fvars_pATLExpr_of_correct ts n f :
   interp_fvar_pATLexpr ts n (fvars_pATLexpr_of _ ts n f) =
-    interp_fvar_pATLexpr ts n (fvars_pATLexpr_of _ ts n f). Set Printing All.
+    interp_fvar_pATLexpr ts n (fvars_pATLexpr_of _ ts n f). 
 Proof.  Abort.
       
 Fixpoint ec_of_vars (names_vals : list (string * Result.result)) :=
@@ -75,14 +75,37 @@ Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor
 (*   intros H. cbv [is_reification]. intros x. *)
 (* Admitted. *)
 
-Derive (reified_matmul : fvar_pATLExpr [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2) in
-  (interp_fvar_pATLexpr _ _ (reified_matmul _) = matmul)
+Fixpoint fun_type (var : type -> Type) (ts : list type) (T : Type) : Type :=
+  match ts with
+  | [] => T
+  | t :: ts' => var t -> fun_type var ts' T
+  end.
+
+Fixpoint varify var ts T (f : fun_type (pExpr_type var) ts T) : fun_type var ts T :=
+  match ts return fun_type (pExpr_type var) ts T -> fun_type var ts T with
+  | [] => fun f => f
+  | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
+  end f.
+
+Fixpoint interp_fun ts n (f : fun_type interp_type ts (pATLexpr interp_type n)) : fun_type interp_type ts (dim_n n) :=
+  match ts return fun_type interp_type ts _ -> fun_type interp_type ts (dim_n n) with
+  | [] => fun f => interp_pATLexpr f
+  | t :: ts' => fun f => fun x => interp_fun ts' n (f x)
+  end f.
+
+Derive (reified_matmul : forall var, fun_type var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] (pATLexpr var 2)) in
+  (interp_fun _ _ (reified_matmul interp_type) = matmul)
     as reified_matmul_correct.
 Proof.
   cbv [matmul].
-  symmetry. Reify_lhs rm. Unset Printing All.
-  Fixpoint reification_spec ts n (r : fvar_pATLExpr ts n)
-  
+  symmetry. Reify_lhs rm.
+  Check (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (rm var)).
+  subst reified_matmul.
+  match goal with
+  | rm := ?x |- _ => instantiate (1 := (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (x var)))
+  end.
+  Time simpl. Time reflexivity.
+Time Qed.
   
   Check rt.
   pattern @lam in rm.
