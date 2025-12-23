@@ -105,8 +105,70 @@ Proof.
   | rm := ?x |- _ => instantiate (1 := (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (x var)))
   end.
   Time simpl. Time reflexivity.
-Time Qed.
-  
+  Time Qed.
+
+Check stringvar_ATLexpr.
+Fixpoint stringvar_fun {ts n} (names : list nat) (big_name : nat) (f : fun_type (fun _ => nat) ts (pATLexpr (fun _ => nat) n)) : option ATLexpr :=
+  match ts return fun_type (fun _ => nat) ts (pATLexpr (fun _ => nat) n) -> _ with
+  | [] => fun f =>
+           match stringvar_ATLexpr big_name f with
+           | Some (_, e) => Some e
+           | None => None
+           end
+  | t :: ts' => fun f =>
+                match names with
+                | [] => None
+                | name :: names' =>
+                    stringvar_fun names' big_name (f name)
+                end
+  end f.
+
+Derive string_matmul in (stringvar_fun (seq 0 5) 6 (reified_matmul _) = Some string_matmul) as string_matmul_correct.
+Proof. simpl. subst string_matmul. reflexivity. Qed.
+
+Fixpoint spec_of' ts n names size (fd : ATLexpr) (fs : fun_type interp_type ts (dim_n n)) (v : fmap string Z) (ec : fmap string Result.result) :=
+  match ts return ATLexpr -> fun_type _ ts _ -> _ with
+  | [] => fun fd fs =>
+      exists r,
+      eval_expr v ec fd r /\
+        tensor_of_result r = fs
+  | tZ :: ts' => fun fd fs =>
+      match size, names with
+      | with_Z_var min max size', name :: names' =>
+          forall (x : Z),
+            (min <= x < max)%Z ->
+            spec_of' ts' n names' (size' x) fd(fs x) (v $+ (nat_to_string name, x)) ec
+      | _, _ => False
+      end
+  | tB :: _ => fun _ _ => False
+  | tensor_n m :: ts' => fun fd fs =>
+      match size, names with
+      | with_T_var sh size', name :: names' =>
+          forall (x : Result.result) (x' : dim_n m),
+            result_has_shape' sh x ->
+            spec_of' ts' n names' size' fd (fs x') v (ec $+ (nat_to_string name, x))
+      | _, _ => False
+      end
+  end fd fs.
+
+Definition spec_of ts n names size fd fs := spec_of' ts n names size fd fs $0 $0.
+
+Definition matmul_size :=
+  with_Z_var 0 10
+    (fun A => with_Z_var 0 10
+             (fun B => with_Z_var 0 10
+                      (fun C => with_T_var [Z.to_nat A; Z.to_nat B]
+                               (with_T_var [Z.to_nat B; Z.to_nat C]
+                                  size_nil)))).             
+
+Opaque tensor_of_result.
+Lemma matmul_correct :
+  spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 (seq 0 5) matmul_size string_matmul matmul.
+Proof.
+  simpl. cbv [spec_of]. simpl.
+Abort.
+
+
   Check rt.
   pattern @lam in rm.
   change (fun x => f x) with (lam _ _ _ _ ).
