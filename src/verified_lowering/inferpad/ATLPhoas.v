@@ -3148,7 +3148,32 @@ Proof.
          all: try exact 0%Z || exact dummy_result || exact (fun _ => 0%nat) || exact (Result.S Result.SX).
 Qed.
 
+Fixpoint compat ts n size (e_shal : fvar_pATLexpr interp_type ts n) (e_res : fvar_pATLexpr interp_type_result ts n) :=
+  match ts, size return fvar_pATLexpr _ ts _ -> fvar_pATLexpr _ ts _ -> _ with
+  | [], size_nil => fun e_shal e_res =>
+           tensor_of_result (result_of_pATLexpr e_res) = interp_pATLexpr e_shal
+  | tB :: _, with_B_var _ => fun e_shal e_res =>
+               False
+  | tZ :: ts', with_Z_var min max size => fun e_shal e_res =>
+                                          forall x,
+                                            (min <= x < max)%Z ->
+                                            compat ts' _ (size x) (e_shal x) (e_res x)
+  | tensor_n _ :: ts', with_T_var sh size => fun e_shal e_res =>
+                                             forall x,
+                                               compat ts' _ size (e_shal (tensor_of_result x)) (e_res x)
+  | _, _ => fun _ _ => False
+  end e_shal e_res.
 
+Lemma res_and_tensor_compat ctx ts n e_shal e_res sh size :
+  wf_fvar_ATLexpr interp_type interp_type_result ctx ts n e_shal e_res ->
+  fvar_sound_sizeof dummy_shal e_shal = Some sh ->
+  Forall res_tensor_corresp ctx ->
+  fvar_idxs_in_bounds size e_res ->
+  fvar_sum_bounds_good e_shal ->
+  compat ts n size e_shal e_res.
+Proof.
+  intros Hwf. revert size.
+  induction Hwf; simpl; intros size Hsz Hcorresp Hidxs Hbds.
 
 Fixpoint result_of_fvar_pATLexpr {ts n} (e : fvar_pATLexpr interp_type_result ts n) (args : list (ctx_elt interp_type_result)) : result :=
   match ts return fvar_pATLexpr _ ts _ -> _ with
