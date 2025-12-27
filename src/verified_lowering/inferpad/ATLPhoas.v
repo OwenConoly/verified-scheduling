@@ -368,19 +368,20 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 .
 Arguments pATLexpr : clear implicits.
 
-Inductive fvar_pATLexpr {var : type -> Type} : list type -> nat -> Type :=
-| no_fvar n : pATLexpr var n -> fvar_pATLexpr [] n
-| with_fvar t ts n : (var t -> fvar_pATLexpr ts n) -> fvar_pATLexpr (t :: ts) n.
-Arguments fvar_pATLexpr : clear implicits.
+Fixpoint fun_type (var : type -> Type) (ts : list type) (T : Type) : Type :=
+  match ts with
+  | [] => T
+  | t :: ts' => var t -> fun_type var ts' T
+  end.
+
+Definition fvar_pATLexpr (var : type -> Type) (ts : list type) (n : nat) :=
+  fun_type var ts (pATLexpr var n).
 
 Fixpoint fvar_type var (ts : list type) n :=
   match ts with
   | [] => var (tensor_n n)
   | t :: ts' => var t -> fvar_type var ts' n
   end.
-
-Definition lam var t ts n (f : var t -> fvar_type var ts n) (x : var t) :=
-  f x.
 
 Section well_formed.
   Context (var1 var2 : type -> Type).
@@ -483,10 +484,10 @@ Inductive wf_ATLexpr : list ctx_elt2 -> forall n, pATLexpr var1 n -> pATLexpr va
 Inductive wf_fvar_ATLexpr : list ctx_elt2 -> forall ts n, fvar_pATLexpr var1 ts n -> fvar_pATLexpr var2 ts n -> Prop :=
 | wf_no_fvar ctx n e1 e2 :
   wf_ATLexpr ctx n e1 e2 ->
-  wf_fvar_ATLexpr ctx [] n (no_fvar n e1) (no_fvar n e2)
+  wf_fvar_ATLexpr ctx [] n e1 e2
 | wf_with_fvar ctx t ts n e1 e2 :
   (forall x1 x2, wf_fvar_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) ts n (e1 x1) (e2 x2)) ->
-  wf_fvar_ATLexpr ctx (t :: ts) n (with_fvar t ts n e1) (with_fvar t ts n e2).
+  wf_fvar_ATLexpr ctx (t :: ts) n e1 e2.
 End well_formed.
 
 Definition fvar_pATLExpr ts n := forall var, fvar_pATLexpr var ts n.
@@ -517,11 +518,10 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_
   end.
 
 Fixpoint interp_fvar_pATLexpr ts n (e : fvar_pATLexpr interp_type ts n) : fvar_type interp_type ts n :=
-  match e with
-  | no_fvar n e0 => interp_pATLexpr e0
-  | with_fvar t ts' n e' =>
-      lam interp_type t ts' _ (fun x => interp_fvar_pATLexpr ts' n (e' x))
-  end.
+  match ts return fvar_pATLexpr interp_type ts n -> fvar_type interp_type ts n with
+  | [] => fun e => interp_pATLexpr e
+  | t :: ts' => fun e => fun x => interp_fvar_pATLexpr ts' n (e x)
+  end e.
 
 Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : option (list nat) :=
   match e with
@@ -813,10 +813,10 @@ Fixpoint unnatify {var n} (ctx : list (ctx_elt var)) (e : pATLexpr (fun _ => nat
   end.
 
 Fixpoint fvar_unnatify {var n ts} (ctx : list (ctx_elt var)) (e : fvar_pATLexpr (fun _ => nat) ts n) : fvar_pATLexpr var ts n :=
-  match e with
-  | no_fvar _ e0 => no_fvar _ (unnatify ctx e0)
-  | with_fvar _ _ _ e' => with_fvar _ _ _ (fun x => fvar_unnatify ({|ctx_elt0 := x|} :: ctx) (e' (length ctx)))
-  end.
+  match ts return fvar_pATLexpr (fun _ => nat) ts n -> fvar_pATLexpr var ts n with
+  | [] => fun e => unnatify ctx e
+  | t :: ts' => fun e => fun x => fvar_unnatify ({|ctx_elt0 := x|} :: ctx) (e (length ctx))
+  end e.
 
 Definition ctx1 {var1 var2} (x : ctx_elt2 var1 var2) :=
   {| ctx_elt0 := x.(ctx_elt_p1 _ _) |}.
@@ -866,7 +866,7 @@ Hint Constructors wf_fvar_ATLexpr : core.
 Lemma wf_fvar_unnatify ts n var1 var2 ctx e :
   wf_fvar_ATLexpr var1 var2 ctx ts n (fvar_unnatify (map ctx1 ctx) e) (fvar_unnatify (map ctx2 ctx) e).
 Proof.
-  revert ctx. induction e; intros; simpl; repeat rewrite length_map; eauto.
+  revert ctx. induction ts; intros; simpl; repeat rewrite length_map; eauto.
 Qed.
 
 Lemma WfByUnnatify ts n (E : fvar_pATLExpr ts n) :
@@ -3028,22 +3028,22 @@ Proof.
 Qed.
 
 Fixpoint stringvar_fvar_ATLexpr {ts n} name (e : fvar_pATLexpr (fun _ => nat) ts n) : option ATLexpr :=
-  match e with
-  | no_fvar n e0 =>
-      match stringvar_ATLexpr name e0 with
-      | Some (_, e_string) => Some e_string
-      | None => None
-      end
-  | with_fvar t ts' n e' =>
-      stringvar_fvar_ATLexpr (S name) (e' name)
-  end.
+  match ts return fvar_pATLexpr _ ts _ -> _ with
+  | [] => fun e =>
+           match stringvar_ATLexpr name e with
+           | Some (_, e_string) => Some e_string
+           | None => None
+           end
+  | t :: ts' => fun e =>
+                stringvar_fvar_ATLexpr (S name) (e name)
+  end e.
 
 Fixpoint fvar_sound_sizeof {var ts n} (dummy : forall t : type, var t) 
   (e : fvar_pATLexpr var ts n) : option (list nat) :=
-  match e with
-  | no_fvar _ e0 => sound_sizeof dummy e0
-  | with_fvar _ _ _ e' => fvar_sound_sizeof dummy (e' (dummy _))
-  end.
+  match ts return fvar_pATLexpr _ ts _ -> _ with
+  | [] => fun e => sound_sizeof dummy e
+  | t :: ts' => fun e => fvar_sound_sizeof dummy (e (dummy _))
+  end e.
 
 Inductive size_spec :=
 | size_nil
@@ -3054,26 +3054,26 @@ Inductive size_spec :=
 .
 
 Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
-  match e, sizes with
-  | no_fvar _ e0, size_nil => idxs_in_bounds e0
-  | with_fvar (tensor_n n) _ _ e', with_T_var sh sz =>
+  match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
+  | [], size_nil => fun e => idxs_in_bounds e
+  | tensor_n n :: ts', with_T_var sh sz => fun e =>
       n = length sh /\
         forall r,
           result_has_shape' sh r ->
-          fvar_idxs_in_bounds sz (e' r)
-  | with_fvar tZ _ _ e', with_Z_var min max sz => forall r,
+          fvar_idxs_in_bounds sz (e r)
+  | tZ :: ts', with_Z_var min max sz => fun e => forall r,
       (min <= r < max)%Z ->
-      fvar_idxs_in_bounds (sz r) (e' r)           
-  | with_fvar tB _ _ e', with_B_var sz => forall r,
-      fvar_idxs_in_bounds sz (e' r)           
-  | _, _ => False
-  end.
+      fvar_idxs_in_bounds (sz r) (e r)           
+  | tB :: ts', with_B_var sz => fun e => forall r,
+      fvar_idxs_in_bounds sz (e r)           
+  | _, _ => fun _ => False
+  end e.
 
 Fixpoint fvar_sum_bounds_good {ts n} (e : fvar_pATLexpr interp_type ts n) : Prop :=
-  match e with
-  | no_fvar _ e0 => sum_bounds_good e0
-  | with_fvar _ _ _ e' => forall r, fvar_sum_bounds_good (e' r)
-  end.
+  match ts return fvar_pATLexpr _ ts _ -> _ with
+  | [] => fun e => sum_bounds_good e
+  | t :: ts' => fun e => forall r, fvar_sum_bounds_good (e r)
+  end e.
 
 Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
 Proof.
@@ -3084,22 +3084,22 @@ Proof.
 Defined.
 
 Fixpoint result_of_fvar_pATLexpr {ts n} (e : fvar_pATLexpr interp_type_result ts n) (args : list (ctx_elt interp_type_result)) : result :=
-  match e with
-  | no_fvar _ e0 => result_of_pATLexpr e0
-  | with_fvar t _ _ e' =>
+  match ts return fvar_pATLexpr _ ts _ -> _ with
+  | [] => fun e => result_of_pATLexpr e
+  | t :: ts' => fun e =>
       match args with
       | {| ctx_elt_t0 := t'; ctx_elt0 := arg|} :: args' =>
           match type_eq_dec t t' with
           | left pf =>
               match pf in (_ = q) return interp_type_result q -> _ with
-              | Logic.eq_refl => fun arg => result_of_fvar_pATLexpr (e' arg) args'
+              | Logic.eq_refl => fun arg => result_of_fvar_pATLexpr (e arg) args'
 
               end arg
           | right _ => dummy_result (tensor_n 0)
           end
       | _ => dummy_result (tensor_n 0)
       end
-  end.
+  end e.
 
 Fixpoint ec_of_args name (args : list (ctx_elt interp_type_result)) :=
   match args with
@@ -3280,7 +3280,7 @@ Proof.
       { simpl in Hsizes. invert Hsizes. }
       destruct t0; simpl in *; try contradiction.
       simpl in *. invert Hcorresp_args. simpl in *. subst.
-      cbv [lam]. eapply H0; eauto.
+      eapply H0; eauto.
       erewrite fvar_sound_sizeof_wf by eauto.
       erewrite <- fvar_sound_sizeof_wf by eauto.
       eassumption.
@@ -3289,7 +3289,7 @@ Proof.
       { simpl in Hsizes. invert Hsizes. }
       destruct t0; simpl in *; try contradiction.
       simpl in *. invert Hcorresp_args. simpl in *. subst.
-      simpl. cbv [lam]. invs'. eapply H0; eauto.
+      simpl. invs'. eapply H0; eauto.
       erewrite fvar_sound_sizeof_wf by eauto.
       erewrite <- fvar_sound_sizeof_wf by eauto.
       eassumption.
