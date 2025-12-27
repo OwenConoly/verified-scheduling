@@ -65,7 +65,7 @@ Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor
 Fixpoint varify var ts T (f : fun_type (pExpr_type var) ts T) : fun_type var ts T :=
   match ts return fun_type (pExpr_type var) ts T -> fun_type var ts T with
   | [] => fun f => f
-  | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
+n  | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
   end f.
 
 Derive (reified_matmul : forall var, fun_type var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] (pATLexpr var 2)) in
@@ -82,7 +82,6 @@ Proof.
   Time simpl. Time reflexivity.
   Time Qed.
 
-Check stringvar_ATLexpr.
 Fixpoint stringvar_fun {ts n} (names : list nat) (big_name : nat) (f : fun_type (fun _ => nat) ts (pATLexpr (fun _ => nat) n)) : option ATLexpr :=
   match ts return fun_type (fun _ => nat) ts (pATLexpr (fun _ => nat) n) -> _ with
   | [] => fun f =>
