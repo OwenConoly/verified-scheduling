@@ -377,11 +377,8 @@ Fixpoint fun_type (var : type -> Type) (ts : list type) (T : Type) : Type :=
 Definition fvar_pATLexpr (var : type -> Type) (ts : list type) (n : nat) :=
   fun_type var ts (pATLexpr var n).
 
-Fixpoint fvar_type var (ts : list type) n :=
-  match ts with
-  | [] => var (tensor_n n)
-  | t :: ts' => var t -> fvar_type var ts' n
-  end.
+Definition fvar_type var (ts : list type) n :=
+  fun_type var ts (var (tensor_n n)).
 
 Section well_formed.
   Context (var1 var2 : type -> Type).
@@ -3335,8 +3332,49 @@ Proof.
     erewrite fvar_sound_sizeof_wf by eauto. eassumption.
 Qed.
 
-(*something about a list of Z inputs, then a list of sizes that can depend on the Z inputs, then ...*)
-Lemma stringvar_fvar_ATLexpr_really_correct ts n (e : fvar_pATLExpr ts n) e_string sz sizes args :
+Fixpoint stringvar_fun {ts n} (names : list nat) (big_name : nat) (f : fun_type (fun _ => nat) ts (pATLexpr (fun _ => nat) n)) : option ATLexpr :=
+  match ts return fun_type (fun _ => nat) ts (pATLexpr (fun _ => nat) n) -> _ with
+  | [] => fun f =>
+           match stringvar_ATLexpr big_name f with
+           | Some (_, e) => Some e
+           | None => None
+           end
+  | t :: ts' => fun f =>
+                match names with
+                | [] => None
+                | name :: names' =>
+                    stringvar_fun names' big_name (f name)
+                end
+  end f.
+
+Fixpoint spec_of' ts n names size (fd : ATLexpr) (fs : fun_type interp_type ts (dim_n n)) (v : fmap string Z) (ec : fmap string Result.result) :=
+  match ts return ATLexpr -> fun_type _ ts _ -> _ with
+  | [] => fun fd fs =>
+      exists r,
+      eval_expr v ec fd r /\
+        tensor_of_result r = fs
+  | tZ :: ts' => fun fd fs =>
+      match size, names with
+      | with_Z_var min max size', name :: names' =>
+          forall (x : Z),
+            (min <= x < max)%Z ->
+            spec_of' ts' n names' (size' x) fd(fs x) (v $+ (nat_to_string name, x)) ec
+      | _, _ => False
+      end
+  | tB :: _ => fun _ _ => False
+  | tensor_n m :: ts' => fun fd fs =>
+      match size, names with
+      | with_T_var sh size', name :: names' =>
+          forall (x : Result.result) (x' : dim_n m),
+            result_has_shape' sh x ->
+            spec_of' ts' n names' size' fd (fs x') v (ec $+ (nat_to_string name, x))
+      | _, _ => False
+      end
+  end fd fs.
+
+Definition spec_of ts n names size fd fs := spec_of' ts n names size fd fs $0 $0.
+Print interp_fvar_pATLexpr. Print fvar_type.
+Lemma stringvar_fvar_ATLexpr_really_correct ts n (e : fvar_pATLExpr ts n) e_string sz sizes args names :
   Wf_fvar_ATLExpr e ->
   stringvar_fvar_ATLexpr O (e _) = Some e_string ->
   fvar_sound_sizeof (fun _ : type => tt) (e _) = Some sz ->
@@ -3344,8 +3382,7 @@ Lemma stringvar_fvar_ATLexpr_really_correct ts n (e : fvar_pATLExpr ts n) e_stri
   Forall res_tensor_corresp args ->
   fvar_idxs_in_bounds sizes (e _) ->
   fvar_sum_bounds_good (e _) ->
-  eval_expr (valuation_of_args O (map ctx2 args)) (ec_of_args O (map ctx2 args)) e_string (result_of_fvar_pATLexpr (e _) (map ctx2 args)) /\
-    tensor_of_result (result_of_fvar_pATLexpr (e _) (map ctx2 args)) = appl_fvar_expr _ _ (interp_fvar_pATLexpr ts n (e _)) (map ctx1 args).
+  spec_of ts n names sizes e_string (interp_fvar_pATLexpr _ _ (e _)).
 Proof.
   intros.
   Print res_tensor_corresp.
