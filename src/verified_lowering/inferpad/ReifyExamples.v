@@ -90,7 +90,7 @@ Definition matmul_size :=
              (fun B => with_Z_var 0 10
                       (fun C => with_T_var [Z.to_nat A; Z.to_nat B]
                                (with_T_var [Z.to_nat B; Z.to_nat C]
-                                  size_nil)))).             
+                                  size_nil)))).
 
 Opaque tensor_of_result.
 Derive string_matmul in
@@ -105,7 +105,9 @@ Proof.
     end.
     simpl. reflexivity. }
   - simpl. apply WfByUnnatify. simpl. reflexivity.
-  - cbv beta. cbn [varify Var']. simpl. admit.
+  - cbv beta. cbn [varify Var']. cbv [fvar_sound_sizeof]. Print sound_sizeof.
+    Print sizeof_pZexpr.
+    simpl. simpl. admit.
   - simpl. intros. admit.
   - simpl. intros. split; try lia. admit.
   - simpl. subst string_matmul. reflexivity.
