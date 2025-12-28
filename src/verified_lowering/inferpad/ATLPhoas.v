@@ -3105,13 +3105,13 @@ Fixpoint res_spec_of' ts n name size (fd : ATLexpr) (fs : fvar_pATLexpr interp_t
   end fd fs.
 
 Definition res_spec_of ts n name size fd fs := res_spec_of' ts n name size fd fs $0 $0.
-  
-Fixpoint spec_of' ts n name size (fd : ATLexpr) (fs : fvar_pATLexpr interp_type ts n) (v : fmap string Z) (ec : fmap string Result.result) :=
+
+Fixpoint spec_of' ts n name size (fd : ATLexpr) (fs : fun_type interp_type ts (dim_n n)) (v : fmap string Z) (ec : fmap string Result.result) :=
   match ts return ATLexpr -> fun_type interp_type ts _ -> _ with
   | [] => fun fd fs =>
            exists r,
              eval_expr v ec fd r /\
-               tensor_of_result r = interp_pATLexpr fs
+               tensor_of_result r = fs
   | tZ :: ts' => fun fd fs =>
       match size with
       | with_Z_var min max size' =>
@@ -3246,7 +3246,7 @@ Qed.
 Lemma res_spec_of_compat_spec_of' ts n name size fd e_res e_shal v ec :
   res_spec_of' ts n name size fd e_res v ec ->
   compat ts n size e_shal e_res ->
-  spec_of' ts n name size fd e_shal v ec.
+  spec_of' ts n name size fd (interp_fvar_pATLexpr ts n e_shal) v ec.
 Proof.
   revert size name e_res e_shal v ec.
   induction ts as [|t ts]; intros size name e_res e_shal v ec Hres Hcompat.
@@ -3257,7 +3257,7 @@ Qed.
 Lemma res_spec_of_compat_spec_of ts n name size fd e_res e_shal :
   res_spec_of ts n name size fd e_res ->
   compat ts n size e_shal e_res ->
-  spec_of ts n name size fd e_shal.
+  spec_of ts n name size fd (interp_fvar_pATLexpr ts n e_shal).
 Proof.
   intros. eapply res_spec_of_compat_spec_of'; eassumption.
 Qed.
@@ -3268,7 +3268,7 @@ Lemma spec_of_correct ts n e sz size name fd :
   fvar_idxs_in_bounds size (e _) ->
   fvar_sum_bounds_good (e _) ->
   stringvar_fvar_ATLexpr name (e _) = Some fd ->
-  spec_of ts n name size fd (e _).
+  spec_of ts n name size fd (interp_fvar_pATLexpr ts n (e _)).
 Proof.
   intros. eapply res_spec_of_compat_spec_of.
   - eapply res_spec_of_correct; eauto.

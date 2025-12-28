@@ -46,26 +46,10 @@ Fixpoint ec_of_vars (names_vals : list (string * Result.result)) :=
   | (n, v) :: names_vals' => ec_of_vars names_vals' $+ (n, v)
   end.
 
-Definition is_reification {n T} e_string (f : T -> list (string * arb_dim_tensor) * dim_n n) :=
-  forall x,
-    let '(vars, e_shal) := f x in
-    exists r,
-    forall inps,
-      Forall2 (fun t r => tensor_of_result r = t.(val)) (map snd vars) inps ->
-      eval_expr $0 (ec_of_vars (combine (map fst vars) inps)) (e_string x) r /\
-        tensor_of_result r = e_shal.
-(* Print ctx_elt. *)
-(* Lemma reify_is_reification {n T} (e : forall var, T var -> list ctx_elt var * pATLexpr var n) name' e_string vars f : *)
-(*   (forall x, stringvar_ATLexpr O ((e x) _) = Some (name', e_string x)) -> *)
-(*   is_reification e_string f. *)
-(* Proof. *)
-(*   intros H. cbv [is_reification]. intros x. *)
-(* Admitted. *)
-
 Fixpoint varify var ts T (f : fun_type (pExpr_type var) ts T) : fun_type var ts T :=
   match ts return fun_type (pExpr_type var) ts T -> fun_type var ts T with
   | [] => fun f => f
-n  | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
+  | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
   end f.
 
 Derive (reified_matmul : forall var, fun_type var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] (pATLexpr var 2)) in
@@ -100,33 +84,6 @@ Fixpoint stringvar_fun {ts n} (names : list nat) (big_name : nat) (f : fun_type 
 Derive string_matmul in (stringvar_fun (seq 0 5) 6 (reified_matmul _) = Some string_matmul) as string_matmul_correct.
 Proof. simpl. subst string_matmul. reflexivity. Qed.
 
-Fixpoint spec_of' ts n names size (fd : ATLexpr) (fs : fun_type interp_type ts (dim_n n)) (v : fmap string Z) (ec : fmap string Result.result) :=
-  match ts return ATLexpr -> fun_type _ ts _ -> _ with
-  | [] => fun fd fs =>
-      exists r,
-      eval_expr v ec fd r /\
-        tensor_of_result r = fs
-  | tZ :: ts' => fun fd fs =>
-      match size, names with
-      | with_Z_var min max size', name :: names' =>
-          forall (x : Z),
-            (min <= x < max)%Z ->
-            spec_of' ts' n names' (size' x) fd(fs x) (v $+ (nat_to_string name, x)) ec
-      | _, _ => False
-      end
-  | tB :: _ => fun _ _ => False
-  | tensor_n m :: ts' => fun fd fs =>
-      match size, names with
-      | with_T_var sh size', name :: names' =>
-          forall (x : Result.result) (x' : dim_n m),
-            result_has_shape' sh x ->
-            spec_of' ts' n names' size' fd (fs x') v (ec $+ (nat_to_string name, x))
-      | _, _ => False
-      end
-  end fd fs.
-
-Definition spec_of ts n names size fd fs := spec_of' ts n names size fd fs $0 $0.
-
 Definition matmul_size :=
   with_Z_var 0 10
     (fun A => with_Z_var 0 10
@@ -136,9 +93,28 @@ Definition matmul_size :=
                                   size_nil)))).             
 
 Opaque tensor_of_result.
-Lemma matmul_correct :
-  spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 (seq 0 5) matmul_size string_matmul matmul.
+Derive string_matmul in
+  (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
+    as matmul_correct.
 Proof.
+  eassert (matmul = _) as ->.
+  2: eapply spec_of_correct.
+  { cbv [matmul]. Reify_lhs rmatmul.
+    match goal with
+    | rm := ?x |- _ => instantiate (1 := (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (x var)))
+    end.
+    simpl. reflexivity. }
+  - simpl. apply WfByUnnatify. simpl. reflexivity.
+  - cbv beta. cbn [varify Var']. simpl. admit.
+  - simpl. intros. admit.
+  - simpl. intros. split; try lia. admit.
+  - simpl. subst string_matmul. reflexivity.
+Admitted.
+    
+Lemma matmul_correct :
+  .
+Proof.
+  
   simpl. cbv [spec_of]. simpl.
 Abort.
 
