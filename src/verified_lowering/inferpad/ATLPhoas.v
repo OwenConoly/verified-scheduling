@@ -596,9 +596,9 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
   | Var x => None (*should never happen*)
   | @Get _ n v idxs =>
       if (length idxs =? n)%nat then
-        match sound_sizeof dummy v with
-        | Some _ => Some []
-        | None => None
+        match v with
+        | Var _ => Some []
+        | _ => None
         end
       else None
   | SBop _ x y =>
@@ -897,9 +897,12 @@ Fixpoint stringvar_S {n} (e : pATLexpr (fun _ => nat) n) : option Sexpr :=
 Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => nat) n) : option (nat * ATLexpr) :=
   match e with
   | Gen lo hi body =>
-      [[name', body']] <- stringvar_ATLexpr (S name) (body name);
-Some (name',
-    ATLDeep.Gen (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
+      match stringvar_ATLexpr (S name) (body name) with
+      | Some (name', body') =>
+          Some (name',
+              ATLDeep.Gen (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
+      | None => None
+      end
 | Sum lo hi body =>
     [[name', body']] <- stringvar_ATLexpr (S name) (body name);
 Some (name',
@@ -1125,7 +1128,8 @@ Proof.
       end;
     try reflexivity.
   - (*why*) erewrite (sound_sizeof_wf_Z _ _ _ hi1) by eauto. reflexivity.
-  - erewrite Forall2_length by eassumption. reflexivity.    
+  - erewrite Forall2_length by eassumption. destruct (_ =? _)%nat; [|reflexivity].
+    destruct H; reflexivity.
 Qed.
 
 Lemma sizeof_pZexpr_eval_Zexpr e e' :
@@ -2546,6 +2550,13 @@ Proof.
       -- apply nth_error_None in E. lia.
 Qed.
 
+Lemma invert_wf_var var1 var2 ctx n i1 x2 :
+  wf_ATLexpr var1 var2 ctx n (Var i1) x2 ->
+  exists i1' i2, Var i1 = Var i1' /\ x2 = Var i2 /\ In {| ctx_elt_p1 := i1'; ctx_elt_p2 := i2 |} ctx.
+Proof.
+  intros H. remember (Var i1). destruct H; try congruence. eauto.
+Qed.
+
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
   wf_ATLexpr interp_type interp_type_result ctx n e_shal e_res ->
   sound_sizeof dummy_shal e_shal = Some sh ->
@@ -2775,10 +2786,13 @@ Proof.
       intros. apply tensor_of_result_size; auto. apply sound_sizeof_gives_dim in E.
       simpl in E. lia.
   - congruence.
-  - rewrite <- IHwf_ATLexpr.
+  - apply invert_wf_var in H. invs'. rewrite H3 in *. clear H3 i.
     assert (map interp_pZexpr idxs1 = map interp_pZexpr idxs2) as ->.
     { clear -H0 Hctx. induction H0; simpl; f_equal; eauto.
       eauto using Zexprs_corresp_same. }
+    simpl.
+    rewrite Forall_forall in Hctx. specialize (Hctx _ ltac:(eassumption)).
+    simpl in Hctx. subst.
     erewrite <- eval_get'_gget_R; cycle 1.
     + rewrite length_map. apply Nat.eqb_eq in E. apply Forall2_length in H0. lia.
     + eassumption.
