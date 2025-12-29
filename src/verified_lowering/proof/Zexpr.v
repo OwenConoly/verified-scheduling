@@ -3275,25 +3275,27 @@ Qed.
 
 Lemma eval_Zexprlist_map_match_fst_map_eval_Zexpr_Z_tup_total :
   forall v l,
-  eval_Zexprlist $0 (map (partially_eval_Zexpr v) (map fst l))
-         (map (eval_Zexpr_Z_total v) (map fst l)) ->
-       (map
-           (fun o : option (Z * Z) =>
-            match o with
-            | Some x => fst x
-            | None => 0%Z
-            end) (map (eval_Zexpr_Z_tup_total v) l)) =
-         (map (eval_Zexpr_Z_total v) (map fst l)).
+    eval_Zexprlist $0 (map (partially_eval_Zexpr v) (map snd l))
+      (map (eval_Zexpr_Z_total v) (map snd l)) ->
+    eval_Zexprlist $0 (map (partially_eval_Zexpr v) (map fst l))
+      (map (eval_Zexpr_Z_total v) (map fst l)) ->
+    (map
+       (fun o : option (Z * Z) =>
+          match o with
+          | Some x => fst x
+          | None => 0%Z
+          end) (map (eval_Zexpr_Z_tup_total v) l)) =
+      (map (eval_Zexpr_Z_total v) (map fst l)).
 Proof.
   induct l; intros.
   - reflexivity.
-  - simpl in *. invert H. 
+  - simpl in *. invert H. invert H0. 
     cases a. simpl in *.
     unfold eval_Zexpr_Z_tup_total. unfold eval_Zexpr_Z_tup. simpl.
-    erewrite -> eval_Zexpr_partially_eval_Zexpr in H4.
-    eapply eval_Zexpr_Z_eval_Zexpr in H4.
-    rewrite H4. simpl. f_equal.
-    eapply IHl. eauto.
+    erewrite -> eval_Zexpr_partially_eval_Zexpr in H4, H3.
+    eapply eval_Zexpr_Z_eval_Zexpr in H4, H3.
+    rewrite H4, H3. simpl. f_equal.
+    eapply IHl. eauto. eauto.
 Qed.
 
 Lemma eval_Zexprlist_map_partially_eval_Zexpr :
