@@ -1914,7 +1914,6 @@ Lemma partially_eval_Zexpr_flatten_shape_index : forall l1 l2 v,
    apply partially_eval_Zexpr_fold_left_ZTimes. 
 Qed.
 
-Print flatten_shape_index.
 Fixpoint flatten (sh : list Z) (i : list Z) :=
   match sh with
   | n :: sh' =>
@@ -3378,4 +3377,3 @@ Proof.
   - simpl. econstructor. lia.
     eauto.
 Qed.
-

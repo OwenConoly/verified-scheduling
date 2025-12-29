@@ -19,10 +19,10 @@ From Lower Require Import Zexpr Bexpr Array Range Sexpr Result ListMisc Meshgrid
      Constant.
 
 Definition shift_top_dim_reindexer
-           (reindexer : list (Zexpr * Z) -> list (Zexpr * Z)) :=
+           (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr)) :=
   fun l => match l with
            | (var,dim)::xs => reindexer
-                                ((var + | 1 |, (dim +  1)%Z )%z :: xs)
+                                ((var + | 1 |, dim + | 1 |)%z :: xs)
            | _ => reindexer l
            end.
 
@@ -38,35 +38,22 @@ Hint Extern 3 (Datatypes.length _ = Datatypes.length _) =>
 Lemma flatten_index_to_function_alt : forall sh args,
     length sh = length args ->
     flatten sh args =
-      index_to_function_alt (combine (map ZLit args) sh) [] [].
+      index_to_function_alt (combine (map ZLit args) (map ZLit sh)) [] [].
 Proof.
   induction sh; intros; cases args; auto.
-  simpl. unfold flatten. cases sh; auto.
-  cases sh; cases args; simpl in *; try lia.
-  unfold index_to_function_alt. simpl. reflexivity.  
-  simpl. rewrite IHsh.
-  unfold index_to_function_alt.
-  unfold index_to_function_rec_alt.
-  simpl.
+  simpl. simpl in H. 
+  unfold index_to_function_alt. simpl.
+  rewrite map_fst_combine by (repeat rewrite length_map; simpl; lia).
+  rewrite map_snd_combine by (repeat rewrite length_map; simpl; lia).
   erewrite eval_Zexpr_Z_flatten_index_flatten.
-  2: { econstructor. eauto. rewrite map_fst_combine
-      by (repeat rewrite length_map; simpl; try lia).
-       eapply eval_Zexprlist_map_ZLit. }
-  rewrite map_snd_combine
-    by (repeat rewrite length_map; simpl; try lia).
-  2: eauto.
-  unfold flatten_index. simpl.
-  rewrite map_snd_combine
-    by (repeat rewrite length_map; simpl; try lia).
-  rewrite map_fst_combine
-    by (repeat rewrite length_map; simpl; try lia).
-  erewrite eval_Zexpr_Z_flatten_index_flatten.
-  2: { econstructor. eauto. eapply eval_Zexprlist_map_ZLit. }
+  2: { eapply eval_Zexprlist_map_ZLit. }
+  2: { eapply eval_Zexprlist_map_ZLit. }
+  rewrite eval_Zexpr_Z_fold_left_ZTimes_ZLit.
   reflexivity.
 Qed.
 
 Definition interpret_reindexer
-           (reindexer : list (Zexpr * Z) -> list (Zexpr * Z))
+           (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr))
            (sh : list Z) (v : valuation) : list Z -> Z :=
   let vars := shape_to_vars sh in
   let result_index := shape_to_index sh vars in
@@ -77,12 +64,11 @@ Definition interpret_reindexer
 Lemma interpret_reindexer_id_flatten : forall sh x v,
     In x (mesh_grid sh) ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
-    (interpret_reindexer (fun l : list (Zexpr * Z) => l) sh v) x =
+    (interpret_reindexer (fun l : list (Zexpr * Zexpr) => l) sh v) x =
       flatten sh x.
 Proof.
   induct sh; intros.
-  - simpl in *. propositional. subst.
-    reflexivity.
+  - simpl in *. propositional.
   - cases x.
     eapply not_In_empty_map2_cons in H; propositional.
     unfold interpret_reindexer.
@@ -101,8 +87,7 @@ Proof.
     rewrite map_fold_left_subst_var_in_Z_tup_shape_to_index.
     simpl.
     rewrite map_partially_eval_Z_tup_ZLit. simpl.
-    epose proof flatten_index_to_function_alt (_ :: _) as H'.
-    cbn [map] in H'. rewrite H'.
+    rewrite flatten_index_to_function_alt.
     reflexivity.
     apply length_mesh_grid_indices_Z. auto.
     rewrite length_map. rewrite length_nat_range_rec.
