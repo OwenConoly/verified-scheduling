@@ -70,10 +70,10 @@ Fixpoint vars_of (e : ATLexpr) : set var :=
   | Scalar _ => constant []
   end.
 
-Fixpoint sizeof (e : ATLexpr) : list nat :=
+Fixpoint sizeof (e : ATLexpr) : list Zexpr :=
   match e with
   | Gen i lo hi body =>
-      Z.to_nat (eval_Zexpr_Z_total $0 (ZMinus hi lo)) ::(sizeof body)
+      ZMinus hi lo :: sizeof body
   | Sum i lo hi body =>
     sizeof body
   | Guard p body =>
@@ -87,55 +87,53 @@ Fixpoint sizeof (e : ATLexpr) : list nat :=
     | n::rest =>
       match sy with
       | m::rest' =>
-        n + m ::rest
+        (n + m)%z ::rest
       | _ => sx
       end
     | _ =>
       match sy with
       | m::rest' =>
         sy
-      | _ => [0]
+      | _ => []
       end
     end
   | Flatten e =>
     match sizeof e with
-    | a::b::rest => a * b :: rest
-    | [] => [0]
+    | a::b::rest => (a * b)%z :: rest
+    | [] => []
     | s => s
     end
   | Split k e =>
     match sizeof e with
-    | a::rest => (a //n (Z.to_nat (eval_Zexpr_Z_total $0 k))):: Z.to_nat (eval_Zexpr_Z_total $0 k) :: rest
-    | [] => [0]
+    | a::rest => (a // k)%z :: k :: rest
+    | [] => []
     end
   | Transpose e =>
     match sizeof e with
     | a::b::rest => b::a::rest
-    | [] => [0]
+    | [] => []
     | s => s
     end
   | Truncr n e =>
     match sizeof e with
     | m::rest  =>
-      m - Z.to_nat (eval_Zexpr_Z_total $0 n) ::rest
-    | [] => [0]
+      (m - n)%z :: rest
+    | [] => []
     end
   | Truncl n e =>
     match sizeof e with
-    | m::rest  =>
-      m - Z.to_nat (eval_Zexpr_Z_total $0 n) ::rest
-    | [] => [0]
+    | m :: rest => (m - n)%z :: rest
+    | [] => []
     end           
   | Padr n e =>
     match sizeof e with
-    | m :: rest => m + Z.to_nat (eval_Zexpr_Z_total $0 n) ::rest
-    | [] => [0]
+    | m :: rest => (m + n)%z :: rest
+    | [] => []
     end         
   | Padl n e =>
     match sizeof e with
-    | m::rest  =>
-      m + Z.to_nat (eval_Zexpr_Z_total $0 n)::rest
-    | [] => [0]
+    | m :: rest => (m + n)%z :: rest
+    | [] => []
     end                  
   | Scalar s =>
     []
@@ -143,20 +141,20 @@ Fixpoint sizeof (e : ATLexpr) : list nat :=
 
 Definition flat_sizeof e :=
   match sizeof e with
-  | [] => 0
-  | x::xs => fold_left mul xs x
+  | [] => | 0 |%z
+  | x::xs => fold_left ZTimes xs x
   end.
 
 Fixpoint lower
          (e : ATLexpr)
-         (f : list (Zexpr * Z) -> list (Zexpr * Z))
-         p asn (sh : context) :=
+         (f : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr))
+         p asn (sh : fmap ) :=
   match e with
   | Gen i lo hi body =>
       For i lo hi
           (lower body (fun l =>
                          f (((! i ! - | eval_Zexpr_Z_total $0 lo |)%z,
-                              eval_Zexpr_Z_total $0 (hi - lo)%z)::l)) p asn sh)
+                              (hi - lo)%z)::l)) p asn sh)
   | Sum i lo hi body =>
       For i lo hi
           (lower body f p Reduce sh)
@@ -241,57 +239,57 @@ Fixpoint lower
                          end)) p asn sh
   end.
 
-Inductive size_of : ATLexpr -> list nat -> Prop :=
+Inductive size_of v : ATLexpr -> list nat -> Prop :=
 | SizeOfGen : forall i lo loz hi hiz body sh,
-    eval_Zexpr $0 lo loz ->
-    eval_Zexpr $0 hi hiz ->
-    size_of body sh ->
-    size_of (Gen i lo hi body) (Z.to_nat (hiz - loz) :: sh)
+    eval_Zexpr v lo loz ->
+    eval_Zexpr v hi hiz ->
+    size_of _ body sh ->
+    size_of _ (Gen i lo hi body) (Z.to_nat (hiz - loz) :: sh)
 | SizeOfSum : forall i lo hi body sh,
-    size_of body sh ->
-    size_of (Sum i lo hi body) sh
+    size_of _ body sh ->
+    size_of _ (Sum i lo hi body) sh
 | SizeOfGuard : forall p e sh,
-    size_of e sh ->
-    size_of (Guard p e) sh
+    size_of _ e sh ->
+    size_of _ (Guard p e) sh
 | SizeOfLBind : forall e1 e2 x sh2,
-    size_of e2 sh2 ->
-    size_of (Lbind x e1 e2) sh2
+    size_of _ e2 sh2 ->
+    size_of _ (Lbind x e1 e2) sh2
 | SizeOfConcat : forall e1 e2 sh1 sh2 n m,
-    size_of e1 (n::sh1) ->
-    size_of e2 (m::sh2) ->
+    size_of _ e1 (n::sh1) ->
+    size_of _ e2 (m::sh2) ->
     sh1 = sh2 ->
-    size_of (Concat e1 e2) (n + m :: sh1)
+    size_of _ (Concat e1 e2) (n + m :: sh1)
 | SizeOfFlatten : forall e n m sh,
-    size_of e (n :: m :: sh) ->
-    size_of (Flatten e) (n * m :: sh)
+    size_of _ e (n :: m :: sh) ->
+    size_of _ (Flatten e) (n * m :: sh)
 | SizeOfSplit : forall e n sh k kz,
-    eval_Zexpr $0 k kz ->
+    eval_Zexpr v k kz ->
     (0 < kz)%Z ->
-    size_of e (n::sh) ->
-    size_of (Split k e) (n //n (Z.to_nat kz) :: Z.to_nat kz :: sh)
+    size_of _ e (n::sh) ->
+    size_of _ (Split k e) (n //n (Z.to_nat kz) :: Z.to_nat kz :: sh)
 | SizeOfTranspose : forall e n m sh,
-    size_of e (n::m::sh) ->
-    size_of (Transpose e) (m::n::sh)
+    size_of _ e (n::m::sh) ->
+    size_of _ (Transpose e) (m::n::sh)
 | SizeOfTruncr : forall k kz e m sh,
-    eval_Zexpr $0 k kz ->
-    size_of e (m::sh) ->
+    eval_Zexpr v k kz ->
+    size_of _ e (m::sh) ->
     (Z.to_nat kz <= m) ->
-    size_of (Truncr k e) (m - Z.to_nat kz :: sh)
+    size_of _ (Truncr k e) (m - Z.to_nat kz :: sh)
 | SizeOfTruncl : forall k kz e m sh,
-    eval_Zexpr $0 k kz ->
-    size_of e (m :: sh) ->
+    eval_Zexpr v k kz ->
+    size_of _ e (m :: sh) ->
     (Z.to_nat kz <= m) ->
-    size_of (Truncl k e) (m - Z.to_nat kz :: sh)
+    size_of _ (Truncl k e) (m - Z.to_nat kz :: sh)
 | SizeOfPadr : forall k kz e m sh,
-    eval_Zexpr $0 k kz ->
-    size_of e (m :: sh) ->
-    size_of (Padr k e) (m + Z.to_nat kz :: sh)
+    eval_Zexpr v k kz ->
+    size_of _ e (m :: sh) ->
+    size_of _ (Padr k e) (m + Z.to_nat kz :: sh)
 | SizeOfPadl : forall k kz e m sh,
-    eval_Zexpr $0 k kz ->
-    size_of e (m :: sh) ->
-    size_of (Padl k e) (m + Z.to_nat kz :: sh)
+    eval_Zexpr v k kz ->
+    size_of _ e (m :: sh) ->
+    size_of _ (Padl k e) (m + Z.to_nat kz :: sh)
 | SizeOfScalar : forall s,
-    size_of (Scalar s) [].
+    size_of _ (Scalar s) [].
 Local Hint Constructors eval_Zexpr eval_Bexpr eval_Sexpr size_of.
 
 Inductive eval_stmt (v : valuation) :
@@ -396,18 +394,18 @@ Inductive eval_expr :
     eval_Zexpr_Z v lo = Some loz ->
     eval_Zexpr_Z v hi = Some hiz ->
     (hiz <= loz)%Z ->
-    size_of body sz ->
+    size_of v body sz ->
     eval_expr v ec (Sum i lo hi body) (gen_pad sz)
 | EvalGuardFalse : forall e v ec b sz,
     eval_Bexpr v b false ->
-    size_of e sz ->
+    size_of v e sz ->
     eval_expr v ec (Guard b e) (gen_pad sz)
 | EvalGuardTrue : forall e ec v b r,
     eval_Bexpr v b true ->
     eval_expr v ec e r ->
     eval_expr v ec (Guard b e) r
 | EvalLbind : forall v e1 e2 x l1 l2 ec sz1,
-    size_of e1 sz1 ->
+    size_of v e1 sz1 ->
     ec $? x = None ->
     ~ x \in vars_of e1 /\ ~ x \in vars_of e2 ->
     vars_of e1 \cap vars_of e2 = constant nil ->
@@ -421,7 +419,7 @@ Inductive eval_expr :
     eval_expr v ec (Concat e1 e2) (V (l1++l2))
 | EvalTranspose : forall e v ec l n m esh,
     eval_expr v ec e (V l) ->
-    size_of e (n::m::esh) ->
+    size_of v e (n::m::esh) ->
     eval_expr v ec (Transpose e)
               (transpose_result l (m::n::esh))
 | EvalFlatten : forall e v ec l,
@@ -446,14 +444,14 @@ Inductive eval_expr :
 | EvalPadr : forall e v ec l s n k kz,
     eval_Zexpr_Z v k = Some kz ->
     (0 <= kz)%Z ->
-    size_of e (n::s) ->
+    size_of v e (n::s) ->
     eval_expr v ec e (V l) ->
     eval_expr v ec (Padr k e)
               (V (l++gen_pad_list ((Z.to_nat kz)::s)))
 | EvalPadl : forall e v ec l s n k kz,
     eval_Zexpr_Z v k = Some kz ->
     (0 <= kz)%Z ->
-    size_of e (n::s) ->
+    size_of v e (n::s) ->
     eval_expr v ec e (V l) ->
     eval_expr v ec (Padl k e)
               (V (gen_pad_list ((Z.to_nat kz)::s)++l))
@@ -497,14 +495,14 @@ Ltac invs' :=
     | H: _ :: _ = _ :: _ |- _ => invert H
     end.
 
-Lemma size_of_deterministic : forall e l1 l2,
-    size_of e l1 ->
-    size_of e l2 ->
+Lemma size_of_deterministic : forall v e l1 l2,
+    size_of v e l1 ->
+    size_of v e l2 ->
     l1 = l2.
 Proof.
   induction e; intros;
     try match goal with
-      | H1: size_of _ _, H2: size_of _ _ |- _ => invert H1; invert H2
+      | H1: size_of _ _ _, H2: size_of _ _ _ |- _ => invert H1; invert H2
       end;
     do 2 try match goal with
       | IH: _, H1: _, H2: _ |- _ => specialize (IH _ _ H1 H2); invert IH
@@ -517,7 +515,7 @@ Ltac eq_size_of :=
   repeat
     match goal with
     | H1 : size_of ?e ?a, H2 : size_of ?e ?b |- _ =>
-      pose proof (size_of_deterministic _ _ _ H1 H2); subst;
+      pose proof (size_of_deterministic _ _ _ _ H1 H2); subst;
       clear H2
   end.
 
