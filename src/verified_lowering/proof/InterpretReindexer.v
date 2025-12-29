@@ -196,13 +196,20 @@ Definition index_to_partial_function
                               | None => 0%Z
                               end) evaled_list_index))
   else None.
+Print shape_to_vars.
+Print shape_to_index.
+Print partially_eval_Z_tup.
+Print partially_eval_Zexpr.
+Print index_to_partial_function.
 
 Definition partial_interpret_reindexer
            (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr))
            (sh : list Z) (v : valuation) : list Z -> option Z :=
   let vars := shape_to_vars sh in
   let result_index := shape_to_index sh vars in
+  (*[(?, d1), (??, d2), ...]*)
   let full_index := reindexer result_index in
+  (*why would v have these ?? strings in its domain??*)
   let evaled_index := map (partially_eval_Z_tup v) full_index in
   index_to_partial_function evaled_index vars.
 
@@ -442,4 +449,3 @@ Proof.
       eapply IHl. eapply H0.
     + simpl in *. right. eapply IHl. apply H.
 Qed.
-

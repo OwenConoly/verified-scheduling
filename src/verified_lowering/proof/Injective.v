@@ -75,9 +75,10 @@ Proof.
   eapply in_or_app. propositional.
 Qed.
 
-Fixpoint list_vars_of_index (idx : list (_ * Z)) :=
+Fixpoint list_vars_of_index idx :=
   match idx with
-  | (a,b)::idx' => vars_of_Zexpr a ++/ list_vars_of_index idx'
+  | (a,b)::idx' => vars_of_Zexpr a ++/ vars_of_Zexpr b ++/
+                   list_vars_of_index idx'
   | _ => []
   end.    
 
@@ -89,7 +90,9 @@ Proof.
   - reflexivity.
   - simpl. simpl in *. cases a.
     eapply app_no_dups_empty_args in H. invert H.
+    eapply app_no_dups_empty_args in H0. invert H0.
     unfold partially_eval_Z_tup at 1. simpl.
+    rewrite partially_eval_Zexpr_no_vars by eauto.
     rewrite partially_eval_Zexpr_no_vars by eauto.
     f_equal. eauto.
 Qed.
@@ -100,8 +103,8 @@ Proof.
   induct l; intros.
   - econstructor.
   - simpl. cases a.
-    eapply no_dup_app_no_dups.
-    eapply vars_of_Zexpr_no_dups. eauto.
+    eapply no_dup_app_no_dups. eapply no_dup_app_no_dups.
+    eapply vars_of_Zexpr_no_dups. eapply vars_of_Zexpr_no_dups. eauto.
 Qed.
 
 Lemma zexpr_dec : forall (z1 z2 : Zexpr), {z1 = z2} + {z1 <> z2}.
@@ -119,21 +122,10 @@ Proof.
     f_equal. eauto.
 Qed.
 
-Lemma filter_ext_weak :
-  forall [A : Type] (f g : A -> bool), forall l,
-  (forall a : A, In a l -> f a = g a) -> filter f l = filter g l.
-Proof.
-  induct l; intros.
-  - reflexivity.
-  - simpl. pose proof (H a). simpl in *.
-    rewrite H by auto.
-    cases (g a). f_equal. eauto. eauto.
-Qed.
-
 Lemma partially_eval_Z_tup_subst_var_in_Zexpr_remove :
   forall v a z,
     v $? a = Some z ->
-    (fun x : Zexpr * Z => partially_eval_Z_tup (v $- a) (subst_var_in_Z_tup a z x)) =
+    (fun x : Zexpr * Zexpr => partially_eval_Z_tup (v $- a) (subst_var_in_Z_tup a z x)) =
       partially_eval_Z_tup v.
 Proof.
   intros. eapply functional_extensionality. intros.
@@ -156,37 +148,42 @@ Proof.
   induct l; intros.
   - reflexivity.
   - simpl. f_equal. 2: eauto.
-    rewrite subst_var_in_Z_tup_id. reflexivity.
-    unfold subst_var_in_Z_tup. simpl.
-    rewrite vars_of_Zexpr_subst_var_in_Zexpr.
-    unfold not. intros. eapply filter_In in H.
-    rewrite String.eqb_refl in H. simpl in *. invert H. discriminate.
+    rewrite subst_var_in_Z_tup_id.
+    + reflexivity.
+    + unfold subst_var_in_Z_tup. simpl.
+      rewrite vars_of_Zexpr_subst_var_in_Zexpr.
+      unfold not. intros. eapply filter_In in H.
+      rewrite String.eqb_refl in H. simpl in *. invert H. discriminate.
+    + unfold subst_var_in_Z_tup. simpl.
+      rewrite vars_of_Zexpr_subst_var_in_Zexpr.
+      unfold not. intros. eapply filter_In in H.
+      rewrite String.eqb_refl in H. simpl in *. invert H. discriminate.
 Qed.
 
 Lemma eq_partial_interpret_reindexer_split :
-  forall reindexer k n l0 z0 v args1,
+  forall reindexer k kz n l0 z0 v args1,
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
-    (forall l1 l2 : list (Zexpr * Z),
+    eval_Zexpr_Z v k = Some kz ->
+    (forall l1 l2 : list (Zexpr * Zexpr),
         eq_Z_tuple_index_list l1 l2 ->
         eq_Z_tuple_index_list (reindexer l1) (reindexer l2)) ->
     vars_of_reindexer (reindexer []) \subseteq dom v ->
-    (forall (var : var) (k : Z) (l : list (Zexpr * Z)),
+    (forall (var : var) (k : Z) (l : list (Zexpr * Zexpr)),
         ~ var \in vars_of_reindexer (reindexer []) ->
                   map (subst_var_in_Z_tup var k) (reindexer l) =
                     reindexer (map (subst_var_in_Z_tup var k) l)) ->
-    (forall l : list (Zexpr * Z),
+    (forall l : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l) ->
-    (0 < k)%Z ->
-    In args1
-       (mesh_grid (map Z.of_nat l0)) ->
+    (0 < kz)%Z ->
+    In args1 (mesh_grid (map Z.of_nat l0)) ->
     (0 <= z0 < Z.of_nat n)%Z ->
 partial_interpret_reindexer
-         (fun l2 : list (Zexpr * Z) =>
+         (fun l2 : list (Zexpr * Zexpr) =>
           reindexer
             match l2 with
             | [] => l2
-            | (v0, d) :: xs => ((v0 / | k |)%z, d // k) :: ((v0 % | k |)%z, k) :: xs
+            | (v0, d) :: xs => ((v0 / k)%z, (d // k)%z) :: ((v0 % (k))%z, k) :: xs
             end)
          (map Z.of_nat
             (filter_until (n :: l0) 0)) v
@@ -195,23 +192,23 @@ partial_interpret_reindexer
         reindexer
         (map Z.of_nat
              (filter_until
-                (n //n (Z.to_nat k) :: Z.to_nat k :: l0) 0)) v 
-        ((z0 / k)%Z :: (Stdlib.ZArith.BinIntDef.Z.modulo z0 k) :: args1).
+                (n //n (Z.to_nat kz) :: Z.to_nat kz :: l0) 0)) v 
+        ((z0 / kz)%Z :: (Stdlib.ZArith.BinIntDef.Z.modulo z0 kz) :: args1).
 Proof.
-  intros ? ? ? ? ? ? ? Hvar HeqZlistwrap Hvarsub Hmap
+  intros ? ? ? ? ? ? ? ? Hvar HeqZlistwrap Hk Hvarsub Hmap
          Hvarrdx Hknonneg Harg Hle.
   unfold partial_interpret_reindexer.
   unfold shape_to_vars in *. simpl.
   cases n.
   { lia. }
-  cases (Datatypes.S n //n (Z.to_nat k)).
+  cases (Datatypes.S n //n (Z.to_nat kz)).
   { exfalso. unfold div_ceil_n in Heq. simpl in *. rewrite Nat.sub_0_r in *.
-    replace (Z.to_nat k) with (1*Z.to_nat k) in Heq at 1 by lia.
+    replace (Z.to_nat kz) with (1*Z.to_nat kz) in Heq at 1 by lia.
     rewrite Nat.add_comm in Heq.
     rewrite Nat.div_add_l in Heq by lia. lia.
   }
   simpl. 
-  cases (Z.to_nat k). lia.
+  cases (Z.to_nat kz). lia.
   simpl. posnats.
   repeat rewrite shape_to_index_cons.
   posnats. simpl.
@@ -248,6 +245,9 @@ Proof.
   symmetry.
   simpl.
   repeat rewrite fold_left_subst_var_in_Z_tup_ZLit.
+  Print partial_interpret_reindexer.
+  About fold_left_subst_var_in_Z_tup_id.
+  
   rewrite fold_left_subst_var_in_Z_tup_id by reflexivity.
   rewrite fold_left_subst_var_in_Z_tup_id by reflexivity.
   rewrite map_fold_left_subst_var_in_Z_tup_shape_to_index.
