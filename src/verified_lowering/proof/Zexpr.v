@@ -468,6 +468,13 @@ Proof.
   simpl. apply app_nil_r.
 Qed.
 
+Lemma app_no_dups_empty_l : forall l,
+    [] ++/ l = l.
+Proof.
+  unfold app_no_dups.
+  simpl. intros. apply filter_true.
+Qed.
+
 Lemma eq_zexpr_add_0_r : forall e,
     eq_zexpr e (e + | 0 |)%z.
 Proof.
@@ -486,6 +493,16 @@ Proof.
   - replace z with (z * 1)%Z by lia. eauto.
   - invert H. invert H4. replace (xz*1)%Z with xz by lia. auto.
   - simpl. rewrite app_no_dups_empty_r. reflexivity.
+Qed.
+
+Lemma eq_zexpr_mul_1_l : forall e,
+    eq_zexpr e (| 1 | * e)%z.
+Proof.
+  intros.
+  unfold eq_zexpr. propositional.
+  - replace z with (1 * z)%Z by lia. eauto.
+  - invert H. invert H2. replace (1*yz)%Z with yz by lia. auto.
+  - simpl. rewrite app_no_dups_empty_l. reflexivity.
 Qed.
 
 Lemma eq_zexpr_transitivity : forall e1 e2 e3,
@@ -603,8 +620,8 @@ Fixpoint subst_var_in_Zexpr (v : var) (z : Z) (e : Zexpr) : Zexpr :=
                 else e
   end.      
 
-Definition subst_var_in_Z_tup var z (t : _ * Z) :=
-  (subst_var_in_Zexpr var z (fst t), snd t).
+Definition subst_var_in_Z_tup var z t :=
+  (subst_var_in_Zexpr var z (fst t), subst_var_in_Zexpr var z (snd t)).
 
 Fixpoint pair_vars_valuation (v : valuation) (vars : list var) :=
   match vars with
@@ -829,14 +846,6 @@ Proof.
   - simpl. f_equal. eauto.
 Qed.
 *)
-Lemma app_no_dups_empty_l : forall l,
-    [] ++/ l = l.
-Proof.
-  intros. cases l.
-  - reflexivity.
-  - unfold app_no_dups.
-    simpl. rewrite filter_true_id. auto.
-Qed.
 
 Lemma in_bool_app : forall l1 l2 x,
     in_bool (l1 ++ l2) x = in_bool l1 x || in_bool l2 x.
@@ -1488,6 +1497,17 @@ Proof.
     apply app_no_dups_assoc.
 Qed.
 
+Lemma eq_zexpr_mul_comm : forall x1 x2,
+    eq_zexpr (x1 * x2)%z (x2 * x1)%z.
+Proof.
+  intros. cbv [eq_zexpr]. simpl. split.
+  - intros. split; invert 1.
+    + eassert (_ * _ = _)%Z as ->. 2: eauto. lia.
+    + eassert (_ * _ = _)%Z as ->. 2: eauto. lia.
+  - Abort.
+(*not true... why does vars_of_Zexpr not return a set?
+  and isn't the condition about having the same variables redundant anyway?*)
+
 Lemma eq_zexpr_mul_assoc : forall x1 x2 x3,
     eq_zexpr (x1 * x2 * x3)%z (x1 * (x2 * x3))%z.
 Proof.
@@ -1794,8 +1814,8 @@ Qed.
 Lemma map_subst_var_in_Z_tup_combine_not_in :
   forall vars sh a z,
     ~ In a vars ->
-    map (subst_var_in_Z_tup a z) (combine (map ZVar vars) sh) =
-      combine (map ZVar vars) sh .
+    map (subst_var_in_Z_tup a z) (combine (map ZVar vars) (map ZLit sh)) =
+      combine (map ZVar vars) (map ZLit sh).
 Proof.
   induct vars; intros.
   - reflexivity.
@@ -1858,127 +1878,65 @@ Lemma eval_flatten_shape_index_cons :
     eval_Zexpr v (fold_left ZTimes (map snd xs) (snd x)) stride ->
     eval_Zexpr v (flatten_shape_index (n :: map snd l) (i :: map fst l)) val.
 Proof.
-  induct l; intros.
-  - discriminate.
-  - invert H1.
-    simpl in *.
-    cases xs.
-    + simpl in *. eauto.
-    + simpl in *.
-      invert H.
-      invert H4.
-      pose proof H6.
-      eapply IHl in H6. 4: reflexivity.
-      5: eassumption.
-      2: eassumption.
-      2: eassumption.
-      2: reflexivity.
-      invert H6.
-      eapply eval_Zexpr_deterministic in H; try eassumption. subst.
-      invert H8.
-      eapply eval_Zexpr_deterministic in H9; try eassumption. subst.
-      eapply eval_Zexpr_deterministic in H10; try eassumption. subst.
-      eauto.
-Qed.
+  intros. simpl. subst. simpl. simpl in H.
+  constructor.
+  2: assumption.
+  constructor; auto.
+  eapply eq_zexpr_eval_Zexpr.
+  2: eassumption.
+  apply eq_zexpr_fold_left_ZTimes_accum.
+  apply eq_zexpr_mul_1_l.
+  all: fail.
+Abort.
 
-Lemma eval_flatten_shape_index_app_end : forall l n i offset iz v,
+Lemma eval_flatten_shape_index_app_end : forall l n i offset nz iz v,
   eval_Zexpr v (flatten_shape_index (map snd l) (map fst l)) offset ->
+  eval_Zexpr v n nz ->
   eval_Zexpr v i iz ->
   eval_Zexpr v (flatten_shape_index (map snd l ++ [n]) (map fst l ++ [i]))
-             (offset*n+iz).
+             (offset*nz+iz).
 Proof.
   induct l; intros.
-  - simpl in *. invert H. rewrite Z.mul_0_l. rewrite Z.add_0_l. auto.
-  - simpl map in *.
-    cases l; try cases l; simpl map in *.
-    + simpl in *.
-      eauto.
-    + simpl in *.
-      invert H. invert H3. invert H6. eassert (_ + _ = _)%Z as ->; [|solve[eauto]].
-      lia.
-    + rewrite <- app_comm_cons.
-      replace ((snd p :: snd p0 :: map snd l) ++ [n])%list with
-        (map snd (p::p0::l++[(i,n)])).
-      2: { simpl. rewrite map_app. reflexivity. }
-      
-      rewrite <- app_comm_cons.
-      replace ((fst p :: fst p0 :: map fst l) ++ [i])%list with
-        (map fst (p::p0::l++[(i,n)])).
-      2: { simpl. rewrite map_app. reflexivity. }
-
-      simpl in H.
-      invert H.
-      invert H3.
-      invert H6.
-      invert H5.
-      invert H3.
-
-      eapply eval_flatten_shape_index_cons.
-      3: reflexivity.
-      4: { simpl. rewrite map_app. simpl. constructor. }
-      simpl map. repeat rewrite map_app. simpl map.
-      eapply IHl.  simpl.
-      econstructor. econstructor. eassumption. eassumption.
-      eassumption. eassumption. eassumption.
-      rewrite fold_left_app. simpl. lia.
+  - simpl in *. invert H. eassert ((_ + _)%Z = _) as ->. 2: eauto. lia.
+  - simpl in *. invert H. invert H4. eassert ((_ + _)%Z = _) as ->.
+    2: { constructor; eauto. rewrite fold_left_app. simpl. eauto. }
+    lia.
 Qed.
 
 Lemma partially_eval_Zexpr_flatten_shape_index : forall l1 l2 v,
     (partially_eval_Zexpr v (flatten_shape_index l1 l2))
     = flatten_shape_index
-        l1
+        (map (partially_eval_Zexpr v) l1)
         (map (partially_eval_Zexpr v) l2).
  Proof.
-   induct l1; intros; cases l2.
-   - simpl. auto.
-   - simpl. auto.
-   - simpl. unfold flatten_shape_index.
-     cases l1; auto.
-   - simpl.
-     cases l1; cases l2.
-     + simpl. auto.
-     + simpl. auto.
-     + simpl. unfold flatten_shape_index. cases l1; auto.
-     + simpl. f_equal. rewrite IHl1. reflexivity.
+   induct l1; intros; cases l2; try reflexivity; [].
+   simpl. rewrite IHl1. f_equal. f_equal.
+   apply partially_eval_Zexpr_fold_left_ZTimes. 
 Qed.
 
+Print flatten_shape_index.
 Fixpoint flatten (sh : list Z) (i : list Z) :=
   match sh with
-  | n::m::ns =>
+  | n :: sh' =>
     match i with
-    | x::xs =>
-        let stride := fold_left Z.mul ns m in
-        ((x * stride) + (flatten (m::ns) xs))%Z
-    | _ => 0%Z
+    | x :: xs =>
+        let stride := fold_left Z.mul sh' 1%Z in
+        ((x * stride) + (flatten sh' xs))%Z
+    | [] => 0%Z
     end
-  | [n] =>
-    match i with
-    | [z] => z
-    | _ => 0%Z
-    end
-  | _ => 0%Z
+  | [] => 0%Z
   end.
 
 Lemma eval_Zexpr_Z_flatten_index_ZLit_flatten : forall sh args v,
-    eval_Zexpr_Z v (flatten_shape_index sh (map ZLit args)) =
+    eval_Zexpr_Z v (flatten_shape_index (map ZLit sh) (map ZLit args)) =
       Some (flatten sh args).
 Proof.
   induct sh; intros.
-  - simpl. cases args.
-    + simpl. reflexivity.
-    + simpl. reflexivity.
-  - simpl. cases sh.
-    + simpl.
-      cases args.
-      * simpl. reflexivity.
-      * simpl. unfold flatten_shape_index.
-        cases args.
-        simpl. reflexivity.
-        simpl. reflexivity.
-    + simpl.
-      cases args.
-      * simpl. reflexivity.
-      * simpl. rewrite IHsh. reflexivity.
+  - simpl. destruct args; reflexivity.
+  - simpl. destruct args; simpl; try reflexivity.
+    rewrite eval_Zexpr_Z_fold_left_ZTimes_ZLit.
+    rewrite IHsh.
+    reflexivity.
 Qed.
 
 Lemma subst_var_in_Zexpr_fold_left_Times :
@@ -1997,15 +1955,14 @@ Qed.
 Lemma subst_var_in_Zexpr_flatten_index :
   forall var k index, 
     subst_var_in_Zexpr var k (flatten_index index) =
-      flatten_index (map (fun t => (subst_var_in_Z_tup var k t)) index).
+      flatten_index (map (subst_var_in_Z_tup var k) index).
 Proof.
   unfold flatten_index.
   induction index.
   - reflexivity.
-  - simpl. repeat rewrite map_map in *. simpl in *.
-    cases index.
-    + simpl in *. eauto.
-    + simpl in *. f_equal. rewrite IHindex. reflexivity.
+  - simpl. rewrite IHindex. f_equal. f_equal.
+    rewrite subst_var_in_Zexpr_fold_left_Times.
+    do 2 rewrite map_map. reflexivity.
 Qed.
 
 Lemma subst_var_in_Z_tup_partially_eval_Z_tup_comm : forall e a x v,
@@ -2017,6 +1974,7 @@ Proof.
   intros. simpl.
   repeat rewrite subst_var_in_Zexpr_partially_eval_Zexpr_comm.  
   reflexivity.
+  eapply None_dom_lookup. auto.
   eapply None_dom_lookup. auto.
 Qed.
 
@@ -2050,9 +2008,9 @@ Qed.
 Lemma fold_left_subst_var_in_Z_tup_ZLit :
   forall z z0 vars x,
     fold_left
-    (fun (a0 : Zexpr * Z) (t0 : var * Z) =>
+    (fun (a0 : Zexpr * Zexpr) (t0 : var * Z) =>
      subst_var_in_Z_tup (fst t0) (snd t0) a0) (combine vars x)
-    ((| z |)%z, z0) = ((| z |)%z, z0).
+    ((| z |)%z, | z0 |%z) = ((| z |)%z, | z0 |%z).
 Proof.
   induct vars; intros.
   - reflexivity.
@@ -2101,22 +2059,22 @@ Proof.
 Qed.
 
 Lemma flatten_index_partially_eval_Zexpr :
-  forall (l : list (Zexpr * Z)) v,
+  forall (l : list (Zexpr * Zexpr)) v,
     partially_eval_Zexpr v (flatten_index l) =
-      flatten_index (map (fun tp => (partially_eval_Zexpr v (fst tp), snd tp)) l).
+      flatten_index (map (fun tp => (partially_eval_Zexpr v (fst tp), partially_eval_Zexpr v (snd tp))) l).
 Proof.
   unfold flatten_index.
   induct l; intros.
   - reflexivity.
-  - specialize (IHl v).
-    repeat rewrite map_map in *. simpl in *.
-    cases l.
-    + reflexivity.
-    + simpl. f_equal. apply IHl.
+  - specialize (IHl v). simpl. repeat rewrite map_map in *. simpl in *.
+    rewrite IHl. f_equal. f_equal.
+    rewrite partially_eval_Zexpr_fold_left_Times.
+    rewrite map_map.
+    reflexivity.
 Qed.
 
 Lemma flatten_index_partially_eval_Z_tup :
-  forall (l : list (Zexpr * Z)) v,
+  forall (l : list (Zexpr * Zexpr)) v,
     partially_eval_Zexpr v (flatten_index l) =
       flatten_index (map (fun tp => partially_eval_Z_tup v tp) l).
 Proof.
@@ -2200,7 +2158,7 @@ Proof. induct l; simpl; auto. Qed.
 
 Lemma index_to_function_alt_vars_cons :
   forall var vars k x
-         (reindexer : list (Zexpr * Z) -> list (Zexpr * Z)) v l,
+         (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr)) v l,
     ~ var \in dom v ->
     index_to_function_alt
       (map (partially_eval_Z_tup v)
@@ -2215,9 +2173,9 @@ Proof.
   unfold index_to_function_rec_alt. simpl.
   rewrite subst_var_in_Zexpr_flatten_index.
   rewrite map_map.
-  replace (fun x0 : Zexpr * Z =>
+  replace (fun x0 : Zexpr * Zexpr =>
              subst_var_in_Z_tup var k (partially_eval_Z_tup v x0)) with
-    (fun x0 : Zexpr * Z =>
+    (fun x0 : Zexpr * Zexpr =>
        partially_eval_Z_tup v (subst_var_in_Z_tup var k x0)).
   2: { eapply functional_extensionality. intros.
        rewrite subst_var_in_Z_tup_partially_eval_Z_tup_comm. reflexivity.
@@ -2226,7 +2184,7 @@ Proof.
 Qed.
 
 Lemma index_to_function_alt_subst_vars_partial :
-  forall vars (rdxr : list (Zexpr * Z) -> list (Zexpr * Z)) l v,
+  forall vars (rdxr : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr)) l v,
     (Forall (fun var =>  ~ var \in dom v) vars) ->
     index_to_function_alt (map (partially_eval_Z_tup v) (rdxr l)) vars =
       fun x =>
@@ -2251,7 +2209,7 @@ Proof.
 Qed.
 
 Lemma index_to_function_alt_subst_vars :
-  forall vars x (rdxr : list (Zexpr * Z) -> list (Zexpr * Z)) l v,
+  forall vars x (rdxr : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr)) l v,
     (Forall (fun var =>  ~ var \in dom v) vars) ->
     index_to_function_alt (map (partially_eval_Z_tup v) (rdxr l)) vars x =
       index_to_function_alt
@@ -2274,10 +2232,11 @@ Proof.
     reflexivity.
 Qed.
 
-Fixpoint vars_of_reindexer (cont : list (Zexpr * Z)) :=
+Fixpoint vars_of_reindexer (cont : list (Zexpr * Zexpr)) :=
   match cont with
   | [] => constant nil
-  | (i,n)::xs => constant (vars_of_Zexpr i) \cup vars_of_reindexer xs
+  | (i,n)::xs => constant (vars_of_Zexpr i) \cup constant (vars_of_Zexpr n)
+                 \cup vars_of_reindexer xs
   end.
 
 Lemma eq_Z_tuple_index_list_eq_vars_of_reindexer : forall l1 l2,
@@ -2293,12 +2252,12 @@ Proof.
     f_equal. 
     unfold eq_Z_tup in H0. invert H0. simpl in *.
     unfold eq_zexpr in H, H2.
-    propositional. subst. rewrite H3. reflexivity.
+    propositional. rewrite H3, H4. reflexivity.
     eauto.
 Qed.
 Lemma map_fold_left_subst_var_in_Z_tup_reindexer :
   forall reindexer vars x l,
-    (forall (var : var) (k : Z) (l : list (Zexpr * Z)),
+    (forall (var : var) (k : Z) (l : list (Zexpr * Zexpr)),
        (var \in vars_of_reindexer (reindexer []) -> False) ->
        map (subst_var_in_Z_tup var k) (reindexer l) =
        reindexer (map (subst_var_in_Z_tup var k) l)) ->    
@@ -2363,7 +2322,7 @@ Lemma eval_Zexpr_Z_fold_left_ZTimes :
 Proof.
   induct 1; intros.
   - simpl. eapply eval_Zexpr_Z_eval_Zexpr. auto.
-  - simpl. eapply IHeval_Zexprlist in H1.
+  - simpl. eapply IHForall2 in H1.
     rewrite fold_left_mul_assoc.
     rewrite eval_Zexpr_Z_fold_left_assoc. simpl.
     rewrite H1.
@@ -2372,16 +2331,17 @@ Qed.
 Arguments flatten : simpl nomatch.
 
 Lemma eval_Zexpr_Z_flatten_index_flatten:
-  forall sh (args : list Zexpr) argsz (v : valuation),
+  forall sh (args : list Zexpr) shz argsz (v : valuation),
     eval_Zexprlist v args argsz ->
-    eval_Zexpr_Z v (flatten_shape_index sh args) = Some (flatten sh argsz).
+    eval_Zexprlist v sh shz ->
+    eval_Zexpr_Z v (flatten_shape_index sh args) = Some (flatten shz argsz).
 Proof.
-  intros sh args argsz v H. revert sh. induction H; intros sh.
-  - destruct sh as [| ? [| ? ?]]; reflexivity.
-  - destruct sh as [| ? [| ? ?]]; simpl; try reflexivity.
-    + invert H0; try reflexivity. simpl. apply eval_Zexpr_Z_eval_Zexpr. assumption.
-    + apply eval_Zexpr_Z_eval_Zexpr in H. rewrite H. rewrite IHeval_Zexprlist.
-      reflexivity.
+  intros sh args shz argsz v H. revert sh shz. induction H; intros sh shz.
+  - invert 1; reflexivity.
+  - invert 1; try reflexivity. simpl.
+    apply eval_Zexpr_Z_eval_Zexpr in H. rewrite H.
+    erewrite IHForall2 by eassumption.
+    erewrite eval_Zexpr_Z_fold_left_ZTimes; eauto.
 Qed.
 
 Lemma In_app_no_dups : forall l1 l2 i,
@@ -2424,6 +2384,7 @@ Qed.
 Lemma subst_var_in_Z_tup_id :
   forall lo (i : var) (loz : Z),
     ~ In i (vars_of_Zexpr (fst lo)) ->
+    ~ In i (vars_of_Zexpr (snd lo)) ->
     subst_var_in_Z_tup i loz lo = lo.
 Proof.
   intros. cases lo. unfold subst_var_in_Z_tup.
@@ -2432,8 +2393,9 @@ Qed.
 
 Lemma fold_left_subst_var_in_Z_tup_id : forall a b l,
     vars_of_Zexpr a = [] ->
+    vars_of_Zexpr b = [] ->
     fold_left
-      (fun (a : Zexpr * Z) (t0 : var * Z) =>
+      (fun (a : Zexpr * Zexpr) (t0 : var * Z) =>
          subst_var_in_Z_tup (fst t0) (snd t0) a) l (a, b) = (a,b).
 Proof.
   induct l; intros.
@@ -2441,6 +2403,7 @@ Proof.
   - propositional. simpl.
     rewrite subst_var_in_Z_tup_id. auto.
     simpl. rewrite H. sets.
+    simpl. rewrite H0. sets.
 Qed.
 
 Lemma fold_left_mul_pos : forall l x,
@@ -2470,12 +2433,12 @@ Lemma map_fold_left_subst_var_in_Z_tup_combine :
     length vars = length x ->
     no_dup vars ->
     map
-      (fun y : Zexpr * Z =>
+      (fun y : Zexpr * Zexpr =>
          fold_left
-           (fun (a : Zexpr * Z) (t0 : var * Z) =>
+           (fun (a : Zexpr * Zexpr) (t0 : var * Z) =>
               subst_var_in_Z_tup (fst t0) (snd t0) a) (combine vars x) y)
-      (combine (map ZVar vars) sh) =
-      combine (map ZLit x) sh.
+      (combine (map ZVar vars) (map ZLit sh)) =
+      combine (map ZLit x) (map ZLit sh).
 Proof.
   induction vars; intros; cases x; simpl in *; try lia.
   - reflexivity.
@@ -2494,6 +2457,7 @@ Qed.
 
 Lemma eq_Z_tup_fold_left_subst_var_in_Z_tup : forall l1 vars idx,
     Forall (fun var => ~ In var vars) (vars_of_Zexpr (fst l1)) ->
+    Forall (fun var => ~ In var vars) (vars_of_Zexpr (snd l1)) ->
     (fold_left
        (fun a t0 =>
           subst_var_in_Z_tup (fst t0) (snd t0) a)
@@ -2506,9 +2470,14 @@ Proof.
     + simpl. rewrite subst_var_in_Z_tup_id.
       eapply IHvars.
       eapply Forall_impl. 2: eapply H.
-      propositional. eapply H0. propositional.
+      propositional. eapply H1. propositional.
+      eapply Forall_impl. 2: eapply H0.
+      propositional. eapply H1. propositional.
       unfold not. intros.
-      eapply Forall_forall in H. 2: apply H0. simpl in *.
+      eapply Forall_forall in H1. 2: apply H. simpl in *.
+      propositional.
+      unfold not. intros.
+      eapply Forall_forall in H1. 2: apply H0. simpl in *.
       propositional.
 Qed.      
 
@@ -2608,13 +2577,12 @@ Lemma eval_Zexprlist_add : forall l v lz,
     ~ i \in dom v ->
     eval_Zexprlist (v $+ (i,x)) l lz.
 Proof.
-  induct 1; intros.
-  - econstructor.
-  - econstructor.
-    eapply eval_Zexpr_subst_var_in_Zexpr.
-    rewrite subst_var_in_Zexpr_id. auto.
-    eapply vars_not_in_vars_of_Zexpr. eassumption. auto.
-    eauto.
+  intros. eapply Forall2_impl; [|eassumption].
+  intros.
+  eapply eval_Zexpr_includes_valuation; eauto.
+  apply includes_add_new.
+  apply None_dom_lookup.
+  assumption.
 Qed.    
 
 Lemma eq_zexpr_literal_subst_var_in_Zexpr : forall x xz v k,
@@ -2634,10 +2602,8 @@ Lemma eval_Zexprlist_includes_valuation : forall v l lz v',
     v $<= v' ->
     eval_Zexprlist v' l lz.
 Proof.
-  induct l; intros.
-  - invert H. eauto.
-  - invert H. econstructor.
-    eapply eval_Zexpr_includes_valuation; eauto. eauto.
+  intros. eapply Forall2_impl; [|eassumption].
+  intros. eapply eval_Zexpr_includes_valuation; eauto.
 Qed.
 
 Definition eval_Zexpr_Z_total v e :=
@@ -2684,7 +2650,7 @@ Proof.
     eapply vars_of_Zexpr_empty_eval_Zexpr_literal in H2. invs.
     pose proof H0.
     specialize (H0 $0). eapply eval_Zexpr_Z_eval_Zexpr in H0. rewrite H0.
-    eapply H1. eauto.
+    eapply H1. apply H.
 Qed.
 
 Lemma vars_of_Zexpr_empty_eq_zexpr_eval_Zexpr_Z_total : forall n v,
@@ -2876,7 +2842,7 @@ Qed.
 
 Lemma reindexer_not_empty_vars_in_index :
   forall reindexer sh,
-    (forall l : list (Zexpr * Z),
+    (forall l : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l)->
     vars_of_reindexer sh <> constant [] ->
@@ -2891,19 +2857,19 @@ Proof.
   sets.
 Qed.
 
-Definition eval_Zexpr_Z_tup v (tup : _ * Z) :=
-  (eval_Zexpr_Z v (fst tup), snd tup).
+Definition eval_Zexpr_Z_tup v tup :=
+  (eval_Zexpr_Z v (fst tup), eval_Zexpr_Z v (snd tup)).
 
 Definition eval_Zexpr_Z_tup_total v tup :=
   match eval_Zexpr_Z_tup v tup with
-  | (Some x, y) => Some (x,y)
+  | (Some x, Some y) => Some (x,y)
   | _ => None
   end.
 
 Lemma map_eval_Zexpr_Z_tup_total_ZLit : forall args2 sh,
     length args2 = length sh ->
     map (eval_Zexpr_Z_tup_total $0)
-        (combine (map ZLit args2) sh) =
+        (combine (map ZLit args2) (map ZLit sh)) =
       map Some (combine args2 sh).
 Proof.
   induction args2; intros; cases sh; simpl in *; try lia; auto.
@@ -2927,7 +2893,7 @@ Lemma fst_fold_left_subst_var_in_Z_tup :
   forall l z z0,
   fst
     (fold_left
-       (fun (z3 : Zexpr * Z) (tup : var * Z) =>
+       (fun (z3 : Zexpr * Zexpr) (tup : var * Z) =>
           subst_var_in_Z_tup (fst tup) (snd tup) z3) l (z, z0)) =
     fold_left
       (fun (z3 : Zexpr) (tup : var * Z) =>
@@ -2942,9 +2908,11 @@ Lemma snd_fold_left_subst_var_in_Z_tup :
   forall l z z0,
     snd
     (fold_left
-       (fun (z3 : Zexpr * Z) (tup : var * Z) =>
+       (fun (z3 : Zexpr * Zexpr) (tup : var * Z) =>
           subst_var_in_Z_tup (fst tup) (snd tup) z3) l (z, z0)) =
-      z0.
+      fold_left
+        (fun (z3 : Zexpr) (tup : var * Z) =>
+           subst_var_in_Zexpr (fst tup) (snd tup) z3) l z0.
 Proof.
   induct l; intros. auto.
   simpl. cases a. simpl.
@@ -2993,10 +2961,10 @@ Lemma eq_zexpr_fold_left_subst_var_in_Z_tup :
   eq_Z_tup z1 z2 ->
   eq_Z_tup
     (fold_left
-       (fun (z3 : Zexpr * Z) (tup : var * Z) =>
+       (fun (z3 : Zexpr * Zexpr) (tup : var * Z) =>
           subst_var_in_Z_tup (fst tup) (snd tup) z3) (combine x x0) z1)
     (fold_left
-       (fun (z3 : Zexpr * Z) (tup : var * Z) =>
+       (fun (z3 : Zexpr * Zexpr) (tup : var * Z) =>
           subst_var_in_Z_tup (fst tup) (snd tup) z3) (combine x x0) z2).
 Proof.
   intros. cases z1. cases z2. invert H. simpl in *.
@@ -3006,7 +2974,8 @@ Proof.
     unfold eq_Z_tup. simpl. propositional.
     eapply IHx.
     eapply eq_zexpr_subst_var_in_Zexpr. auto.
-    assumption.
+    simpl.
+    eapply eq_zexpr_subst_var_in_Zexpr. auto.
 Qed.
 
 Lemma eval_Zexpr_Z_subst_var_in_Zexpr : forall e v i k,
@@ -3062,16 +3031,16 @@ Lemma map_eval_Zexpr_Z_tup_total_map_fold_left_subst_var_in_Z_tup :
     eq_Z_tuple_index_list index1 index2 ->
     map (eval_Zexpr_Z_tup_total $0)
         (map
-           (fun tup : Zexpr * Z =>
+           (fun tup : Zexpr * Zexpr =>
               (fold_left
-                 (fun (z5 : Zexpr * Z) (tup0 : var * Z) =>
+                 (fun (z5 : Zexpr * Zexpr) (tup0 : var * Z) =>
                     subst_var_in_Z_tup (fst tup0) (snd tup0) z5) 
                  (combine x x0) tup)) index1) =
       map (eval_Zexpr_Z_tup_total $0)
           (map
-             (fun tup : Zexpr * Z =>
+             (fun tup : Zexpr * Zexpr =>
                 (fold_left
-                   (fun (z5 : Zexpr * Z) (tup0 : var * Z) =>
+                   (fun (z5 : Zexpr * Zexpr) (tup0 : var * Z) =>
                       subst_var_in_Z_tup (fst tup0) (snd tup0) z5) 
                    (combine x x0) tup)) index2). 
 Proof.
@@ -3099,8 +3068,8 @@ Qed.
 Lemma map_partially_eval_Z_tup_combine_ZLit :
   forall v idx sh,
   (map (partially_eval_Z_tup v)
-       (combine (map ZLit idx) sh)) =
-    (combine (map ZLit idx) sh).
+       (combine (map ZLit idx) (map ZLit sh))) =
+    (combine (map ZLit idx) (map ZLit sh)).
 Proof.
   induct idx; intros.
   - simpl. reflexivity.
@@ -3229,14 +3198,14 @@ Proof.
 Qed.
 
 Lemma snd_partially_eval_Z_tup : forall v t,
-    snd (partially_eval_Z_tup v t) = snd t.
+    snd (partially_eval_Z_tup v t) = partially_eval_Zexpr v (snd t).
 Proof.
   intros. unfold partially_eval_Z_tup. reflexivity.
 Qed.
 
 Lemma map_snd_map_partially_eval_Z_tup : forall v l,
     map snd (map (partially_eval_Z_tup v) l) =
-      map snd l.
+      map (partially_eval_Zexpr v) (map snd l).
 Proof.
   induct l; intros.
   - reflexivity.
@@ -3281,25 +3250,27 @@ Qed.
     
 Lemma eval_Zexprlist_map_match_snd_map_eval_Zexpr_Z_tup_total :
   forall v l,
-  eval_Zexprlist $0 (map (partially_eval_Zexpr v) (map fst l))
-         (map (eval_Zexpr_Z_total v) (map fst l)) ->
-       (map
-           (fun o : option (Z * Z) =>
-            match o with
-            | Some x => snd x
-            | None => 0%Z
-            end) (map (eval_Zexpr_Z_tup_total v) l)) =
-         map snd l.
+    eval_Zexprlist $0 (map (partially_eval_Zexpr v) (map snd l))
+      (map (eval_Zexpr_Z_total v) (map snd l)) ->
+    eval_Zexprlist $0 (map (partially_eval_Zexpr v) (map fst l))
+      (map (eval_Zexpr_Z_total v) (map fst l)) ->
+    (map
+       (fun o : option (Z * Z) =>
+          match o with
+          | Some x => snd x
+          | None => 0%Z
+          end) (map (eval_Zexpr_Z_tup_total v) l)) =
+      (map (eval_Zexpr_Z_total v) (map snd l)).
 Proof.
   induct l; intros.
   - reflexivity.
-  - simpl in *. invert H.
+  - simpl in *. invert H. invert H0.
     cases a. simpl in *.
     unfold eval_Zexpr_Z_tup_total. unfold eval_Zexpr_Z_tup. simpl.
-    erewrite -> eval_Zexpr_partially_eval_Zexpr in H4.
-    eapply eval_Zexpr_Z_eval_Zexpr in H4.
-    rewrite H4. simpl. f_equal.
-    eapply IHl. eauto.
+    erewrite -> eval_Zexpr_partially_eval_Zexpr in H4,H3.
+    eapply eval_Zexpr_Z_eval_Zexpr in H4, H3.
+    rewrite H4, H3. simpl. f_equal.
+    eapply IHl. eauto. eauto.
 Qed.
 
 Lemma eval_Zexprlist_map_match_fst_map_eval_Zexpr_Z_tup_total :
