@@ -85,9 +85,9 @@ Proof.
     rewrite map_cons.
     rewrite fold_left_subst_var_in_Z_tup_ZLit.
     rewrite map_fold_left_subst_var_in_Z_tup_shape_to_index.
-    simpl.
-    rewrite map_partially_eval_Z_tup_ZLit. simpl.
     rewrite flatten_index_to_function_alt.
+    simpl.
+    rewrite map_partially_eval_Z_tup_ZLit.
     reflexivity.
     apply length_mesh_grid_indices_Z. auto.
     rewrite length_map. rewrite length_nat_range_rec.
@@ -161,7 +161,7 @@ Proof.
 Qed.
     
 Lemma vars_of_shift_top_dim_reindexer : forall reindexer l,
-    ((forall l : list (Zexpr * Z),
+    ((forall l : list (Zexpr * Zexpr),
          vars_of_reindexer (reindexer l) =
            vars_of_reindexer (reindexer []) \cup vars_of_reindexer l)) ->
     vars_of_reindexer (shift_top_dim_reindexer reindexer l) =
@@ -176,14 +176,14 @@ Proof.
 Qed.
 
 Definition index_to_partial_function
-           (index : list (Zexpr * Z)) vars (args : list Z) : option Z
+           (index : list (Zexpr * Zexpr)) vars (args : list Z) : option Z
   :=
   if (length vars =? length args)%nat
   then let evaled_list_index :=
          map (eval_Zexpr_Z_tup_total $0)
              (map (fun tup =>
                      (fold_left
-                        (fun (z : Zexpr * Z) (tup : string * Z) =>
+                        (fun (z : Zexpr * Zexpr) (tup : string * Z) =>
                            subst_var_in_Z_tup (fst tup) (snd tup) z)
                         (combine vars args) tup)) index) in
        Some (flatten
@@ -198,7 +198,7 @@ Definition index_to_partial_function
   else None.
 
 Definition partial_interpret_reindexer
-           (reindexer : list (Zexpr * Z) -> list (Zexpr * Z))
+           (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr))
            (sh : list Z) (v : valuation) : list Z -> option Z :=
   let vars := shape_to_vars sh in
   let result_index := shape_to_index sh vars in
@@ -209,18 +209,13 @@ Definition partial_interpret_reindexer
 Lemma flatten_index_to_partial_function : forall sh args,
     In args (mesh_grid sh) ->
     Some (flatten sh args) =
-      index_to_partial_function (combine (map ZLit args) sh) [] [].
+      index_to_partial_function (combine (map ZLit args) (map ZLit sh)) [] [].
 Proof.
   induction sh; intros; cases args; auto.
-  simpl. unfold flatten. cases sh; auto.
+  simpl.
   decomp_index.
   unfold index_to_partial_function. simpl.
   propositional.
-  replace (0 <=? z)%Z with true.
-  2: { symmetry. eapply Z.leb_le. lia. }
-  replace (z <? a)%Z with true.
-  2: { symmetry. eapply Z.ltb_lt. lia. }
-  simpl.
   rewrite map_id. rewrite map_eval_Zexpr_Z_tup_total_ZLit.
   2: { symmetry. eapply length_mesh_grid_indices_Z. auto. }
   rewrite map_map. rewrite map_map.
@@ -241,7 +236,7 @@ Ltac eq_if_discriminee :=
 
 Lemma index_to_partial_function_vars_cons :
   forall var vars k x
-         (reindexer : list (Zexpr * Z) -> list (Zexpr * Z)) v l,
+         (reindexer : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr)) v l,
     ~ var \in dom v ->
               index_to_partial_function
       (map (partially_eval_Z_tup v)
@@ -273,7 +268,7 @@ Proof.
 Qed.
 
 Lemma index_to_partial_function_subst_vars :
-  forall vars x (rdxr : list (Zexpr * Z) -> list (Zexpr * Z)) l v,
+  forall vars x (rdxr : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr)) l v,
     (Forall (fun var =>  ~ var \in dom v) vars) ->
     length vars = length x ->
     index_to_partial_function
@@ -297,7 +292,7 @@ Qed.
 Lemma partial_interpret_reindexer_id_flatten : forall sh x v,
     In x (mesh_grid sh) ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
-    (partial_interpret_reindexer (fun l : list (Zexpr * Z) => l) sh v) x =
+    (partial_interpret_reindexer (fun l : list (Zexpr * Zexpr) => l) sh v) x =
       Some (flatten sh x).
 Proof.
   induct sh; intros.
@@ -318,10 +313,10 @@ Proof.
     rewrite map_cons.
     rewrite fold_left_subst_var_in_Z_tup_ZLit.
     rewrite map_fold_left_subst_var_in_Z_tup_shape_to_index.
+    rewrite flatten_index_to_partial_function.
     simpl.
     rewrite map_partially_eval_Z_tup_ZLit. simpl.
     unfold partially_eval_Z_tup. simpl.
-    rewrite flatten_index_to_partial_function.
     reflexivity.
     erewrite <- in_mesh_grid_cons__. propositional.
 
