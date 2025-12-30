@@ -194,9 +194,7 @@ Fixpoint flatten_shape_index (sh : list Zexpr) (i : list Zexpr) :=
 
 Arguments flatten_shape_index : simpl nomatch.
 
-Definition eval_Zexprlist (v : valuation) : list Zexpr -> list Z -> Prop :=
-  Forall2 (eval_Zexpr v).
-#[export] Hint Unfold eval_Zexprlist.
+Notation eval_Zexprlist v := (Forall2 (eval_Zexpr v)).
 
 Definition eq_Z_index_list :=
   Forall2 eq_zexpr.
