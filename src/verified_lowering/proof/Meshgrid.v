@@ -463,29 +463,13 @@ Proof.
     auto.
 Qed.
 
-Lemma in_mesh_grid_args_flatten_bounds : forall sh args1 z1,
-  In args1 (mesh_grid (z1 :: sh)) ->
-  (0 <= flatten (z1 :: sh) args1 < fold_left Z.mul sh z1)%Z \/
-    (fold_left Z.mul sh z1 < flatten (z1 :: sh) args1 <= 0)%Z.
+Lemma in_mesh_grid_args_flatten_bounds : forall sh args1,
+  In args1 (mesh_grid sh) ->
+  (0 <= flatten sh args1 < fold_left Z.mul sh 1)%Z \/
+    (fold_left Z.mul sh 1 < flatten sh args1 <= 0)%Z.
 Proof.
   induct sh; intros.
-  - simpl in *.
-    cases args1. eapply not_In_empty_map2_cons in H. propositional.
-    pose proof H.
-    eapply not_In_cons_l2 in H.
-    eapply not_In_cons_l1 in H0.
-    rewrite <- repeat_to_concat in H.
-    eapply repeat_spec in H. subst. simpl.
-    unfold zrange in *.
-    rewrite Z.sub_0_r in H0.
-    eapply in_concat in H0.
-    invs.
-    eapply in_map_iff in H0. invs.
-    invert H1.
-    pose proof (in_zrange'_lower_bound _ _ _ H2).
-    pose proof (in_zrange'_upper_bound _ _ _ H2).
-    lia.
-    simpl in *. propositional.
+  - simpl in *. lia.
   - cases args1. simpl in *.
     eapply not_In_empty_map2_cons in H. propositional.
     simpl in *.
@@ -502,43 +486,34 @@ Proof.
     eapply repeat_spec in H1. subst.
     apply In_zrange in H2.
     invert H3.
-    + cases z1; try lia.
-      left.
-      rewrite (Z.mul_comm (Z.pos p)).
+    + left.
       rewrite fold_left_mul_assoc.
-      assert (x0 < Z.pos p)%Z by lia. clear H0.
+      assert (x0 < a)%Z by lia. clear H0.
       split.
       eapply Z.add_nonneg_nonneg.
-      eapply Z.mul_nonneg_nonneg. lia.
-      rewrite <- fold_left_mul_assoc. rewrite Z.mul_1_l. lia. lia.
-      rewrite fold_left_mul_assoc.
-      rewrite <- fold_left_mul_assoc.
-      rewrite Z.mul_1_l.
-      rewrite (Z.mul_comm _ (Z.pos p)).
+      eapply Z.mul_nonneg_nonneg. lia. lia. lia.
+      rewrite (Z.mul_comm _ a).
       eapply mul_add_lt.
       lia. lia. lia. lia.
-    + cases z1; try lia.
-      right.
+    + right.
       split.
-      rewrite (Z.mul_comm (Z.pos p)).
       rewrite fold_left_mul_assoc.
-      rewrite (Z.mul_comm _ (Z.pos p)).
+      rewrite (Z.mul_comm _ a).
       assert (forall x y, -x < -y -> y < x)%Z.
       intros. lia. eapply H0.
       rewrite Z.opp_add_distr.
       rewrite Zopp_mult_distr_r.
       rewrite Zopp_mult_distr_r.
       rewrite Z.add_opp_r.
-      rewrite Z.mul_1_l.
       eapply mul_add_lt. lia. lia. lia. lia.
       assert (forall x y, -x <= -y -> y <= x)%Z.
       lia. eapply H0.
       simpl. rewrite Z.opp_add_distr.
       rewrite Zopp_mult_distr_r.
-      assert (flatten (a::sh) args1 = 0 \/ flatten (a::sh) args1 <> 0)%Z
+      assert (flatten sh args1 = 0 \/ flatten sh args1 <> 0)%Z
         by lia. invert H1.
-      * rewrite H3. rewrite Z.mul_1_l. lia.
-      * eapply auxiliary.Zle_mult_approx. rewrite Z.mul_1_l. lia. lia. lia.
+      * rewrite H3. lia.
+      * eapply auxiliary.Zle_mult_approx. lia. lia. lia.
 Qed.
 
 Lemma exists_0_empty_mesh_grid : forall l,
