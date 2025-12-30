@@ -153,7 +153,7 @@ Fixpoint lower
   | Gen i lo hi body =>
       For i lo hi
         (lower body (fun l =>
-                       f (((! i ! - | eval_Zexpr_Z_total $0 lo |)%z,
+                       f (((! i ! - lo)%z,
                             (hi - lo)%z)::l)) p asn sh)
   | Sum i lo hi body =>
       For i lo hi
@@ -427,7 +427,7 @@ Inductive eval_expr :
     eval_expr v ec (Flatten e) (V (flatten_result l))
 | EvalSplit : forall e v ec l k kz,
     eval_expr v ec e (V l) ->
-    eval_Zexpr_Z $0 k = Some kz ->
+    eval_Zexpr_Z v k = Some kz ->
     eval_expr v ec (Split k e) (V (split_result (Z.to_nat kz) l))
 | EvalTruncr : forall e v ec k kz l,
     eval_Zexpr_Z v k = Some kz ->
@@ -463,7 +463,7 @@ Ltac invs :=
     | H : eval_Zexprlist _ [] _ |- _ => invert H
     | H : eval_Zexprlist _ _ (_::_) |- _ => invert H
     | H : eval_Zexprlist _ (_::_) _ |- _ => invert H
-    | H : size_of _ _ |- _ => invert1 H
+    | H : size_of _ _ _ |- _ => invert1 H
     | H : eval_Zexpr _ (ZPlus _ _) _ |- _ => invert H
     | H : eval_Zexpr _ (ZMinus _ _) _ |- _ => invert H
     | H : eval_Zexpr _ (ZTimes _ _) _ |- _ => invert H
@@ -692,6 +692,15 @@ Proof.
         apply eq_Z_index_list_sym. assumption.
 Qed.
 
+Lemma size_of_includes v1 v2 e sz :
+  v1 $<= v2 ->
+  size_of v1 e sz ->
+  size_of v2 e sz.
+Proof.
+  intros H. revert sz.
+  induction e; invert 1; eauto using eval_Zexpr_includes_valuation.
+Qed.
+
 Lemma eval_expr_for_gen_result_has_shape :
   forall n v ec i lo hi loz hiz e v0,
     eval_Zexpr_Z v lo = Some loz ->
@@ -718,35 +727,37 @@ Proof.
 Qed.
 
 Lemma result_has_shape_for_sum :
-  forall e v ,
+  forall e v0,
     (forall sz : list nat,
-        size_of v e sz ->
-        forall v : valuation,
-        forall (ec : expr_context) (r : result),
-        eval_expr v ec e r ->
-        result_has_shape r sz) ->
-    forall n sz r ec i lo hi loz hiz,
-    size_of v e sz ->
-    eval_Zexpr_Z v lo = Some loz ->
-    eval_Zexpr_Z v hi = Some hiz ->
-    Z.of_nat n = (hiz - loz)%Z ->
-    eval_expr v ec (Sum i lo hi e) r ->
-    result_has_shape r sz.
+        size_of v0 e sz ->
+        forall (v : fmap var Z) (ec : expr_context) (r : result),
+          v0 $<= v -> eval_expr v ec e r -> result_has_shape r sz) ->
+    forall v' n sz r ec i lo hi loz hiz,
+      v0 $<= v' ->
+      size_of v0 e sz ->
+      eval_Zexpr_Z v' lo = Some loz ->
+      eval_Zexpr_Z v' hi = Some hiz ->
+      Z.of_nat n = (hiz - loz)%Z ->
+      eval_expr v' ec (Sum i lo hi e) r ->
+      result_has_shape r sz.
 Proof.
   intros ? ? ? ?.
   induct n; propositional.
-  - invert H4.
-    rewrite H1, H2 in *. invert H9. invert H10. lia.
-    rewrite H1, H2 in *. invert H11. invert H13.
+  - invert H5.
+    rewrite H2, H3 in *. invert H10. invert H11. lia.
+    rewrite H2, H3 in *. invert H12. invert H14.
+    eapply size_of_includes in H1; eauto.
     eq_size_of.
     eapply result_has_shape_gen_pad.
-  - invert H4.
-    rewrite H1,H2 in *. invert H9. invert H10.
+  - invert H5.
+    rewrite H2,H3 in *. invert H10. invert H11.
     pose proof H0.
     eapply result_has_shape_add_result. eassumption.
-    2: { eapply IHn in H18. auto. eassumption. eassumption.
-         simpl. rewrite H1. reflexivity.
+    2: { eapply IHn in H19. eassumption. eassumption. eassumption.
+         simpl. rewrite H2. reflexivity.
          eauto. lia. } 
-    eapply H. 2: eassumption. eassumption.
+    eapply H. 3: eassumption. eassumption.
+    { eapply includes_trans. 1: eassumption. apply includes_add_new. sets. }
+    eapply size_of_includes in H1; eauto.
     eq_size_of. apply result_has_shape_gen_pad.
 Qed.      
