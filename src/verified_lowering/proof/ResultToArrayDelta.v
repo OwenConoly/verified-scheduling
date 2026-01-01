@@ -1409,8 +1409,8 @@ Proof.
       2: { simpl. rewrite Hlo,Hhi. eauto. }
       lia.
       clear Heq. clear n.
-      eapply IHe. eauto. eassumption.
-      { eapply includes_trans. 1: eassumption. apply includes_add_new. sets. }
+      eapply IHe. 2: eassumption.
+      { eapply size_of_includes. 2: eassumption. apply includes_add_new. sets. }
       pose proof (eval_expr_for_gen_result_has_shape
                     n v ec i (lo+|1|)%z hi (loz0+1) hiz0 e l).
       assert (eval_Zexpr_Z v (lo + | 1 |)%z = Some (loz0+1)%Z).
@@ -1418,69 +1418,60 @@ Proof.
       assert ((hiz0 - (loz0 + 1))%Z = Z.of_nat n). lia.
       specialize (H ltac:(assumption) ltac:(assumption) ltac:(assumption) ltac:(assumption)).
       eapply Forall_forall. intros.
-      eapply In_nth with (d:= S (SS 0)) in H3. invs.
-      eapply IHe. eauto. 2: eapply H.
-      { eapply includes_trans. 1: eassumption. apply includes_add_new. sets. }
-      eapply length_eval_expr_gen in H18; eauto.
+      eapply In_nth with (d:= S (SS 0)) in H2. invs.
+      eapply IHe. 2: eapply H.
+      { eapply size_of_includes. 2: eassumption. apply includes_add_new. sets. }
+      eapply length_eval_expr_gen in H17; eauto.
       2: { simpl. rewrite Hlo,Hhi. reflexivity. }
       lia.
   - (* SUM *)
-    invert H. invert H1.
+    invert H. invert H0.
     + (* STEP SUM *)
       eapply result_has_shape_add_result.
       eassumption.
-      eapply IHe. 1,3: eassumption.
-      { eapply includes_trans. 1: eassumption. apply includes_add_new. sets. }
+      eapply IHe. 2: eassumption.
+      { eapply size_of_includes. 2: eassumption. apply includes_add_new. sets. }
       eapply result_has_shape_for_sum.
-      apply IHe. 6: eassumption. all: eauto.
-      simpl. rewrite H5. reflexivity.
+      apply IHe. 5: eassumption. all: eauto.
+      simpl. rewrite H4. reflexivity.
       rewrite Z2Nat.id. reflexivity. lia.
     + (* EMPTY SUM *)
-      eapply size_of_includes in H7; eauto.
-      eq_size_of. eq_eval_Zlist.
+      eq_size_of.
       eapply result_has_shape_gen_pad.
-  - invs. invert H1.
-    eapply size_of_includes in H5; try eassumption.
+  - invs. invert H0.
     eq_size_of.
     apply result_has_shape_gen_pad.
     eauto.
-  - invs. invert H1.
-    + eauto.
-  - invs. invert H1. eauto using result_has_shape_concat.
-  - invs. invert H1. eauto using result_has_shape_flatten.
-  - invs. invert H1.
-    eapply eval_Zexpr_includes_valuation in H4; eauto.
-    apply eval_Zexpr_Z_eval_Zexpr in H4. rewrite H4 in *. invs.
+  - invs. invert H0. eauto.
+  - invs. invert H0. eauto using result_has_shape_concat.
+  - invs. invert H0. eauto using result_has_shape_flatten.
+  - invs. invert H0.
+    apply eval_Zexpr_Z_eval_Zexpr in H3. rewrite H3 in *. invs.
     eapply result_has_shape_split_result. lia. eauto.
-  - invs. invert H1.
-    eapply size_of_includes in H3; try eassumption.
+  - invs. invert H0.
     eq_size_of. invert H.
     eapply result_has_shape_transpose_result.
-    eapply IHe. 3: eassumption. ; eauto.
+    eapply IHe. 2: eassumption. eauto.
   - invs. invert H0.
     eapply result_has_shape_rev.
-    eapply eval_Zexpr_includes_valuation in H3; try apply empty_includes.
-    eapply eval_Zexpr_Z_eval_Zexpr in H3. rewrite H2 in H3. invs.
+    eapply eval_Zexpr_Z_eval_Zexpr in H3. rewrite H8 in H3. invs.
     eapply result_has_shape_truncl_list.
     eapply result_has_shape_rev.
     erewrite <- result_has_shape_filter_until_0.
     eapply IHe; eauto.
   - invs. invert H0.
-    eapply eval_Zexpr_includes_valuation in H3; try apply empty_includes.
-    eapply eval_Zexpr_Z_eval_Zexpr in H3. rewrite H2 in H3. invs.
+    eapply eval_Zexpr_Z_eval_Zexpr in H3. rewrite H8 in H3. invs.
     eapply result_has_shape_truncl_list.
     erewrite <- result_has_shape_filter_until_0.
     eapply IHe; eauto.
   - invs. invert H0.
     eq_size_of. invert H.
-    eapply eval_Zexpr_includes_valuation in H3; try apply empty_includes.
     eapply eval_Zexpr_Z_eval_Zexpr in H3. rewrite H2 in H3. invs.
     eapply result_has_shape_concat.
     eapply IHe; eauto.
     eapply result_has_shape_repeat_gen_pad.
   - invs. invert H0.
     eq_size_of. invert H.
-    eapply eval_Zexpr_includes_valuation in H3; try apply empty_includes.
     eapply eval_Zexpr_Z_eval_Zexpr in H3. rewrite H2 in H3. invs.
     rewrite Nat.add_comm.
     eapply result_has_shape_concat.

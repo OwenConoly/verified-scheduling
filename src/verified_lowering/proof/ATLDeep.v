@@ -727,37 +727,35 @@ Proof.
 Qed.
 
 Lemma result_has_shape_for_sum :
-  forall e v0,
-    (forall sz : list nat,
-        size_of v0 e sz ->
-        forall (v : fmap var Z) (ec : expr_context) (r : result),
-          v0 $<= v -> eval_expr v ec e r -> result_has_shape r sz) ->
-    forall v' n sz r ec i lo hi loz hiz,
-      v0 $<= v' ->
-      size_of v0 e sz ->
-      eval_Zexpr_Z v' lo = Some loz ->
-      eval_Zexpr_Z v' hi = Some hiz ->
+  forall e,
+    (forall (v : valuation) (sz : list nat),
+        size_of v e sz ->
+        forall (ec : expr_context) (r : result),
+          eval_expr v ec e r ->
+          result_has_shape r sz) ->
+    forall v n sz r ec i lo hi loz hiz,
+      size_of v e sz ->
+      eval_Zexpr_Z v lo = Some loz ->
+      eval_Zexpr_Z v hi = Some hiz ->
       Z.of_nat n = (hiz - loz)%Z ->
-      eval_expr v' ec (Sum i lo hi e) r ->
+      eval_expr v ec (Sum i lo hi e) r ->
       result_has_shape r sz.
 Proof.
   intros ? ? ? ?.
   induct n; propositional.
-  - invert H5.
-    rewrite H2, H3 in *. invert H10. invert H11. lia.
-    rewrite H2, H3 in *. invert H12. invert H14.
-    eapply size_of_includes in H1; eauto.
+  - invert H4.
+    rewrite H1, H2 in *. invs'. lia.
+    rewrite H1, H2 in *. invs'.
     eq_size_of.
     eapply result_has_shape_gen_pad.
-  - invert H5.
-    rewrite H2,H3 in *. invert H10. invert H11.
-    pose proof H0.
+  - invert H4.
+    rewrite H1,H2 in *. invs'.
     eapply result_has_shape_add_result. eassumption.
-    2: { eapply IHn in H19. eassumption. eassumption. eassumption.
-         simpl. rewrite H2. reflexivity.
+    2: { eapply IHn in H18. eassumption. eassumption.
+         simpl. rewrite H1. reflexivity.
          eauto. lia. } 
-    eapply H. 3: eassumption. eassumption.
-    { eapply includes_trans. 1: eassumption. apply includes_add_new. sets. }
-    eapply size_of_includes in H1; eauto.
+    eapply H. 2: eassumption.
+    { eapply size_of_includes. 2: eassumption. apply includes_add_new. sets. }
+    eapply size_of_includes in H0; eauto.
     eq_size_of. apply result_has_shape_gen_pad.
 Qed.      
