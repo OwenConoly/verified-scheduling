@@ -193,7 +193,7 @@ partial_interpret_reindexer
         reindexer
         (map Z.of_nat
              (filter_until
-                ( Z.to_nat (Z.of_nat n // (eval_Zexpr_Z_total $0 k))
+                (n //n (Z.to_nat (eval_Zexpr_Z_total $0 k))
                             :: Z.to_nat (eval_Zexpr_Z_total $0 k) :: l0) 0)) v 
         ((z0 / eval_Zexpr_Z_total $0 k)%Z :: (Stdlib.ZArith.BinIntDef.Z.modulo z0 (eval_Zexpr_Z_total $0 k)) :: args1).
 Proof.
@@ -201,10 +201,8 @@ Proof.
          Hvarrdx Hknonneg Harg Hle.
   unfold partial_interpret_reindexer.
   unfold shape_to_vars in *. simpl.
-  rewrite Z2Nat_div_distr in * by lia.
   cases n.
   { lia. }
-  rewrite Nat2Z.id.
   cases (Datatypes.S n //n (Z.to_nat (eval_Zexpr_Z_total $0 k))).
   { exfalso. unfold div_ceil_n in Heq. simpl in *. rewrite Nat.sub_0_r in *.
     replace (Z.to_nat (eval_Zexpr_Z_total $0 k))
@@ -2554,7 +2552,6 @@ result_has_shape (V l) (n :: l0) ->
     (forall l : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l) ->
-    (0 <= n) ->
     (0 < eval_Zexpr_Z_total $0 k)%Z ->
     partial_injective
     (partial_interpret_reindexer
@@ -2581,15 +2578,12 @@ Proof.
   rewrite <- filter_until_0_cons.
   erewrite eq_partial_interpret_reindexer_split in H1; eauto.
   erewrite eq_partial_interpret_reindexer_split in H1; eauto.
-  rewrite Z2Nat_div_distr in * by lia.
-  rewrite Nat2Z.id in *.
   eapply Hinj in H1.
   rewrite (Z_div_mod_eq_full z0 (eval_Zexpr_Z_total $0 k)) at 1 by lia.
   rewrite (Z_div_mod_eq_full z (eval_Zexpr_Z_total $0 k)) at 1 by lia.     
   propositional.
   + invert H. auto.
   + erewrite eq_partial_interpret_reindexer_split; eauto.
-    rewrite Z2Nat_div_distr by lia. rewrite Nat2Z.id. eauto.
   + eapply filter_In. propositional.
     rewrite mesh_grid_filter_until. simpl map.
     repeat decomp_goal_index. propositional.

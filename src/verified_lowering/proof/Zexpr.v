@@ -2558,6 +2558,22 @@ Proof.
   eapply lookup_Some_dom in H. sets.
 Qed.
 
+Lemma eval_empty_eq_Zexpr x xz :
+  eval_Zexpr $0 x xz ->
+  eq_zexpr x (| xz |)%z.
+Proof.
+  intros H. cbv [eq_zexpr]. 
+  - split.
+    + intros v z. split; intros H'.
+      -- eapply eval_Zexpr_includes_valuation in H. 2: apply empty_includes.
+         eapply eval_Zexpr_deterministic in H'. 2: apply H. subst. constructor.
+      -- invert H'. eapply eval_Zexpr_includes_valuation. 1: eassumption.
+         apply empty_includes.
+    + simpl. apply eval_Zexpr_vars_in_valuation in H.
+      destruct (vars_of_Zexpr x) as [| v ?]; auto.
+      rewrite dom_empty in H. exfalso. specialize (H v). apply H. simpl. auto.
+Qed.      
+
 Lemma eval_Zexpr_forall_vars_of_Zexpr : forall e v ez,
   eval_Zexpr v e ez ->
   Forall (fun var => var \in dom v) (vars_of_Zexpr e).

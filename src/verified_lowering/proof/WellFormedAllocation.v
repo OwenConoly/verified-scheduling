@@ -2173,8 +2173,7 @@ Proof.
     erewrite eq_partial_interpret_reindexer_split.
     eexists ((z / eval_Zexpr_Z_total $0 k)%Z ::
                                           (z mod eval_Zexpr_Z_total $0 k)%Z :: x1).
-    split.  
-    rewrite Z2Nat_div_distr by lia. rewrite Nat2Z.id. reflexivity.
+    split. reflexivity.
     eapply filter_In. propositional.
     repeat decomp_goal_index.
     propositional.
