@@ -508,12 +508,33 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma size_of_includes v1 v2 e sz :
+  v1 $<= v2 ->
+  size_of v1 e sz ->
+  size_of v2 e sz.
+Proof.
+  intros H. revert sz.
+  induction e; invert 1; eauto using eval_Zexpr_includes_valuation.
+Qed.
+
+Lemma size_of_deterministic' e v l1 l2 :
+  size_of $0 e l1 ->
+  size_of v e l2 ->
+  l1 = l2.
+Proof.
+  intros H1 H2. eapply size_of_includes in H1. 2: apply empty_includes.
+  eauto using size_of_deterministic.
+Qed.
+
 Ltac eq_size_of :=
   repeat
     match goal with
-    | H1 : size_of ?v ?e ?a, H2 : size_of ?v ?e ?b |- _ =>
-      pose proof (size_of_deterministic _ _ _ _ H1 H2); subst;
+    | H1 : size_of $0 ?e ?a, H2 : size_of ?v ?e ?b |- _ =>
+      pose proof (size_of_deterministic' _ _ _ _ H1 H2); subst;
       clear H2
+    | H1 : size_of ?v ?e ?a, H2 : size_of ?v ?e ?b |- _ =>
+        pose proof (size_of_deterministic _ _ _ _ H1 H2); subst;
+        clear H2
   end.
 
 Theorem size_of_sizeof : forall v e1 l,
@@ -690,15 +711,6 @@ Proof.
         specialize (H0 []).
         invert H0.
         apply eq_Z_index_list_sym. assumption.
-Qed.
-
-Lemma size_of_includes v1 v2 e sz :
-  v1 $<= v2 ->
-  size_of v1 e sz ->
-  size_of v2 e sz.
-Proof.
-  intros H. revert sz.
-  induction e; invert 1; eauto using eval_Zexpr_includes_valuation.
 Qed.
 
 Lemma eval_expr_for_gen_result_has_shape :
