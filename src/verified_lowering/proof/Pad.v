@@ -3766,7 +3766,9 @@ Proof.
     2: { reflexivity. }
     pose proof Hsize1 as Hsh1. pose proof Hsize2 as Hsh2.
     
+    eapply size_of_includes in Hsh1. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsh1; eauto.
+    eapply size_of_includes in Hsh2. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsh2; eauto.
     eapply result_has_shape_length in Hsh. rewrite length_app in *.
     pose proof Hsh1 as Hsh1''. pose proof Hsh2 as Hsh2''.
@@ -3783,10 +3785,10 @@ Proof.
       repeat rewrite skipn_nil. simpl.
       repeat rewrite firstn_nil. simpl.
       propositional; econstructor. }
-    { simpl in *. 
+    { cbn -[Nat.sub] in *.
       invert HHH. 
       eapply IHeval_expr2 in Hsh2; eauto.
-      simpl in *. invs.
+      cbn -[Nat.sub] in *. invs.
       replace x with 0 in * by lia.
       replace y with 0 in * by lia.
       simpl. split. auto.
@@ -3796,6 +3798,7 @@ Proof.
       replace (rev l2 ++ [r])%list with (rev (r::l2)) by auto.
       split.
       pose proof Hsize1 as Hsh1'''.
+      eapply size_of_includes in Hsh1'''. 2: apply empty_includes.
       eapply size_of_eval_expr_result_has_shape in Hsh1'''; eauto.
       invert Hsh1'''.
       replace l0 with 0 by lia. simpl. econstructor.
@@ -3803,6 +3806,7 @@ Proof.
       eapply Forall_forall. intros. eapply Forall_forall in H10.
       2: eassumption.
       pose proof Hsize2 as Hsh2'''.
+      eapply size_of_includes in Hsh2'''. 2: apply empty_includes.
       eapply size_of_eval_expr_result_has_shape in Hsh2'''; eauto.
       replace (rev l2 ++ [r])%list with (rev (r::l2)) in * by auto.
       simpl map in Hsh2'''.
@@ -3813,8 +3817,8 @@ Proof.
       eapply Forall_forall in Hsh2'''.
       2: { eassumption. }
       eapply result_has_shape_filter_until_0. rewrite <- H2.
-      erewrite <- result_has_shape_filter_until_0.  eauto.
-      rewrite <-H2.
+      erewrite <- result_has_shape_filter_until_0. eauto.
+      rewrite <- H2.
       eapply relate_pads_filter_until_0.
       eapply Forall_rev in Hsh2'''. eapply forall_skipn in Hsh2'''.
       eapply forall_firstn in Hsh2'''.
@@ -3835,7 +3839,8 @@ Proof.
       split.
       eapply Forall_forall. intros. eapply Forall_forall in H3.
       2: eassumption.
-      eapply size_of_eval_expr_result_has_shape in H; eauto.
+      eapply size_of_eval_expr_result_has_shape in H.
+      2: eapply size_of_includes; [apply empty_includes|eassumption].
       eapply result_has_shape_forall in H.      
       eapply relate_pads_filter_until_0.
       eapply forall_skipn in H. eapply forall_firstn in H.
@@ -3884,7 +3889,8 @@ Proof.
     eapply Forall_forall. intros. eapply Forall_forall in H14.
     2: { eassumption. }
 
-    eapply size_of_eval_expr_result_has_shape in H; eauto.
+    eapply size_of_eval_expr_result_has_shape in H.
+    2: eapply size_of_includes; [apply empty_includes|eassumption].
     simpl map in H.
     eapply result_has_shape_forall in H.
     eapply relate_pads_filter_until_0.
@@ -3906,7 +3912,8 @@ Proof.
     replace (r2 - (Datatypes.length (r0 :: l2) - b)) with 0 by lia.
     simpl firstn at 2. rewrite app_nil_r.
     simpl.
-    eapply size_of_eval_expr_result_has_shape in H0; eauto.
+    eapply size_of_eval_expr_result_has_shape in H0.
+    2: eapply size_of_includes; [apply empty_includes|eassumption].
     simpl map in H0.
     eapply result_has_shape_forall in H0.
     eapply Forall_forall. intros. eapply Forall_forall in H12.
@@ -3928,11 +3935,12 @@ Proof.
     invert Hpad; invert Hsize; eq_size_of.
     { (* STRONG *)
       invert H1. invert H5.
-      rename H0 into Hsize.
+      rename H3 into Hsize.
     simpl in *|-.
     pose proof Hsize as Hsize'.
     cases rsh.
     unfold transpose_result in Hsh. invert Hsh.
+    eapply size_of_includes in Hsize'. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsize'.
     2: { eauto. }
 
@@ -3954,10 +3962,10 @@ Proof.
     cases l.
     { simpl. invert Hsize'. simpl in *.
       repeat rewrite rev_repeat in *. simpl.
-      cases m1.
+      cases m.
       - simpl in *. repeat rewrite skipn_nil.
         repeat rewrite firstn_nil. eauto.
-      - simpl in Hsh''. cases n. simpl in Hsh''.
+      - simpl in Hsh''. cases n0. simpl in Hsh''.
         invert Hsh''. simpl in Hsh''. invert Hsh''.
         cases rsh. simpl in *. discriminate.
         simpl in H9. cases n; invert H9.
@@ -3977,10 +3985,10 @@ Proof.
     2: { eauto. }
     
     rewrite <- gen_pad_cons in *.
-    cases m1.
+    cases m.
     { simpl. repeat rewrite skipn_nil. repeat rewrite firstn_nil. eauto. }
     (* rewrite filter_until_cons in * by lia. *)
-    cases n. simpl in Hsh''. invert Hsh''.
+    cases n0. simpl in Hsh''. invert Hsh''.
     symmetry in Hsh''.
     rewrite filter_until_cons in Hsh'' by lia. invert Hsh''.
 
@@ -4003,7 +4011,7 @@ Proof.
     invert Hsize'. 
     simpl in H9.
     cases rsh. invert H9.
-    cases n0. invert H9. invert H9.
+    cases n. invert H9. invert H9.
     
     split.
     {
@@ -4160,7 +4168,7 @@ Proof.
 
       erewrite <- (firstn_skipn x (r0::l)).
       rewrite map_app.
-      erewrite get_col_app with (b:=Datatypes.S n).
+      erewrite get_col_app with (b:=Datatypes.S n0).
       2: { eapply result_has_shape_map_rev.
            eapply forall_result_has_shape. eapply forall_firstn.
            econstructor; eauto. rewrite length_firstn. reflexivity. }
@@ -4180,7 +4188,7 @@ Proof.
       rewrite <- (firstn_skipn y (rev (r0::l))).
       rewrite rev_app_distr. rewrite skipn_app. rewrite map_app.
       rewrite length_rev. rewrite length_skipn. rewrite length_rev.
-      erewrite get_col_app with (b:=Datatypes.S n).
+      erewrite get_col_app with (b:=Datatypes.S n0).
       2: { eapply result_has_shape_map_rev.
            eapply forall_result_has_shape. eapply forall_skipn.
            eapply Forall_rev. eapply forall_skipn. eapply Forall_rev.
@@ -4218,7 +4226,7 @@ Proof.
       rewrite <- (firstn_skipn r (skipn y (rev (r0 :: l)))).
       rewrite rev_app_distr. rewrite skipn_app.
       rewrite map_app.
-      erewrite get_col_app with (b:=Datatypes.S n).
+      erewrite get_col_app with (b:=Datatypes.S n0).
       2: { eapply result_has_shape_map_rev.
            eapply forall_result_has_shape. eapply forall_skipn.
            eapply Forall_rev. eapply forall_skipn. eapply forall_skipn.
@@ -4245,7 +4253,7 @@ Proof.
                                  end)
            (skipn (x - (Datatypes.S (Datatypes.length l) - y - r))
                   (rev (firstn r (skipn y (rev (r0 :: l))))))))
-               with (m:=Datatypes.S n).
+               with (m:=Datatypes.S n0).
       2: { eapply Forall_map.
            eapply forall_skipn. eapply Forall_rev.
            eapply Forall_impl. 2: eassumption. simpl.
@@ -4270,7 +4278,7 @@ Proof.
       pose proof H5.
 
       erewrite forall_get_col_relate_pads_gen_pad
-               with (m:=Datatypes.S n).
+               with (m:=Datatypes.S n0).
       2: { eapply Forall_map.
            eapply forall_firstn_ge.
            eapply Forall_impl. 2: eassumption.
@@ -4381,9 +4389,10 @@ Proof.
     { (* WEAK *)
     invert H1. invert H4.
     simpl in *|-.
-    rename H0 into Hsize. pose proof Hsize as Hsize'.
+    rename H3 into Hsize. pose proof Hsize as Hsize'.
     cases rsh.
     unfold transpose_result in Hsh. invert Hsh.
+    eapply size_of_includes in Hsize'. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsize'.
     2: { eauto. }
     
@@ -4405,9 +4414,9 @@ Proof.
     { simpl. invert Hsize'.
       repeat rewrite rev_repeat in *. simpl.
       split. auto. split. auto.
-      cases m0.
+      cases m.
       - simpl in *. repeat rewrite firstn_nil. eauto.
-      - simpl in Hsh''. cases n. simpl in Hsh''.
+      - simpl in Hsh''. cases n0. simpl in Hsh''.
         invert Hsh''. simpl in Hsh''. invert Hsh''.
         cases rsh. simpl in *. discriminate.
         split. eapply forall_firstn. eapply Forall_repeat.
@@ -4425,10 +4434,10 @@ Proof.
     
     rewrite <- gen_pad_cons in *.
     split. auto. split. auto.
-    cases m0.
+    cases m.
     { simpl. repeat rewrite firstn_nil. eauto. }
     rewrite filter_until_cons in * by lia.
-    cases n. simpl in Hsh''. invert Hsh''.
+    cases n0. simpl in Hsh''. invert Hsh''.
     symmetry in Hsh''.
     rewrite filter_until_cons in Hsh'' by lia. invert Hsh''.
 
@@ -4587,7 +4596,7 @@ Proof.
     }
   - (* TRUNCR *)
     invert Hpad. invert Hsize.
-    rename H6 into Hsize. rename H5 into Hk.
+    rename H5 into Hsize. rename H4 into Hk.
     pose proof Hk as Hk'.
     eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
     apply eval_Zexpr_Z_eval_Zexpr in Hk'. rewrite Hk' in *. invs. clear Hk'.
@@ -4595,7 +4604,8 @@ Proof.
     cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
 
     pose proof Hsize as Hsize'.
-    eapply size_of_eval_expr_result_has_shape in Hsize'; eauto.
+    eapply size_of_includes in Hsize'. 2: apply empty_includes.
+    eapply size_of_eval_expr_result_has_shape in Hsize'; eauto; [].
     cases rsh. invert Hsh.
     pose proof Hsh as Hsh'.
     eapply result_has_shape_rev in Hsh'.
@@ -4616,8 +4626,8 @@ Proof.
       rewrite length_rev in *.
       erewrite result_has_shape_length in H.
       2: { eauto. }
-      assert (m <= Z.to_nat kz) by lia.
-      eapply H in H2. rewrite H2.
+      assert (m <= Z.to_nat kz) as Hm by lia.
+      eapply H in Hm. rewrite Hm.
       simpl. repeat rewrite skipn_nil. repeat rewrite firstn_nil. eauto. }
     simpl in *. invert Hsh''.
     cases (m - Z.to_nat kz).
@@ -4626,8 +4636,8 @@ Proof.
       rewrite length_rev in *.
       erewrite result_has_shape_length in H.
       2: { eauto. }
-      assert (m <= Z.to_nat kz) by lia.
-      eapply H in H2. rewrite H2.
+      assert (m <= Z.to_nat kz) as Hm by lia.
+      eapply H in Hm. rewrite Hm.
       simpl. repeat rewrite skipn_nil. repeat rewrite firstn_nil. eauto. }
     simpl in *. invert Hsh''.
     
@@ -4640,7 +4650,7 @@ Proof.
     simpl in *. invs.
     rewrite truncl_list_skipn.
     rewrite gen_pad_filter_until_0.
-    rewrite H3.
+    rewrite H5.
     rewrite <- gen_pad_filter_until_0.
     split.
     eapply forall_firstn_sub. eauto.
@@ -4649,7 +4659,7 @@ Proof.
 
     split.
 
-    rename H2 into H'.
+    rename H4 into H'.
     rewrite <- rev_involutive with (l:=l) in H'.
     rewrite <- firstn_skipn
       with (n:=(Z.to_nat kz)) (l:=rev l) in H'.
@@ -4658,7 +4668,7 @@ Proof.
     rewrite length_skipn in H'. rewrite length_rev in H'.
     rewrite length_skipn in H'. rewrite length_rev in H'.
     eapply Forall_app in H'. invs.
-    eapply Forall_forall. intros. eapply Forall_forall in H2. 2: eauto.
+    eapply Forall_forall. intros. eapply Forall_forall in H4. 2: eauto.
 
     eapply result_has_shape_forall in Hsize''.
     eapply Forall_rev in Hsize''.
@@ -4670,14 +4680,14 @@ Proof.
     2: eassumption.
     eapply relate_pads_filter_until_0.
     eapply result_has_shape_filter_until_0.
-    rewrite H3.
+    rewrite H5.
     erewrite <- result_has_shape_filter_until_0. eauto.
-    rewrite H3.
+    rewrite H5.
     eapply relate_pads_filter_until_0. eauto. eauto.
 
     rewrite skipn_skipn.
     rewrite sub_add by lia.
-    eapply Forall_forall. intros. eapply Forall_forall in H8. 2: eauto.
+    eapply Forall_forall. intros. eapply Forall_forall in H9. 2: eauto.
     eapply result_has_shape_forall in Hsize''.
     eapply Forall_rev in Hsize''.
     eapply forall_skipn in Hsize''.
@@ -4686,13 +4696,13 @@ Proof.
     2: eassumption.
     eapply relate_pads_filter_until_0.
     eapply result_has_shape_filter_until_0.
-    rewrite H3.
+    rewrite H5.
     erewrite <- result_has_shape_filter_until_0. eauto.
-    rewrite H3.
+    rewrite H5.
     eapply relate_pads_filter_until_0. eauto. eauto.
   - (* TRUNCL *)
     invert Hpad. invert Hsize.
-    rename H6 into Hsize. rename H5 into Hk.
+    rename H5 into Hsize. rename H4 into Hk.
     pose proof Hk as Hk'.
     eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
     apply eval_Zexpr_Z_eval_Zexpr in Hk'. rewrite Hk' in *. invs. clear Hk'.
@@ -4700,6 +4710,7 @@ Proof.
     cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
     
     pose proof Hsize as Hsize'.
+    eapply size_of_includes in Hsize'. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsize'; eauto.
     cases rsh. invert Hsh.
     pose proof Hsh as Hsh'.
@@ -4720,8 +4731,8 @@ Proof.
       pose proof (truncl_list_length_empty (Z.to_nat kz) l).
       erewrite result_has_shape_length in H.
       2: { eauto. }
-      assert (m <= Z.to_nat kz) by lia.
-      eapply H in H2. rewrite H2.
+      assert (m <= Z.to_nat kz) as Hm by lia.
+      eapply H in Hm. rewrite Hm.
       simpl. repeat rewrite skipn_nil. repeat rewrite firstn_nil. eauto. }
     simpl in *. invert Hsh''.
     cases (m - Z.to_nat kz).
@@ -4729,8 +4740,8 @@ Proof.
       pose proof (truncl_list_length_empty (Z.to_nat kz) l).
       erewrite result_has_shape_length in H.
       2: { eauto. }
-      assert (m <= Z.to_nat kz) by lia.
-      apply H in H2. rewrite H2.
+      assert (m <= Z.to_nat kz) as Hm by lia.
+      apply H in Hm. rewrite Hm.
       simpl. repeat rewrite skipn_nil. repeat rewrite firstn_nil. eauto. }
     simpl in *. invert Hsh''.
 
@@ -4743,7 +4754,7 @@ Proof.
     rewrite truncl_list_skipn in *.
 
     rewrite gen_pad_filter_until_0.
-    rewrite H3.
+    rewrite H5.
     rewrite <- gen_pad_filter_until_0.
     split.
     eapply forall_firstn_skipn. eauto.
@@ -4756,25 +4767,25 @@ Proof.
     rewrite sub_add by lia.
 
     split.
-    eapply Forall_forall. intros. eapply Forall_forall in H2. 2: eassumption.
+    eapply Forall_forall. intros. eapply Forall_forall in H4. 2: eassumption.
     eapply result_has_shape_forall in Hsize'.
     eapply forall_skipn in Hsize'.
     eapply forall_firstn in Hsize'.
     eapply Forall_forall in Hsize'. 2: eassumption.
     eapply relate_pads_filter_until_0.
     eapply result_has_shape_filter_until_0.
-    rewrite H3.
+    rewrite H5.
     erewrite <-  result_has_shape_filter_until_0.
     eauto.
-    rewrite H3.
+    rewrite H5.
     eapply relate_pads_filter_until_0. eauto. eauto.
 
-    rewrite <- firstn_skipn with (l:=l) (n:=Z.to_nat kz) in H8.
+    rewrite <- firstn_skipn with (l:=l) (n:=Z.to_nat kz) in H9.
     rewrite rev_app_distr in *. rewrite skipn_app in *.
     rewrite firstn_app in *.
     rewrite length_skipn in *. rewrite length_rev in *.
-    rewrite length_skipn in *. eapply Forall_app in H8. invs.
-    eapply Forall_forall. intros. eapply Forall_forall in H6.
+    rewrite length_skipn in *. eapply Forall_app in H9. invs.
+    eapply Forall_forall. intros. eapply Forall_forall in H8.
     2: eassumption.
 
     eapply result_has_shape_forall in Hsize'.
@@ -4783,29 +4794,30 @@ Proof.
     eapply Forall_forall in Hsize'. 2: eassumption.
     eapply relate_pads_filter_until_0.
     eapply result_has_shape_filter_until_0.
-    rewrite H3.
+    rewrite H5.
     erewrite <- result_has_shape_filter_until_0. eauto.
-    rewrite H3.
+    rewrite H5.
     eapply relate_pads_filter_until_0.
     eauto. eauto.
   - (* PADR *)
     invert Hsize. 
     invert Hpad; eq_size_of.
-    { invert H3. invert H4.
+    { invert H2. invert H3.
 
-      rename H1 into Hsize. rename H5 into Hk.
+      rename H7 into Hsize. rename H4 into Hk.
       pose proof Hk as Hk'.
       eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
       apply eval_Zexpr_Z_eval_Zexpr in Hk'. rewrite Hk' in *. invs. clear Hk'.
       apply eval_Zexpr_Z_eval_Zexpr in Hk.
       cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
       
-      pose proof H2 as Hh.
-      eapply size_of_eval_expr_result_has_shape in H2; eauto.
-      invert H2. rewrite app_nil_l in *.
+      pose proof H1 as Hh.
+      eapply size_of_includes in Hsize. 2: apply empty_includes.
+      eapply size_of_eval_expr_result_has_shape in H1; eauto.
+      invert H1. rewrite app_nil_l in *.
       simpl gen_pad_list in *.
       rewrite <- gen_pad_cons in *.
-      pose proof (result_has_shape_gen_pad (Z.to_nat kz :: rest)) as Hsh'.
+      pose proof (result_has_shape_gen_pad (Z.to_nat kz :: s)) as Hsh'.
       eapply result_has_shape_result_shape_nat in Hsh,Hsh'.
       rewrite Hsh in Hsh'. clear Hsh.
 
@@ -4818,9 +4830,9 @@ Proof.
       eapply relate_pads_filter_until_0.
       eapply result_has_shape_gen_pad.
       eapply relate_pads_gen_pad_id. }
-    invert H3. invert H4.
+    invert H2. invert H3.
 
-    rename H1 into Hsize. rename H5 into Hk.
+    rename H7 into Hsize. rename H4 into Hk.
     pose proof Hk as Hk'.
     eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
     apply eval_Zexpr_Z_eval_Zexpr in Hk'. rewrite Hk' in *. invs. clear Hk'.
@@ -4830,6 +4842,7 @@ Proof.
     cases rsh. invert Hsh.
 
     pose proof Hsize as Hsize'.
+    eapply size_of_includes in Hsize'. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsize'.
     2: eauto.
     pose proof Hsh as Hsh'.
@@ -4853,13 +4866,13 @@ Proof.
     rewrite minus_plus in *.
     pose proof Hsh' as Hsh'1.
     rewrite <- gen_pad_cons in *.
-    pose proof (result_has_shape_gen_pad (Z.to_nat kz :: rest)) as Hsh'2.
+    pose proof (result_has_shape_gen_pad (Z.to_nat kz :: s)) as Hsh'2.
     eapply result_has_shape_result_shape_nat in Hsh'1,Hsh'2.
     rewrite Hsh'1 in Hsh'2. clear Hsh'1.
 
-    assert (length l = dim) as Heqq.
+    assert (length l = n) as Heqq.
     { simpl in *.
-      cases dim. simpl in *. lia.
+      cases n. simpl in *. lia.
       simpl in *. cases l. simpl in *. invert Hsh2. simpl in *.
       invert Hsh2. lia. }
     
@@ -4911,21 +4924,22 @@ Proof.
   - (* PADL *)
     invert Hsize.
     invert Hpad; eq_size_of.
-    { invert H3. invert H4.
+    { invert H2. invert H3.
 
-      rename H1 into Hsize. rename H5 into Hk.
+      rename H7 into Hsize. rename H4 into Hk.
       pose proof Hk as Hk'.
       eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
       apply eval_Zexpr_Z_eval_Zexpr in Hk'. rewrite Hk' in *. invs. clear Hk'.
       apply eval_Zexpr_Z_eval_Zexpr in Hk.
       cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
       
-      pose proof H2 as Hh.
-      eapply size_of_eval_expr_result_has_shape in H2; eauto.
-      invert H2. rewrite app_nil_r in *.
+      pose proof H1 as Hh.
+      eapply size_of_eval_expr_result_has_shape in H1; eauto.
+      2: eapply size_of_includes; [apply empty_includes|eassumption].
+      invert H1. rewrite app_nil_r in *.
       simpl gen_pad_list in *.
       rewrite <- gen_pad_cons in *.
-      pose proof (result_has_shape_gen_pad (Z.to_nat kz :: rest)) as Hsh'.
+      pose proof (result_has_shape_gen_pad (Z.to_nat kz :: s)) as Hsh'.
       eapply result_has_shape_result_shape_nat in Hsh,Hsh'.
       rewrite Hsh in Hsh'. clear Hsh.
 
@@ -4939,9 +4953,9 @@ Proof.
       eapply result_has_shape_gen_pad.
       eapply relate_pads_gen_pad_id. }
 
-    invert H3. invert H4.
+    invert H2. invert H3.
 
-    rename H1 into Hsize. rename H5 into Hk.
+    rename H7 into Hsize. rename H4 into Hk.
     pose proof Hk as Hk'.
     eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
     apply eval_Zexpr_Z_eval_Zexpr in Hk'. rewrite Hk' in *. invs. clear Hk'.
@@ -4951,6 +4965,7 @@ Proof.
     cases rsh. invert Hsh.
     
     pose proof Hsize as Hsize'.
+    eapply size_of_includes in Hsize'. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsize'.
     2: eauto.
     pose proof Hsh as Hsh'.
@@ -4975,12 +4990,12 @@ Proof.
     rewrite minus_plus in *.
     pose proof Hsh'' as Hsh''1.
     rewrite <- gen_pad_cons in *.
-    pose proof (result_has_shape_gen_pad (Z.to_nat kz :: rest)) as Hsh''2.
+    pose proof (result_has_shape_gen_pad (Z.to_nat kz :: s)) as Hsh''2.
     eapply result_has_shape_result_shape_nat in Hsh''1,Hsh''2.
     rewrite Hsh''1 in Hsh''2. clear Hsh''1.
 
-    assert (length l = dim) as Heqq.
-    { cases dim. simpl in *. lia.
+    assert (length l = n) as Heqq.
+    { cases n. simpl in *. lia.
       simpl in *. cases l. simpl in *. invert Hsize'. simpl in *.
       invert Hsize'. lia. }
 
