@@ -26,6 +26,14 @@ Local Hint Constructors eval_Zexpr eval_Bexpr eval_Sexpr size_of.
 Local Hint Resolve
       eval_Zexprlist_includes_valuation includes_add_new None_dom_lookup.
 
+Lemma eval_Zexpr_Z_eval_Zexpr' v x xz :
+  eval_Zexpr_Z v x = Some xz ->
+  eval_Zexpr v x xz.
+Proof.
+  intros. apply eval_Zexpr_Z_eval_Zexpr. assumption.
+Qed.
+Local Hint Resolve eval_Zexpr_Z_eval_Zexpr' : core.
+
 Hint Resolve no_dup_var_generation no_dup_mesh_grid
      forall_map_not_in_index forall_map_not_in_dom
      not_In_var_map2 not_In_var_map
@@ -41,7 +49,7 @@ Theorem lower_correct_weak :
     forall v ec r,
       (* functional evaluation of ATL *)
       eval_expr v ec e r ->
-      forall l, size_of e l ->
+      forall l, size_of $0 e l ->
       forall p st h st' h' reindexer asn sh,
         (* imperative evaluation of lowering *)
         eval_stmt v st h (lower e reindexer p asn sh) st' h' ->
@@ -84,12 +92,14 @@ Proof.
   induct 1; intros ls Hsize p st h st' h' reindexer asm sh
                    Heval Henv Hrdx Halloc Hctx pads g Hpad Hrelate.
   11: { (* SPLIT *) simpl in *. invert Hsize.
-        rename H3 into Hk. apply eval_Zexpr_Z_eval_Zexpr in Hk.
-        cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *. invs'.
+        rename H3 into Hk.
+        pose proof Hk as Hk'.
+        eapply eval_Zexpr_includes_valuation in Hk'. 2: apply empty_includes.
+        apply eval_Zexpr_Z_eval_Zexpr in Hk'. rewrite Hk' in *. invs'. clear Hk'.
         
      assert (result_has_shape (V l) (n::sh0)) as Hsh.
      { eapply size_of_eval_expr_result_has_shape in H.
-       eapply H. eassumption. }
+       eapply H. eapply size_of_includes. apply empty_includes. eassumption. }
 
      pose proof Hsh as Hsh'.
      repeat rewrite map_cons in *.
@@ -240,7 +250,7 @@ Proof.
           2: { erewrite result_has_shape_result_shape_Z by eauto.
                reflexivity. }
           eapply partial_injective_split. apply Hrdx.
-          eauto. apply Henv.
+          eauto. apply Henv. assumption.
           apply Hrdx. apply Hrdx. apply Hrdx. apply Hrdx. lia.
         - replace (map Z.of_nat
              (filter_until
@@ -281,8 +291,8 @@ Proof.
    - (* STEPPING GEN *)
      simpl in Heval.
      unfold lookup_total in *.
-     invert Hsize. rename H13 into Hsize.
-     rename H11 into Hlo. rename H12 into Hhi.
+     invert Hsize. rename H14 into Hsize.
+     rename H10 into Hlo. rename H12 into Hhi.
      pose proof Hlo as Hlo'. pose proof Hhi as Hhi'.
      eapply eval_Zexpr_includes_valuation in Hlo', Hhi'; try apply empty_includes.
      apply eval_Zexpr_Z_eval_Zexpr in Hlo', Hhi'. rewrite Hlo', Hhi' in *. invs'.
@@ -294,8 +304,7 @@ Proof.
        eapply result_has_shape_self.
        eapply size_of_eval_expr_result_has_shape.
        2: eassumption. eauto. econstructor; eauto.
-       apply eval_Zexpr_Z_eval_Zexpr. eassumption.
-       apply eval_Zexpr_Z_eval_Zexpr. eassumption. }
+       eapply size_of_includes. 1: apply empty_includes. eassumption. }
      pose proof Halloc as Halloc1.
      eapply well_formed_allocation_result_V in Halloc; try apply Hrdx.
      invs'.
@@ -305,9 +314,9 @@ Proof.
      eapply reindexer_not_empty in Heq; propositional; try apply Hrdx;
        discriminate.
      erewrite <- tensor_to_array_delta_cons
-       with (i:=i) (hi:=hiz) (lo:=loz);
+       with (i:=i) (hi:=hi) (lo:=lo);
        try eapply result_shape_gen_length in H5; eauto; simpl;
-       try rewrite H; try rewrite Hlo'; try rewrite Hhi'; try reflexivity; try lia.
+       try rewrite H; try rewrite Hlo'; try rewrite Hhi'; try reflexivity; try lia.     
      2: apply Hrdx.
      2: apply Hrdx.
      2: apply Hrdx.
@@ -324,9 +333,9 @@ Proof.
      cbv [eval_Zexpr_Z_total] in *. cbn [eval_Zexpr_Z] in *. rewrite Hlo, Hhi in *.
 
      cases k.
-     2: { eapply IHeval_expr1 in H17.
+     2: { eapply IHeval_expr1 in H18.
           cases (reindexer
-                   (((! i ! - | loz0 |)%z, (hiz0 - loz0)%Z)
+                   (((! i ! - lo)%z, (hi - lo)%z)
                       :: shape_to_index (result_shape_Z r)
                       (shape_to_vars (result_shape_Z r)))).
           { eapply reindexer_not_empty_vars_in_index in Heq0; try apply Hrdx.
@@ -347,7 +356,7 @@ Proof.
                                (partial_interpret_reindexer
                                   (fun l =>
                                      reindexer
-                                       (((! i ! - | loz0 |)%z,(hiz0 - loz0)%Z) :: l))
+                                       (((! i ! - lo)%z,(hi - lo)%z) :: l))
                                   (result_shape_Z r)
                                   (v $+ (i, loz0))) r)))).
             rewrite lookup_add_eq in * by auto.
@@ -367,9 +376,7 @@ Proof.
               - eapply reindexer_not_empty_vars_in_index in H8. propositional.
                 apply Hrdx. simpl. unfold not. intros. cups_empty. }
             rewrite H0 in *. eapply H with (st:=st) (st':=st') (asn:=asm).
-            -- econstructor; eauto.
-               apply eval_Zexpr_Z_eval_Zexpr. simpl. rewrite Hlo. reflexivity.
-               apply eval_Zexpr_Z_eval_Zexpr. simpl. rewrite Hhi. reflexivity.
+            -- econstructor; eauto. lia.
             -- clear IHeval_expr2.
             invs'.
             unfold shift_top_dim_reindexer.
@@ -383,7 +390,6 @@ Proof.
             ++ invs'. eapply HeqZlist.
                erewrite <- eq_Z_tuple_index_list_cons.
                propositional.
-               cbv [eval_Zexpr_Z_total]. simpl. rewrite Hhi, Hlo.
                2: apply eq_Z_tuple_index_list_id.
                unfold eq_Z_tup. simpl.
                split.
@@ -393,9 +399,16 @@ Proof.
                eapply eq_zexpr_transitivity.
                eapply eq_zexpr_sub.
                eapply eq_zexpr_id. auto.
-               apply eq_zexpr_sub_literal.
-               apply eq_zexpr_id.
-               f_equal. f_equal. lia. lia.
+               apply eq_zexpr_add_sub_id.
+               apply eq_zexpr_id. reflexivity.
+               eapply eq_zexpr_comm.
+               eapply eq_zexpr_transitivity.
+               eapply eq_zexpr_sub_sub_distr.
+               eapply eq_zexpr_transitivity.
+               eapply eq_zexpr_sub.
+               eapply eq_zexpr_id. auto.
+               apply eq_zexpr_add_sub_id.
+               apply eq_zexpr_id. reflexivity.
          -- decomp_well_formed_environment.
             unfold well_formed_environment.
             split. auto.
@@ -432,11 +445,11 @@ Proof.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi. lia.
             eauto.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo.
-            intros. apply H19; lia.
+            intros. apply H20; lia.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hhi.
-            intros. apply H21; lia.
-            cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
             intros. apply H22; lia.
+            cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
+            intros. apply H23; lia.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
             intros. lia.
          -- eauto.
@@ -451,20 +464,20 @@ Proof.
        unfold not. intros H.
        eapply shape_to_vars_contains_substring in H.
        propositional.
-       simpl in *. lia. auto. auto. eauto.
+       eauto. eauto. simpl in *. lia. eauto.
        lia. eauto. apply Hrdx.
      * eapply well_formed_allocation_eval_step;
          try apply Halloc; eauto; try apply Hrdx; try apply Henv.
      * eauto.
-     * eapply H22; lia.
+     * eapply H23; lia.
      * eauto.
 }
 
      (* k = 0, no left padding *)
      cases ll.
-     2: { eapply IHeval_expr1 in H17.
+     2: { eapply IHeval_expr1 in H18.
           cases (reindexer
-                   (((! i ! - | loz0 |)%z, (hiz0 - loz0)%Z)
+                   (((! i ! - lo)%z, (hi - lo)%z)
                       :: shape_to_index (result_shape_Z r)
                       (shape_to_vars (result_shape_Z r)))).
           { eapply reindexer_not_empty_vars_in_index in Heq0; try apply Hrdx.
@@ -485,7 +498,7 @@ Proof.
                                (partial_interpret_reindexer
                                   (fun l =>
                                      reindexer
-                                       (((! i ! - | loz0 |)%z,(hiz0 - loz0)%Z) :: l))
+                                       (((! i ! - lo)%z,(hi - lo)%z) :: l))
                                   (result_shape_Z r)
                                   (v $+ (i, loz0))) r)))).
             rewrite lookup_add_eq in * by auto.
@@ -505,11 +518,8 @@ Proof.
               - eapply reindexer_not_empty_vars_in_index in H8. propositional.
                 apply Hrdx. simpl. intros ?. cups_empty. }
             rewrite H0 in *.
-            cbv [eval_Zexpr_Z_total] in *. cbn [eval_Zexpr_Z] in *. rewrite Hlo, Hhi in *.
             eapply H with (st:=st) (st':=st') (asn:=asm).
-         -- econstructor; eauto.
-            apply eval_Zexpr_Z_eval_Zexpr. simpl. rewrite Hlo. reflexivity.
-            apply eval_Zexpr_Z_eval_Zexpr. simpl. rewrite Hhi. reflexivity.
+         -- econstructor; eauto. lia.
          -- clear IHeval_expr2.
             invs'.
             unfold shift_top_dim_reindexer.
@@ -532,9 +542,16 @@ Proof.
                eapply eq_zexpr_transitivity.
                eapply eq_zexpr_sub.
                eapply eq_zexpr_id. auto.
-               apply eq_zexpr_sub_literal.
-               apply eq_zexpr_id.
-               f_equal. f_equal. lia. lia.
+               apply eq_zexpr_add_sub_id.
+               apply eq_zexpr_id. reflexivity.
+               eapply eq_zexpr_comm.
+               eapply eq_zexpr_transitivity.
+               eapply eq_zexpr_sub_sub_distr.
+               eapply eq_zexpr_transitivity.
+               eapply eq_zexpr_sub.
+               eapply eq_zexpr_id. auto.
+               apply eq_zexpr_add_sub_id.
+               apply eq_zexpr_id. reflexivity.
          -- decomp_well_formed_environment.
             unfold well_formed_environment.
             split. auto.
@@ -571,11 +588,11 @@ Proof.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi. lia.
             eauto.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo.
-            intros. apply H19; lia.
+            intros. apply H20; lia.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hhi.
-            intros. apply H21; lia.
-            cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
             intros. apply H22; lia.
+            cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
+            intros. apply H23; lia.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
             intros. lia.
          -- eauto.
@@ -590,18 +607,18 @@ Proof.
        unfold not. intros.
        eapply shape_to_vars_contains_substring in H.
        propositional.
-       simpl in *. lia. auto. auto. eauto. lia. eauto. apply Hrdx.
+       eauto. eauto. simpl in *. lia. eauto. lia. eauto. apply Hrdx.
      * eapply well_formed_allocation_eval_step;
          try apply Halloc; eauto; try apply Hrdx; try apply Henv.
      * eauto.
-     * eapply H19; lia.
+     * eapply H20; lia.
      * eauto.
      }
 
      cases rr.
-          2: { eapply IHeval_expr1 in H17.
+          2: { eapply IHeval_expr1 in H18.
           cases (reindexer
-                   (((! i ! - | loz0 |)%z, (hiz0 - loz0)%Z)
+                   (((! i ! - lo)%z, (hi - lo)%z)
                       :: shape_to_index (result_shape_Z r)
                       (shape_to_vars (result_shape_Z r)))).
           { eapply reindexer_not_empty_vars_in_index in Heq0; try apply Hrdx.
@@ -622,7 +639,7 @@ Proof.
                                (partial_interpret_reindexer
                                   (fun l =>
                                      reindexer
-                                       (((! i ! - | loz0 |)%z,(hiz0 - loz0)%Z) :: l))
+                                       (((! i ! - lo)%z,(hi - lo)%z) :: l))
                                   (result_shape_Z r)
                                   (v $+ (i, loz0))) r)))).
             rewrite lookup_add_eq in * by auto.
@@ -642,11 +659,8 @@ Proof.
               - eapply reindexer_not_empty_vars_in_index in H8. propositional.
                 apply Hrdx. simpl. unfold not. intros. cups_empty. }
             rewrite H0 in *.
-            cbv [eval_Zexpr_Z_total] in *. cbn [eval_Zexpr_Z] in *. rewrite Hlo, Hhi in *.
             eapply H with (st:=st) (st':=st') (asn:=asm).
-         -- econstructor; eauto.
-            apply eval_Zexpr_Z_eval_Zexpr. simpl. rewrite Hlo. reflexivity.
-            apply eval_Zexpr_Z_eval_Zexpr. simpl. rewrite Hhi. reflexivity.
+         -- econstructor; eauto. lia.
          -- clear IHeval_expr2.
             invs'.
             unfold shift_top_dim_reindexer.
@@ -669,9 +683,16 @@ Proof.
                eapply eq_zexpr_transitivity.
                eapply eq_zexpr_sub.
                eapply eq_zexpr_id. auto.
-               apply eq_zexpr_sub_literal.
-               apply eq_zexpr_id.
-               f_equal. f_equal. lia. lia.
+               apply eq_zexpr_add_sub_id.
+               apply eq_zexpr_id. reflexivity.
+               eapply eq_zexpr_comm.
+               eapply eq_zexpr_transitivity.
+               eapply eq_zexpr_sub_sub_distr.
+               eapply eq_zexpr_transitivity.
+               eapply eq_zexpr_sub.
+               eapply eq_zexpr_id. auto.
+               apply eq_zexpr_add_sub_id.
+               apply eq_zexpr_id. reflexivity.
          -- decomp_well_formed_environment.
             unfold well_formed_environment.
             split. auto.
@@ -708,11 +729,11 @@ Proof.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi. lia.
             eauto.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo.
-            intros. apply H19; lia.
+            intros. apply H20; lia.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hhi.
-            intros. apply H21; lia.
-            cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
             intros. apply H22; lia.
+            cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
+            intros. apply H23; lia.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
             intros. lia.
          -- eauto.
@@ -727,17 +748,17 @@ Proof.
        unfold not. intros.
        eapply shape_to_vars_contains_substring in H.
        propositional.
-       simpl in *. lia. auto. auto. eauto. lia. eauto. apply Hrdx.
+       eauto. eauto. simpl in *. lia. eauto. lia. eauto. apply Hrdx.
      * eapply well_formed_allocation_eval_step;
          try apply Halloc; eauto; try apply Hrdx; try apply Henv.
      * eauto.
-     * eapply H21; lia.
+     * eapply H22; lia.
      * eauto.
  }
 
-          eapply IHeval_expr1 in H17.
+          eapply IHeval_expr1 in H18.
           cases (reindexer
-                   (((! i ! - | loz0 |)%z, (hiz0 - loz0)%Z)
+                   (((! i ! - lo)%z, (hi - lo)%z)
                       :: shape_to_index (result_shape_Z r)
                       (shape_to_vars (result_shape_Z r)))).
           { eapply reindexer_not_empty_vars_in_index in Heq0; try apply Hrdx.
@@ -758,7 +779,7 @@ Proof.
                                (partial_interpret_reindexer
                                   (fun l =>
                                      reindexer
-                                       (((! i ! - | loz0 |)%z,(hiz0 - loz0)%Z) :: l))
+                                       (((! i ! - lo)%z,(hi - lo)%z) :: l))
                                   (result_shape_Z r)
                                   (v $+ (i, loz0))) r)))).
             rewrite lookup_add_eq in * by auto.
@@ -778,11 +799,8 @@ Proof.
               - eapply reindexer_not_empty_vars_in_index in H8. propositional.
                 apply Hrdx. simpl. unfold not. intros. cups_empty. }
             rewrite H0 in *.
-            cbv [eval_Zexpr_Z_total] in *. cbn [eval_Zexpr_Z] in *. rewrite Hlo, Hhi in *.
             eapply H with (st:=st) (st':=st') (asn:=asm).
-         -- econstructor; eauto.
-            apply eval_Zexpr_Z_eval_Zexpr. simpl. rewrite Hlo. reflexivity.
-            apply eval_Zexpr_Z_eval_Zexpr. simpl. rewrite Hhi. reflexivity.
+         -- econstructor; eauto. lia.
          -- clear IHeval_expr2.
             invs'.
             unfold shift_top_dim_reindexer.
@@ -805,9 +823,16 @@ Proof.
                eapply eq_zexpr_transitivity.
                eapply eq_zexpr_sub.
                eapply eq_zexpr_id. auto.
-               apply eq_zexpr_sub_literal.
-               apply eq_zexpr_id.
-               f_equal. f_equal. lia. lia.
+               apply eq_zexpr_add_sub_id.
+               apply eq_zexpr_id. reflexivity.
+               eapply eq_zexpr_comm.
+               eapply eq_zexpr_transitivity.
+               eapply eq_zexpr_sub_sub_distr.
+               eapply eq_zexpr_transitivity.
+               eapply eq_zexpr_sub.
+               eapply eq_zexpr_id. auto.
+               apply eq_zexpr_add_sub_id.
+               apply eq_zexpr_id. reflexivity.
          -- decomp_well_formed_environment.
             unfold well_formed_environment.
             split. auto.
@@ -835,6 +860,7 @@ Proof.
          -- unfold well_formed_environment in *. invs'.
             eapply well_formed_reindexer_shift_top_dim_reindexer;
               eauto.
+            
          -- eapply well_formed_allocation_shift_top_dim_reindexer;
               try apply Hrdx; try apply Henv; eauto.
          -- eapply contexts_agree_add_heap; try apply Henv; auto.
@@ -844,11 +870,11 @@ Proof.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi. lia.
             eauto.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo.
-            intros. apply H19; lia.
+            intros. apply H20; lia.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hhi.
-            intros. apply H21; lia.
-            cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
             intros. apply H22; lia.
+            cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
+            intros. apply H23; lia.
             cbv [eval_Zexpr_Z_total]. simpl. rewrite Hlo, Hhi.
             intros. lia.
          -- eauto.
@@ -863,11 +889,11 @@ Proof.
        unfold not. intros.
        eapply shape_to_vars_contains_substring in H.
        propositional.
-       simpl in *. lia. auto. auto. eauto. lia. eauto. apply Hrdx.
+       eauto. eauto. simpl in *. lia. auto. auto. eauto. lia. eauto. apply Hrdx.
      * eapply well_formed_allocation_eval_step;
          try apply Halloc; eauto; try apply Hrdx; try apply Henv.
      * eauto.
-     * eapply H22; lia.
+     * eapply H23; lia.
      * eauto.
    - (* STEPPING SUM *)
      simpl in *.
@@ -879,7 +905,7 @@ Proof.
      { assert (eval_expr v ec (Sum i lo hi body) s).
        econstructor; eauto.
        eapply size_of_eval_expr_result_has_shape.
-       2: eassumption. eauto. }
+       2: eassumption. eapply size_of_includes. apply empty_includes. eauto. }
        pose proof H6 as Hshh.
        eapply result_has_shape_add_result_result in Hshh.
        2: { eassumption. }
@@ -1119,7 +1145,7 @@ Proof.
                  (shape_to_vars (result_shape_Z (gen_pad _))))) eqn:Heq.
      { unfold well_formed_allocation in *. rewrite Heq in *. invs'.
        rewrite H. split. auto.
-       cases ls; simpl; rewrite add_id; try rewrite Rplus_0_r; auto. }
+       cases sz; simpl; rewrite add_id; try rewrite Rplus_0_r; auto. }
      eapply well_formed_allocation_reindexer_not_empty in Heq;
        try apply Halloc. invs'.
      rewrite H0 in *.

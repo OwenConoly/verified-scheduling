@@ -2593,9 +2593,9 @@ Lemma well_formed_reindexer_eval0 :
     result_has_shape (V (x1 :: xs1)) (result_shape_nat (V (x1 :: xs1))) ->
     ~ i \in dom v ->
     ~ In i (shape_to_vars (result_shape_Z x1)) ->
-    (hiz - loz)%Z = Z.of_nat (Datatypes.length (x1 :: xs1)) ->
     eval_Zexpr $0 lo loz ->
     eval_Zexpr $0 hi hiz ->
+    (hiz - loz)%Z = Z.of_nat (Datatypes.length (x1 :: xs1)) ->
     h $? o = Some arr ->
     (loz < hiz)%Z ->
     ~ contains_substring "?" i ->

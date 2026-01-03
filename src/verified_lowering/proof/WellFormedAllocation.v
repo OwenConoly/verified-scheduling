@@ -1216,7 +1216,7 @@ Proof.
 Qed.
 
 Lemma well_formed_allocation_shift_top_dim_reindexer :
-  forall reindexer r l st h v p hi lo i a,
+  forall reindexer r l st h v p hi lo loz i a,
     well_formed_allocation reindexer
                                    (V (r :: l)) st h p v ->
     h $? p = Some a ->
@@ -1224,6 +1224,7 @@ Lemma well_formed_allocation_shift_top_dim_reindexer :
         eq_Z_tuple_index_list l1 l2 ->
         eq_Z_tuple_index_list (reindexer l1) (reindexer l2)) ->
     (forall var, contains_substring "?" var -> var \in dom v -> False) ->
+    eval_Zexpr $0 lo loz ->
     vars_of_reindexer (reindexer []) \subseteq dom v ->
     (forall (var : var) (k : Z) (l0 : list (Zexpr * Zexpr)),
         (var \in vars_of_reindexer (reindexer []) -> False) ->
@@ -1251,9 +1252,9 @@ Lemma well_formed_allocation_shift_top_dim_reindexer :
                                  reindexer (((! i ! - lo)%z,
                                               (hi - lo)%z) :: l1)) 
                               (result_shape_Z r)
-                              (v $+ (i, eval_Zexpr_Z_total $0 lo))) r))) p v.
+                              (v $+ (i, loz))) r))) p v.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? ? ? Halloc Heq HeqZlist Hvar Hvarsub Hmap
+  intros ? ? ? ? ? ? ? ? ? ? ? ? Halloc Heq HeqZlist Hvar Hlo Hvarsub Hmap
          Hvarindexsub Hsh Hinj.
   cases l.
   { eapply well_formed_allocation_result_V in Halloc. invs.
