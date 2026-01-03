@@ -102,21 +102,19 @@ Proof.
 Qed.
 
 Lemma well_formed_allocation_padl :
-  forall reindexer st h p v k l0 l m,
+  forall reindexer st h p v k kz l0 l m,
     well_formed_allocation
-      reindexer
-      (V (repeat (gen_pad l0)
-                 (Z.to_nat (eval_Zexpr_Z_total $0 k)) ++ l)) st h p v ->
+      reindexer (V (repeat (gen_pad l0) (Z.to_nat kz) ++ l)) st h p v ->
     result_has_shape (V l) (m :: l0) ->
     (forall l0 : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l0) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l0) ->
-    (0 <= eval_Zexpr_Z_total $0 k)%Z ->
+    (0 <= kz)%Z ->
     (forall (var : var) (k0 : Z) (l2 : list (Zexpr * Zexpr)),
         ~ var \in vars_of_reindexer (reindexer []) ->
                   map (subst_var_in_Z_tup var k0) (reindexer l2) =
                     reindexer (map (subst_var_in_Z_tup var k0) l2)) ->
-    (eq_zexpr k (| eval_Zexpr_Z_total $0 k |)%z) ->
+    eval_Zexpr $0 k kz ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
     vars_of_reindexer (reindexer []) \subseteq dom v ->
     (forall l2 l3 : list (Zexpr * Zexpr),
@@ -131,7 +129,7 @@ Lemma well_formed_allocation_padl :
            end)      
          (V l) st h p v.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Halloc Hsh Hvarsub Hknonneg Hmap Hkz
+  intros ? ? ? ? ? ? ? ? ? ? Halloc Hsh Hvarsub Hknonneg Hmap Hkz
          Henv Hvarsubdom HeqZlist.
   eapply well_formed_allocation_result_V in Halloc; eauto.
   invs. unfold well_formed_allocation.
@@ -172,7 +170,7 @@ Proof.
     rewrite <- H.
     repeat rewrite map_cons.
     erewrite eq_partial_interpret_reindexer_padl.
-    eexists ((z + eval_Zexpr_Z_total $0 k)%Z :: x1).
+    eexists ((z + kz)%Z :: x1).
     split.
     reflexivity.
     eapply in_map_iff. eexists (z::x1).
@@ -186,21 +184,18 @@ Proof.
 Qed.
 
 Lemma well_formed_allocation_truncl :
-  forall reindexer st h p v k l0 x m,
+  forall reindexer st h p v k kz l0 x m,
     well_formed_allocation reindexer (V x) st h p v ->
     (forall l0 : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l0) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l0) ->
-    result_has_shape
-      (V
-         (gen_pad_list
-            (Z.to_nat (eval_Zexpr_Z_total $0 k) :: l0) ++ x)) (m :: l0) ->    
-    (0 <= eval_Zexpr_Z_total $0 k)%Z ->
+    result_has_shape (V (gen_pad_list (Z.to_nat kz :: l0) ++ x)) (m :: l0) ->    
+    (0 <= kz)%Z ->
     (forall (var : var) (k0 : Z) (l2 : list (Zexpr * Zexpr)),
         ~ var \in vars_of_reindexer (reindexer []) ->
                   map (subst_var_in_Z_tup var k0) (reindexer l2) =
                     reindexer (map (subst_var_in_Z_tup var k0) l2)) ->
-    (eq_zexpr k (| eval_Zexpr_Z_total $0 k |)%z) ->
+    eval_Zexpr $0 k kz ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
     vars_of_reindexer (reindexer []) \subseteq dom v ->
     (forall l2 l3 : list (Zexpr * Zexpr),
@@ -213,11 +208,9 @@ Lemma well_formed_allocation_truncl :
            | [] => l
            | (v0, d) :: xs => ((v0 - k)%z, (d - k)%z) :: xs
            end)      
-         (V
-            (gen_pad_list
-               (Z.to_nat (eval_Zexpr_Z_total $0 k) :: l0) ++ x)) st h p v.
+         (V (gen_pad_list (Z.to_nat kz :: l0) ++ x)) st h p v.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Halloc Hvarsub Hsh Hknonneg Hmap Hkz Henv
+  intros ? ? ? ? ? ? ? ? ? ? Halloc Hvarsub Hsh Hknonneg Hmap Hkz Henv
          Hvarsubdom HeqZlist.
   eapply well_formed_allocation_result_V in Halloc; eauto.
   invs. unfold well_formed_allocation.
@@ -225,15 +218,12 @@ Proof.
            (result_shape_Z
               (V
                  (gen_pad_list
-                    (Z.to_nat
-                       (eval_Zexpr_Z_total $0 k)
-                       :: l0) ++ x)))
+                    (Z.to_nat kz :: l0) ++ x)))
            (shape_to_vars
               (result_shape_Z
                  (V
                     (gen_pad_list
-                       (Z.to_nat (eval_Zexpr_Z_total $0 k)
-                                 :: l0) ++ x))))).
+                       (Z.to_nat kz :: l0) ++ x))))).
   { eapply shape_to_index_not_empty_Z in Heq. propositional. }  
   cases (reindexer
       (let (v0, d) := p0 in ((v0 - k)%z, (d - k)%z) :: l)).
@@ -276,33 +266,26 @@ Proof.
 Qed.
 
 Lemma well_formed_allocation_truncr :
-  forall reindexer x st h p v k l0 m,
+  forall reindexer x st h p v k kz l0 m,
     well_formed_allocation
       reindexer
       (V
          (rev
             (truncl_list
-               (Z.to_nat (eval_Zexpr_Z_total $0 k))
-               (rev
-                  (x ++
-                     gen_pad_list
-                     (Z.to_nat (eval_Zexpr_Z_total $0 k) :: l0))))))
+               (Z.to_nat kz)
+               (rev (x ++ gen_pad_list (Z.to_nat kz :: l0))))))
       st h p v ->
     (forall l0 : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l0) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l0) ->
     result_has_shape
-      (V
-         (x ++
-            gen_pad_list
-            (Z.to_nat (eval_Zexpr_Z_total $0 k) :: l0)))
-      (m :: l0) ->
-    (0 <= eval_Zexpr_Z_total $0 k)%Z ->
+      (V (x ++ gen_pad_list (Z.to_nat kz :: l0))) (m :: l0) ->
+    (0 <= kz)%Z ->
     (forall (var : var) (k0 : Z) (l2 : list (Zexpr * Zexpr)),
         ~ var \in vars_of_reindexer (reindexer []) ->
                   map (subst_var_in_Z_tup var k0) (reindexer l2) =
                     reindexer (map (subst_var_in_Z_tup var k0) l2)) ->
-    (eq_zexpr k (| eval_Zexpr_Z_total $0 k |)%z) ->
+    eval_Zexpr $0 k kz ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
     vars_of_reindexer (reindexer []) \subseteq dom v ->
     (forall l2 l3 : list (Zexpr * Zexpr),
@@ -314,43 +297,30 @@ Lemma well_formed_allocation_truncr :
                    | [] => l
                    | (v0, d) :: xs => (v0, (d - k)%z) :: xs
                    end)
-      (V
-         (x ++
-            gen_pad_list
-            (Z.to_nat (eval_Zexpr_Z_total $0 k) :: l0))) st h p v.
+      (V (x ++ gen_pad_list (Z.to_nat kz :: l0))) st h p v.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Halloc Hvarsub Hsh Hknonneg Hmap Hkz Henv
+  intros ? ? ? ? ? ? ? ? ? ? Halloc Hvarsub Hsh Hknonneg Hmap Hkz Henv
          Hvarsubdom HeqZlist.      
   
   eapply well_formed_allocation_result_V in Halloc; eauto.
   invs. unfold well_formed_allocation.
   cases (shape_to_index
           (result_shape_Z
-             (V
-                (x ++
-                 gen_pad_list
-                   (Z.to_nat (eval_Zexpr_Z_total $0 k) :: l0))))
+             (V (x ++ gen_pad_list (Z.to_nat kz :: l0))))
           (shape_to_vars
              (result_shape_Z
-                (V
-                   (x ++
-                    gen_pad_list
-                      (Z.to_nat (eval_Zexpr_Z_total $0 k) :: l0)))))).
+                (V (x ++ gen_pad_list (Z.to_nat kz :: l0)))))).
   { eapply shape_to_index_not_empty_Z in Heq. propositional. }
   cases (reindexer (let (v0, d) := p0 in (v0, (d - k)%z) :: l)).
   { eapply reindexer_not_empty_vars_in_index in Heq0; auto. propositional.
     unfold result_shape_Z in Heq. simpl in Heq.
-    cases ((x ++
-                repeat (gen_pad l0)
-                  (Z.to_nat (eval_Zexpr_Z_total $0 k)))%list).
+    cases ((x ++ repeat (gen_pad l0) (Z.to_nat kz))%list).
     - invert Heq. simpl. unfold app_no_dups.
       unfold not. intros. cups_empty.
     - invert Heq. simpl.
       unfold app_no_dups.
       unfold not. intros. cups_empty. }
-  assert (0 < Z.of_nat m - eval_Zexpr_Z_total $0 k \/
-            Z.of_nat m - eval_Zexpr_Z_total $0 k <= 0)%Z
-    as Hcase by lia.
+  assert (0 < Z.of_nat m - kz \/ Z.of_nat m - kz <= 0)%Z as Hcase by lia.
   inversion Hcase as [ Hcase1 | Hcase2 ]; clear Hcase.
   2: { eapply result_has_shape_app_r in Hsh; eauto.
        simpl gen_pad_list in Hsh. rewrite repeat_length in Hsh.
@@ -384,10 +354,7 @@ Proof.
   2: { rewrite repeat_length. reflexivity. }
   cases (result_lookup_Z_option
            (z :: x2)
-           (V
-              (x ++
-                 repeat (gen_pad l0)
-                 (Z.to_nat (eval_Zexpr_Z_total $0 k)))));
+           (V (x ++ repeat (gen_pad l0) (Z.to_nat kz))));
     try (simpl in *; discriminate).
   eapply result_lookup_Z_option_Some_pad_r in Heq1; auto.
   erewrite result_has_shape_length in Heq1.
@@ -400,10 +367,7 @@ Proof.
   rewrite repeat_length.
   cases (result_lookup_Z_option
            (z :: x2)
-           (V
-              (x ++
-                 repeat (gen_pad l0)
-                 (Z.to_nat (eval_Zexpr_Z_total $0 k)))));
+           (V (x ++ repeat (gen_pad l0) (Z.to_nat kz))));
     try (simpl in *; discriminate).
   eapply result_lookup_Z_option_Some_pad_r in Heq1; auto.
   erewrite result_has_shape_length in Heq1.
@@ -1102,7 +1066,7 @@ Proof.
 Qed.
 *)
 Lemma well_formed_allocation_eval_step :
-  forall reindexer r l st h v p hi lo i a,
+  forall reindexer r l st h v p hi hiz lo loz i a,
     well_formed_allocation reindexer
                                    (V (r :: l)) st h p v ->
     h $? p = Some a ->
@@ -1121,11 +1085,10 @@ Lemma well_formed_allocation_eval_step :
     result_has_shape (V (r :: l)) (result_shape_nat (V (r :: l))) ->
     ~ contains_substring "?" i ->
     ~ i \in dom v ->
-    eq_zexpr lo (| eval_Zexpr_Z_total $0 lo |)%z ->
-    eq_zexpr hi (| eval_Zexpr_Z_total $0 hi |)%z ->
-    (eval_Zexpr_Z_total $0 lo < eval_Zexpr_Z_total $0 hi)%Z ->
-    Datatypes.length l =
-      Z.to_nat (eval_Zexpr_Z_total $0 hi - (eval_Zexpr_Z_total $0 lo + 1)) ->
+    eval_Zexpr $0 lo loz ->
+    eval_Zexpr $0 hi hiz ->
+    (loz < hiz)%Z ->
+    Datatypes.length l = Z.to_nat (hiz - (loz + 1)) ->
     partial_injective 
       (partial_interpret_reindexer
          reindexer (result_shape_Z (V (r :: l))) v)
@@ -1138,7 +1101,7 @@ Lemma well_formed_allocation_eval_step :
       (fun l1 : list (Zexpr * Zexpr) =>
          reindexer (((! i ! - lo)%z,
                       (hi - lo)%z) :: l1))
-      r st h p (v $+ (i, eval_Zexpr_Z_total $0 lo)).
+      r st h p (v $+ (i, loz)).
 Proof.
   unfold well_formed_allocation in *. propositional.
   cases (reindexer
@@ -1155,10 +1118,7 @@ Proof.
     + eapply reindexer_not_empty_vars_in_index in Heq. propositional. auto.
       simpl. unfold app_no_dups.
       rewrite <- union_constant.
-      unfold not. intros. eapply cup_empty in H14. invs.
-      eapply cup_empty in H15. invs.
-      eapply cup_empty in H14. invs.
-      eapply constant_not_empty in H15. propositional. inversion 1.
+      unfold not. intros. cups_empty.
     + clear Heq. invs.
       eexists. split. eassumption.
       eapply subseteq_transitivity.
@@ -1671,7 +1631,7 @@ Lemma well_formed_allocation_concat_l :
     (forall l1 l2 : list (Zexpr * Zexpr),
         eq_Z_tuple_index_list l1 l2 ->
         eq_Z_tuple_index_list (reindexer l1) (reindexer l2)) ->
-    eq_zexpr x2 (|Z.of_nat m|)%z ->
+    eval_Zexpr $0 x2 (Z.of_nat m) ->
     (forall l : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l) ->
@@ -1740,11 +1700,11 @@ Proof.
 Qed.
 
 Lemma well_formed_allocation_concat_r :
-  forall l1 l2 st h p v reindexer l0 n m,
+  forall l1 l2 st h p v reindexer l0 n nz m,
     well_formed_allocation
       reindexer (V (l1 ++ l2)%list)
                            st h p v->
-    result_has_shape (V l1) (Z.to_nat (eval_Zexpr_Z_total $0 n) :: l0) ->
+    result_has_shape (V l1) (Z.to_nat nz :: l0) ->
     result_has_shape (V l2) (m :: l0) ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
     (forall (var : var) (k : Z) (l0 : list (Zexpr * Zexpr)),
@@ -1758,8 +1718,8 @@ Lemma well_formed_allocation_concat_r :
     (forall l : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l) ->
-    eq_zexpr n (| eval_Zexpr_Z_total $0 n |)%z ->
-    (0 <= eval_Zexpr_Z_total $0 n)%Z ->
+    eval_Zexpr $0 n nz ->
+    (0 <= nz)%Z ->
     well_formed_allocation
       (fun l : list (Zexpr * Zexpr) =>
          reindexer
@@ -1793,7 +1753,7 @@ Proof.
     auto.
     erewrite result_has_shape_result_shape_Z; eauto.
     simpl.
-    cases (Z.to_nat (eval_Zexpr_Z_total $0 n) + m); inversion 1. }
+    cases (Z.to_nat nz + m); inversion 1. }
 
   assert (0 < m \/ m <= 0) as Hcase by lia.
   inversion Hcase as [ Hcase1 | Hcase2 ]; clear Hcase.
@@ -1827,10 +1787,10 @@ Proof.
   rewrite add_sub.
   cases z; try lia.
   simpl Z.add.
-  cases (eval_Zexpr_Z_total $0 n); try lia.
+  cases nz; try lia.
   eauto. eauto.
-  cases (Z.pos p3 + eval_Zexpr_Z_total $0 n)%Z; try lia.
-  eauto. lia. lia. invert H0. simpl. lia. simpl. lia. 
+  cases (Z.pos p3 + nz)%Z; try lia.
+  eauto. lia. lia. invert H0. simpl. lia. simpl. lia.
 
   erewrite result_has_shape_result_shape_Z by eauto.
   simpl.
@@ -1983,15 +1943,13 @@ Proof.
 Qed.
 
 Lemma well_formed_allocation_padr :
-  forall l m l0 k st h p v reindexer,
+  forall l m l0 k kz st h p v reindexer,
     result_has_shape (V l) (m :: l0) ->
-    eq_zexpr k (| eval_Zexpr_Z_total $0 k |)%z ->
-    (0 <= eval_Zexpr_Z_total $0 k)%Z ->
+    eval_Zexpr $0 k kz ->
+    (0 <= kz)%Z ->
     well_formed_allocation
       reindexer
-      (V
-         (l ++ repeat (gen_pad l0)
-            (Z.to_nat (eval_Zexpr_Z_total $0 k)))) st h p v ->
+      (V (l ++ repeat (gen_pad l0) (Z.to_nat kz))) st h p v ->
     (forall l : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l) ->
@@ -2011,7 +1969,7 @@ Lemma well_formed_allocation_padr :
                    | (v0, d) :: xs => (v0, (d + k)%z) :: xs
                    end) (V l) st h p v.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Hsh Hk Hknonneg Halloc Hvarsarg Henv HeqZlist
+  intros ? ? ? ? ? ? ? ? ? ? Hsh Hk Hknonneg Halloc Hvarsarg Henv HeqZlist
          Hvarsub Hmap.
   unfold well_formed_allocation in *.
   simpl in *.
@@ -2034,22 +1992,16 @@ Proof.
   cases (reindexer
            (shape_to_index
               (result_shape_Z
-                 (V
-                    (l ++
-                       repeat (gen_pad l0)
-                       (Z.to_nat (eval_Zexpr_Z_total $0 k)))))
+                 (V (l ++ repeat (gen_pad l0) (Z.to_nat kz))))
               (shape_to_vars
                  (result_shape_Z
-                    (V
-                       (l ++
-                          repeat (gen_pad l0)
-                          (Z.to_nat (eval_Zexpr_Z_total $0 k)))))))).
+                    (V (l ++ repeat (gen_pad l0) (Z.to_nat kz))))))).
   { eapply reindexer_not_empty_vars_in_index in Heq1. propositional. auto.
     erewrite result_has_shape_result_shape_Z.
     2: { eapply result_has_shape_concat. eauto.
          eapply result_has_shape_repeat_gen_pad. }
     simpl.
-    cases (m + Z.to_nat (eval_Zexpr_Z_total $0 k)).
+    cases (m + Z.to_nat kz).
     - simpl. unfold not. intros. cups_empty.
     - simpl. unfold not. intros. cups_empty. }
   invs. eexists. split. eassumption.
@@ -2113,19 +2065,19 @@ Proof.
 Qed.
 
 Lemma well_formed_allocation_split :
-  forall reindexer st h p v k l0 l n,
+  forall reindexer st h p v k kz l0 l n,
     well_formed_allocation reindexer
-             (V (split_result (Z.to_nat (eval_Zexpr_Z_total $0 k)) l)) st h p v ->
+             (V (split_result (Z.to_nat kz) l)) st h p v ->
 result_has_shape (V l) (n :: l0) ->
     (forall l0 : list (Zexpr * Zexpr),
         vars_of_reindexer (reindexer l0) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l0) ->
-    (0 < eval_Zexpr_Z_total $0 k)%Z ->
+    (0 < kz)%Z ->
     (forall (var : var) (k0 : Z) (l2 : list (Zexpr * Zexpr)),
         ~ var \in vars_of_reindexer (reindexer []) ->
                   map (subst_var_in_Z_tup var k0) (reindexer l2) =
                     reindexer (map (subst_var_in_Z_tup var k0) l2)) ->
-    (eq_zexpr k (| eval_Zexpr_Z_total $0 k |)%z) ->
+    eval_Zexpr $0 k kz ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
     vars_of_reindexer (reindexer []) \subseteq dom v ->
     (forall l2 l3 : list (Zexpr * Zexpr),
@@ -2139,7 +2091,7 @@ well_formed_allocation
        | (v0, d) :: xs => ((v0 / k)%z, (d // k)%z) :: ((ZMod v0 k)%z, k) :: xs
        end) (V l) st h p v.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Halloc Hsh Hvarsub Hknonneg Hmap Hkz
+  intros ? ? ? ? ? ? ? ? ? ? Halloc Hsh Hvarsub Hknonneg Hmap Hkz
          Henv Hvarsubdom HeqZlist.
   eapply well_formed_allocation_result_V in Halloc; eauto.
   invs. unfold well_formed_allocation.
@@ -2171,8 +2123,7 @@ Proof.
     rewrite <- H.
     repeat rewrite map_cons.
     erewrite eq_partial_interpret_reindexer_split.
-    eexists ((z / eval_Zexpr_Z_total $0 k)%Z ::
-                                          (z mod eval_Zexpr_Z_total $0 k)%Z :: x1).
+    eexists ((z / kz)%Z :: (z mod kz)%Z :: x1).
     split. reflexivity.
     eapply filter_In. propositional.
     repeat decomp_goal_index.
@@ -2187,8 +2138,8 @@ Proof.
     eapply mod_upper_bound. lia.
     rewrite <- H4.
     f_equal. f_equal.
-    rewrite <- (Z2Nat.id (eval_Zexpr_Z_total $0 k)) at 1 by lia.
-    rewrite <- (Z2Nat.id (eval_Zexpr_Z_total $0 k)) at 2 by lia.
+    rewrite <- (Z2Nat.id kz) at 1 by lia.
+    rewrite <- (Z2Nat.id kz) at 2 by lia.
     erewrite result_lookup_Z_option_split. reflexivity.
     eauto. lia. eassumption. lia. eauto.
     eauto. eauto. eauto. eauto. eauto. eauto. lia. eauto. lia.

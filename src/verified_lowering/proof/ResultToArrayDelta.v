@@ -559,11 +559,10 @@ Lemma tensor_to_array_delta_empty_tensor :
 Proof. reflexivity. Qed.
 
 Lemma tensor_to_array_delta_cons :
-  forall r0 v i lo hi reindexer,
-    eq_zexpr lo (| eval_Zexpr_Z_total $0 lo |)%z ->
-    eq_zexpr hi (| eval_Zexpr_Z_total $0 hi |)%z ->
-    Z.to_nat (eval_Zexpr_Z_total $0 hi - eval_Zexpr_Z_total $0 lo) =
-      Datatypes.S (Datatypes.length r0) ->
+  forall r0 v i lo loz hi hiz reindexer,
+    eval_Zexpr $0 lo loz ->
+    eval_Zexpr $0 hi hiz ->
+    Z.to_nat (hiz - loz) = Datatypes.S (Datatypes.length r0) ->
     forall r,
       result_has_shape (V (r::r0)) (result_shape_nat (V (r::r0))) ->
       partial_injective
@@ -597,12 +596,12 @@ Lemma tensor_to_array_delta_cons :
                            (((! i ! - lo)%z,
                               (hi - lo)%z) :: l0))
               (result_shape_Z r)
-              (v $+ (i, eval_Zexpr_Z_total $0 lo))) r) =
+              (v $+ (i, loz))) r) =
         tensor_to_array_delta (partial_interpret_reindexer
                                  reindexer (result_shape_Z (V (r :: r0))) v)
                               (V (r :: r0)).
 Proof.
-  intros ? ? ? ? ? ? ? ? ? ? ? Hinj HeqZlist Hvarsub Hmap Hvarsarg. intros.
+  intros ? ? ? ? ? ? ? ? ? ? ? ? ? Hinj HeqZlist Hvarsub Hmap Hvarsarg. intros.
   cases r0.
   { unfold tensor_to_array_delta at 1.
     unfold tensor_to_array_delta_by_indices at 1. simpl.
