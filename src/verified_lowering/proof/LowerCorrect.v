@@ -1526,7 +1526,6 @@ Proof.
             clear Heq. clear Heq0. clear Heq2. clear H3.
             decomp_well_formed_reindexer.
             erewrite result_has_shape_result_shape_Z in Hinj by eauto.
-            Check eq_partial_interpret_reindexer_padl.
             erewrite eq_partial_interpret_reindexer_padl in H6,H8;
               try eassumption; try apply Henv; try lia.
             erewrite eq_partial_interpret_reindexer_concat_l in H6;
