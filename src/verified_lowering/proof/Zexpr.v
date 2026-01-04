@@ -3368,10 +3368,20 @@ Qed.
 Lemma vars_of_reindexer_subseteq_map_partially_eval_Z_tup : forall l v,
     vars_of_reindexer l \subseteq dom v ->
     Forall (fun x => vars_of_Zexpr x = [])
-           (map fst (map (partially_eval_Z_tup v) l)).
+      (map fst (map (partially_eval_Z_tup v) l)) /\
+      Forall (fun x => vars_of_Zexpr x = [])
+        (map snd (map (partially_eval_Z_tup v) l)).
 Proof.
   induct l; propositional.
   - econstructor.
+  - econstructor.
+  - simpl. econstructor.
+    simpl in H.
+    assert (constant (vars_of_Zexpr a0) \subseteq dom v) by sets.
+    eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+    auto.
+    simpl in H.
+    apply IHl. sets.
   - simpl. econstructor.
     simpl in H.
     assert (constant (vars_of_Zexpr a0) \subseteq dom v) by sets.

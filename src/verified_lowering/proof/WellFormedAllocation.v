@@ -190,12 +190,12 @@ Lemma well_formed_allocation_truncl :
         vars_of_reindexer (reindexer l0) =
           vars_of_reindexer (reindexer []) \cup vars_of_reindexer l0) ->
     result_has_shape (V (gen_pad_list (Z.to_nat kz :: l0) ++ x)) (m :: l0) ->    
+    eval_Zexpr $0 k kz ->
     (0 <= kz)%Z ->
     (forall (var : var) (k0 : Z) (l2 : list (Zexpr * Zexpr)),
         ~ var \in vars_of_reindexer (reindexer []) ->
                   map (subst_var_in_Z_tup var k0) (reindexer l2) =
                     reindexer (map (subst_var_in_Z_tup var k0) l2)) ->
-    eval_Zexpr $0 k kz ->
     (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
     vars_of_reindexer (reindexer []) \subseteq dom v ->
     (forall l2 l3 : list (Zexpr * Zexpr),
@@ -210,7 +210,7 @@ Lemma well_formed_allocation_truncl :
            end)      
          (V (gen_pad_list (Z.to_nat kz :: l0) ++ x)) st h p v.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? ? Halloc Hvarsub Hsh Hknonneg Hmap Hkz Henv
+  intros ? ? ? ? ? ? ? ? ? ? Halloc Hvarsub Hsh Hkz Hknonneg Hmap Henv
          Hvarsubdom HeqZlist.
   eapply well_formed_allocation_result_V in Halloc; eauto.
   invs. unfold well_formed_allocation.
