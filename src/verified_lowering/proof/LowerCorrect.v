@@ -1184,18 +1184,20 @@ Proof.
        eapply IHeval_expr in H5; eauto.
        rewrite Heq in H5. auto.
        invs. eauto.
-   - (* LET *)
+    - (* LET *)
+      pose proof size_of_sizeof as Hsz. specialize (Hsz _ e1 _ ltac:(eassumption)).
+      destruct Hsz as (?&Hsz&?). subst.
+      invert Hsize.
      cases sz1; simpl in *.
-     + (* SCALAR LET *)
-       simpl in *.
-       erewrite size_of_sizeof in Heval by eassumption.
+      + (* SCALAR LET *)
+        invert Hsz. rewrite <- H6 in *.
        assert (result_has_shape l1 []) as Hl1.
        { eauto using size_of_eval_expr_result_has_shape. }
        invert Hl1.
        simpl in Heval.
-       invert Heval. invert H12. invert H14. invert H15. invert H9.
+       invert Heval. invert H14. invert H16. invert H17. invert H11.
        invert Hpad.
-       eapply IHeval_expr1 in H10; try eassumption.
+       eapply IHeval_expr1 in H12; try eassumption.
        2: { eapply well_formed_environment_alloc_stack; eauto. sets.
             sets. }
        2: { decomp_well_formed_reindexer. propositional.
@@ -1210,12 +1212,11 @@ Proof.
             split; intros. sets. invs'. sets. }
        2: { apply well_formed_allocation_scalar_id. }
        2: { eapply contexts_agree_alloc_stack; eauto. }
-       simpl in H10. rewrite lookup_add_eq in * by auto.
-       rewrite add_overwrite in H10. invert H10.
+       simpl in H12. rewrite lookup_add_eq in * by auto.
+       rewrite add_overwrite in H12. invert H12.
        clear IHeval_expr1.
-       eapply IHeval_expr2 in H11.
+       eapply IHeval_expr2 in H13.
        2: eauto.
-       2: { invert Hsize. eauto. }
        2: { rewrite Rplus_0_l.
             eapply well_formed_environment_let_bind1_scalar.
             eauto. sets. sets. sets. }
@@ -1234,7 +1235,7 @@ Proof.
        2: { intros. cases (x0 ==v x).
             - subst. rewrite lookup_add_eq in * by auto. invs'.
               simpl. eq_size_of.
-              eapply has_pad_gen_pad in H12.
+              eapply has_pad_gen_pad in H14.
               2: { eauto. }
               2: { econstructor. }
               eauto. eauto. eauto.
@@ -1258,32 +1259,44 @@ Proof.
           decomp_well_formed_environment.
           rewrite cap_distr in Hsthec.
           eapply cup_empty in Hsthec. invs'.
-          rewrite cap_distr in H7.
-          eapply cup_empty in H7. invs'.
-          eapply constant_cap_empty in H9.
+          rewrite cap_distr in H.
+          eapply cup_empty in H. invs'.
+          eapply constant_cap_empty in H10.
           sets.
        -- invs'. unfold lookup_total.
-          rewrite H7. split. auto.
+          rewrite H8. split. auto.
           erewrite <- add_remove_id. reflexivity.
           decomp_well_formed_environment.
           rewrite cap_distr in Hsthec.
           eapply cup_empty in Hsthec. invs'.
           rewrite cap_distr in H1.
           eapply cup_empty in H1. invs'.
-          eapply constant_cap_empty in H10.
+          eapply constant_cap_empty in H12.
           sets.
      + (* VECTOR LET *)
-       erewrite size_of_sizeof in Heval by eassumption. simpl in Heval.
+        invert Hsz. rewrite <- H5 in *.        
        invs'.
        assert (result_has_shape l1 (n :: sz1)) as Hsh1.
        { eauto using size_of_eval_expr_result_has_shape. }
        destruct l1 as [|l1]; [invert Hsh1|]; [].
        invs.
        assert (result_has_shape l2 ls) as Hsh2.
-       { eapply size_of_eval_expr_result_has_shape; eauto. }
+       { eapply size_of_eval_expr_result_has_shape.
+         2: eassumption.
+         eapply size_of_includes. apply empty_includes. eassumption. }
        invert Hpad. eq_size_of.
 
-       eapply IHeval_expr1 in H12; clear IHeval_expr1.
+       pose proof size_of_sizeof as Hsz. specialize (Hsz _ e1 _ ltac:(eassumption)).
+       destruct Hsz as (?&Hsz&?). subst.
+
+       unfold flat_sizeof in *.
+       rewrite <- H5 in *.
+       pose proof eval_Zexpr_Z_fold_left_ZTimes as H''.
+       specialize (H'' _ _ v ltac:(eassumption) _ _ H8).
+       apply eval_Zexpr_Z_eval_Zexpr in H''.
+       eapply eval_Zexpr_deterministic in H''; [|apply H19]. subst.
+       
+       eapply IHeval_expr1 in H15; clear IHeval_expr1.
        2: eassumption.
        2: { eapply well_formed_environment_letbind1; eauto. }
        2: { decomp_well_formed_reindexer. propositional.
@@ -1293,29 +1306,27 @@ Proof.
             rewrite lookup_add_eq by auto. rewrite dom_add.
             split; intros.
             2: sets. invs'. rewrite add_0_r.
-            eapply dom_lookup_Some in H9. invert H9.
-            unfold flat_sizeof in *.
-            erewrite size_of_sizeof in * by eauto.
-            simpl in *.
-            pose proof (lookup_alloc_array (fold_left mul sz1 n) x0) as H9.
-            destruct H9.
+            eapply dom_lookup_Some in H12. invert H12.
+            rewrite <- Z_of_nat_fold_left_mul. rewrite Nat2Z.id.
+            pose proof (lookup_alloc_array (fold_left mul sz1 n) x1) as H'.
+            destruct H' as [H'|H'].
             2: eassumption.
-            eapply lookup_None_dom in H9.
-            rewrite dom_alloc_array in H9.
-            exfalso. apply H9.
+            eapply lookup_None_dom in H'.
+            rewrite dom_alloc_array in H'.
+            exfalso. apply H'.
             erewrite <- In_iff_in.
-            eapply In_zrange. clear H10.
+            eapply In_zrange. clear H'.
             unfold tensor_to_array_delta in *.          
-            eapply lookup_Some_dom in H1.
-            unfold tensor_to_array_delta_by_indices in H1.
-            erewrite partial_dom_fold_left_array_add in H1.
+            eapply lookup_Some_dom in H.
+            unfold tensor_to_array_delta_by_indices in H.
+            erewrite partial_dom_fold_left_array_add in H.
             rewrite dom_empty in *. rewrite cup_empty_r in *.
-            rewrite filter_idempotent in H1.
-            eapply In_iff_in in H1.
-            eapply in_extract_Some in H1. eapply in_map_iff in H1. invert H1.
-            invert H10. decomp_index.
-            rewrite partial_interpret_reindexer_id_flatten in H1; eauto.
-            invert H1.
+            rewrite filter_idempotent in H.
+            eapply In_iff_in in H.
+            eapply in_extract_Some in H. eapply in_map_iff in H. invert H.
+            invs'. decomp_index.
+            rewrite partial_interpret_reindexer_id_flatten in H; eauto.
+            invert H.
             eapply In_zrange. eassert (zrange _ _ = _) as ->; cycle 1.
             eapply in_mesh_grid_flatten_in_range.
             eapply Forall_map. eapply Forall_forall. intros. lia.
@@ -1327,24 +1338,22 @@ Proof.
             apply Henv.
 
             eapply partial_injective_id_reindexer; eauto. apply Henv. }
-       2: { eassert (flat_sizeof _ = _) as ->.
-            2: { eapply well_formed_allocation_letbind1; eauto.
-                 apply Henv.
-                 eapply well_formed_environment_not_in_stack_heap. apply Henv. sets. }
-            unfold flat_sizeof in *.
-            erewrite size_of_sizeof in * by eassumption.
-            simpl in *. cbv [result_shape_Z].
-            replace 1%Z with (Z.of_nat 1) by reflexivity.
+       2: { eapply well_formed_allocation_letbind1.
+            apply Henv.
+            eapply well_formed_environment_not_in_stack_heap. apply Henv.
+            sets.
+            erewrite result_has_shape_result_shape_Z by eauto.
             rewrite <- Z_of_nat_fold_left_mul.
-            rewrite Nat2Z.id. erewrite result_has_shape_result_shape_nat by eassumption.
+            replace 1%Z with (Z.of_nat 1%nat) by reflexivity.
+            rewrite <- Z_of_nat_fold_left_mul.
             rewrite fold_left_mul_filter_until.
-            simpl. f_equal. lia. }
+            simpl. f_equal. f_equal. lia. }
        3: { eassumption. }
        cases (shape_to_index (result_shape_Z (V l1))
                 (shape_to_vars (result_shape_Z (V l1)))).
        { eapply shape_to_index_not_empty_Z in Heq. propositional. }
        invs'.
-       pose proof H10 as Hsize. pose proof Hsize as Hsize'.
+       pose proof H9 as Hsize. pose proof Hsize as Hsize'.
        eapply IHeval_expr2 in Hsize'.
        2: { eauto. }
        2: { unfold alloc_array_in_heap. rewrite add_overwrite.
@@ -1372,19 +1381,16 @@ Proof.
             erewrite tensor_to_array_delta_id_valuation.
             2: { apply Henv. }
             eapply contexts_agree_add_alloc_heap; eauto.
-            cbv [flat_sizeof].
-            erewrite size_of_sizeof in * by eassumption.
-            cbn -[filter_until].
+            { simpl. constructor; auto. }
             replace 1%Z with (Z.of_nat 1) by reflexivity.
-            rewrite <- Z_of_nat_fold_left_mul. rewrite Nat2Z.id.
+            rewrite <- Z_of_nat_fold_left_mul.
+            rewrite <- Z_of_nat_fold_left_mul.
             rewrite fold_left_mul_filter_until.
-            simpl. f_equal. lia. }
+            simpl. f_equal. f_equal. lia. }
        2: { eauto. }
-       2: { intros. cases (x==v x0).
+       2: { intros. cases (x==v x1).
             - subst. rewrite lookup_add_eq in * by auto. invs.
               eapply has_pad_gen_pad. eauto. eauto.
-              eapply size_of_eval_expr_result_has_shape
-                in H; eauto.
               eapply result_has_shape_self; eauto.
               eauto. eauto.
             - rewrite lookup_add_ne in * by auto. eauto. }
@@ -1393,7 +1399,7 @@ Proof.
                 (shape_to_index (result_shape_Z l2)
                    (shape_to_vars (result_shape_Z l2)))).
        -- unfold well_formed_allocation in *. rewrite Heq0 in *.
-          invs'. rewrite H1.
+          invs'. rewrite H.
           rewrite add_remove.
           unfold alloc_array_in_heap.
           rewrite add_remove.
@@ -1401,15 +1407,15 @@ Proof.
           decomp_well_formed_environment.
           eapply remove_id.
           rewrite cap_distr in Hsthec. eapply cup_empty in Hsthec. invs'.
-          rewrite cap_distr in H7. eapply cup_empty in H7. invs'.
-          eapply constant_cap_empty in H9. sets.
+          rewrite cap_distr in H1. eapply cup_empty in H1. invs'.
+          eapply constant_cap_empty in H13. sets.
        -- unfold well_formed_allocation in *. rewrite Heq0 in *.
-          invs'. unfold lookup_total. rewrite H7.
+          invs'. unfold lookup_total. rewrite H1.
           unfold alloc_array_in_heap.
           repeat rewrite add_overwrite.
           rewrite lookup_add_eq by auto.
           rewrite lookup_add_ne.
-          rewrite H7.              
+          rewrite H1.              
           rewrite add_remove_comm.
           2: { intros. pose proof var_eq as Hor. specialize (Hor k k').
                destruct Hor; auto. }
@@ -1436,23 +1442,39 @@ Proof.
      unfold lookup_total in *.
      invert Hsize. rename H5 into Hsize1. rename H6 into Hsize2.
      assert (result_has_shape (V l1) (n::sh2)) as Hsh1.
-     { eapply size_of_eval_expr_result_has_shape; eauto. }
+     { eapply size_of_eval_expr_result_has_shape. 2: eassumption.
+       eapply size_of_includes. apply empty_includes. assumption. }
      assert (result_has_shape (V l2) (m::sh2)) as Hsh2.
-     { eapply size_of_eval_expr_result_has_shape; eauto. }
+     { eapply size_of_eval_expr_result_has_shape. 2: eassumption.
+       eapply size_of_includes. apply empty_includes. assumption. }
      pose proof (result_has_shape_length _ _ _ Hsh1).
      pose proof (result_has_shape_length _ _ _ Hsh2). subst.
      pose proof (result_has_shape_concat _ _ _ _ _ Hsh1 Hsh2).
-     erewrite size_of_sizeof in * by eassumption.
 
      invert Heval. invert Hpad. eq_size_of. invert H4. invert H5.
+
+     pose proof size_of_sizeof as Hsz. specialize (Hsz _ e1 _ ltac:(eassumption)).
+     destruct Hsz as (?&Hsz&?). subst.
+     invert Hsz. rewrite <- H4 in *.
+     
+     pose proof size_of_sizeof as Hsz. specialize (Hsz _ e2 _ ltac:(eassumption)).
+     destruct Hsz as (?&Hsz&?). subst.
+     invert Hsz. rewrite <- H5 in *.
+
      eapply IHeval_expr1 in H8; auto; clear IHeval_expr1.
      2: { eauto. }
      2: { eapply well_formed_environment_subseteq_vars. eassumption. sets. }
      2: { eapply well_formed_allocation_result_V in Halloc.
           eapply well_formed_reindexer_concat_l;
             try apply Hrdx.
-          rewrite H2 in *. eauto. rewrite H2 in *. eauto.
-          apply Henv. eauto.
+          rewrite Nat2Z.id. eassumption.
+          rewrite Nat2Z.id. eassumption.
+          lia.
+          lia.
+          eassumption.
+          eassumption.
+          apply Henv.
+          eauto.
           apply Hrdx. }
      2: { eapply well_formed_allocation_concat_l; eauto;
           try eapply Henv; try eapply Hrdx. }
@@ -1500,17 +1522,14 @@ Proof.
           - invs'.
             repeat erewrite result_has_shape_result_shape_Z in * by eauto.
             repeat decomp_index.
-            rewrite <- H5 in H4.
+            rewrite <- H8 in H6.
             clear Heq. clear Heq0. clear Heq2. clear H3.
             decomp_well_formed_reindexer.
             erewrite result_has_shape_result_shape_Z in Hinj by eauto.
-            erewrite eq_partial_interpret_reindexer_padl in H5,H4;
-              try assumption; try apply Henv; try lia.
-            2: { erewrite size_of_sizeof by eauto. simpl. lia. }
-            2: { erewrite size_of_sizeof by eauto. simpl. lia. }
-            erewrite size_of_sizeof in * by eauto.
-            simpl eval_Zexpr_Z_total in H5,H4.
-            erewrite eq_partial_interpret_reindexer_concat_l in H4;
+            Check eq_partial_interpret_reindexer_padl.
+            erewrite eq_partial_interpret_reindexer_padl in H6,H8;
+              try eassumption; try apply Henv; try lia.
+            erewrite eq_partial_interpret_reindexer_concat_l in H6;
               try assumption; try apply Henv; try lia.
             3: apply Hsh1.
             3: apply Hsh2.
@@ -1518,18 +1537,17 @@ Proof.
                  eapply filter_In. propositional.
                  repeat decomp_goal_index.
                  propositional. }
-            cbv match in *.
             rewrite Nat2Z.id in *.
-            pose proof H4 as H4'.
-            eapply Hinj in H4.
-            invert H4.
+            pose proof H6 as H6'.
+            eapply Hinj in H6.
+            invert H6.
             + invs'. lia.
-            + rewrite H4' in H3. rewrite H3 in *.
+            + rewrite H6' in H3. rewrite H3 in *.
               discriminate.
             + eapply filter_In. propositional.
               repeat decomp_goal_index.
               propositional. lia. 
-              rewrite <- H15.
+              rewrite <- H23.
               simpl.
               rewrite nth_error_app1.
               auto.
@@ -1538,7 +1556,7 @@ Proof.
             + eapply filter_In. propositional.
               repeat decomp_goal_index.
               propositional. lia. lia.
-              rewrite <- H15.
+              rewrite <- H23.
               simpl.
               rewrite nth_error_app2 by lia.
               rewrite Z2Nat.inj_add by lia.
@@ -1551,24 +1569,25 @@ Proof.
               eauto.
               cases (Z.pos p0 + Z.of_nat (length l1))%Z; try lia.
               eauto.
+            + eassumption.
           - invs'.
             repeat erewrite result_has_shape_result_shape_Z in * by eauto.
             repeat decomp_index.
-            rewrite <- H5 in H4.
+            rewrite <- H8 in H6.
             clear Heq. clear Heq0. clear Heq2. clear H3.
             decomp_well_formed_reindexer.
             erewrite result_has_shape_result_shape_Z in Hinj by eauto.
-            erewrite eq_partial_interpret_reindexer_padl in H4;
+            erewrite eq_partial_interpret_reindexer_padl in H6;
               try assumption; try apply Henv; try lia.
-            2: { erewrite size_of_sizeof by eauto. simpl. lia. }
-            erewrite size_of_sizeof in * by eauto.
-            cbv match in *.
-            erewrite eq_partial_interpret_reindexer_concat_l in H5,H4;
+            2: { eassumption. }
+            erewrite eq_partial_interpret_reindexer_concat_l in H8,H6;
               try assumption; try apply Henv; try lia.
             3: apply Hsh1.
             3: apply Hsh2.
+            3: eassumption.
             4: apply Hsh1.
             4: apply Hsh2.
+            4: eassumption.
             2: { erewrite result_has_shape_result_shape_Z by eauto.
                  eapply filter_In. propositional.
                  repeat decomp_goal_index.
@@ -1578,16 +1597,16 @@ Proof.
                  repeat decomp_goal_index.
                  propositional. }
             rewrite Nat2Z.id in *.
-            pose proof H4 as H4'.
-            eapply Hinj in H4.
-            invert H4.
+            pose proof H6 as H6'.
+            eapply Hinj in H6.
+            invert H6.
             + invs'. lia.
-            + rewrite H4' in H3. rewrite H3 in *.
+            + rewrite H6' in H3. rewrite H3 in *.
               discriminate.
             + eapply filter_In. propositional.
               repeat decomp_goal_index.
               propositional. lia. lia.
-              rewrite <- H11.
+              rewrite <- H21.
               simpl.
               rewrite nth_error_app2 by lia.
               rewrite Z2Nat.inj_add by lia.
@@ -1602,10 +1621,11 @@ Proof.
             + eapply filter_In. propositional.
               repeat decomp_goal_index.
               propositional. lia. 
-              rewrite <- H11.
+              rewrite <- H21.
               simpl.
               rewrite nth_error_app1 by lia.
-              auto. }
+              auto.
+            + lia. }
      2: { eauto. }
      2: { eauto. }
      2: { decomp_well_formed_reindexer.
@@ -1613,7 +1633,6 @@ Proof.
           erewrite result_has_shape_result_shape_Z by eauto.
             eapply partial_injective_concat_l; eauto; try apply Henv. }
      2: { decomp_well_formed_reindexer.
-          erewrite size_of_sizeof by eassumption. simpl.
           erewrite result_has_shape_result_shape_Z by eauto.
           eapply partial_injective_concat_r; eauto.          
           3: lia. 2: apply Henv. rewrite Nat2Z.id. assumption. }
@@ -1621,19 +1640,17 @@ Proof.
      2: { eapply well_formed_environment_add_heap.
           eapply well_formed_environment_subseteq_vars. eassumption.
           sets. auto. }
-     2: { erewrite size_of_sizeof by eassumption. simpl.
-          eapply well_formed_allocation_result_V in Halloc.
+     2: { eapply well_formed_allocation_result_V in Halloc.
           invert Halloc. invs'.
           eapply well_formed_reindexer_concat_r;
             try apply Henv; eauto.
-          rewrite Nat2Z.id. assumption.
-          lia.
+          rewrite Nat2Z.id. eassumption.
+          rewrite Nat2Z.id. eassumption.
+          lia. lia.
           apply Hrdx. }
      2: { eapply well_formed_allocation_add_heap.
-          erewrite size_of_sizeof by eauto.
           eapply well_formed_allocation_concat_r; eauto;
             try apply Henv; try apply Hrdx.
-          rewrite Nat2Z.id. eassumption.
           rewrite Nat2Z.id. eassumption.
           lia.
           eassumption. }
@@ -1641,15 +1658,8 @@ Proof.
             try apply Henv. }
        eapply eq_tensor_to_array_delta_by_indices. intros.
      2: { eapply Hrdx. }
-     2: { erewrite size_of_sizeof by eauto. simpl.
-          decomp_well_formed_reindexer.
+     2: { decomp_well_formed_reindexer.
           repeat erewrite result_has_shape_result_shape_Z by eauto.
-          replace (fun e : Zexpr =>
-                          match eval_Zexpr_Z $0 e with
-                          | Some x0 => x0
-                          | None => 0%Z
-                          end) with
-            (eval_Zexpr_Z_total $0) in * by reflexivity.
           cases l1. invert Hsh1.
           { simpl length. simpl Z.of_nat.
             rewrite add_0_l. rewrite app_nil_l.
@@ -1662,22 +1672,22 @@ Proof.
             cases (z <? 0)%Z. eapply Z.ltb_lt in Heq5. lia.
             rewrite Z.sub_0_r in *.
 
-            erewrite eq_partial_interpret_reindexer_padl in H6;
+            erewrite eq_partial_interpret_reindexer_padl in H11;
               eauto; try apply Henv; try lia.
-            erewrite eq_partial_interpret_reindexer_padl in H6;
+            erewrite eq_partial_interpret_reindexer_padl in H11;
               eauto; try apply Henv; try lia.
 
             rewrite add_0_l in *.
             rewrite Z.sub_0_r in *.
             rewrite Z.add_0_r in *.
-            eapply Hinj in H6.
-            destruct H6 as [H6|H6].
-            - invert H6. left. f_equal. lia. 
+            eapply Hinj in H11.
+            destruct H11 as [H11|H11].
+            - invert H11. left. f_equal. lia. 
             - erewrite eq_partial_interpret_reindexer_padl;
                 eauto; try apply Henv.
               rewrite Z.add_0_r.
               simpl Z.to_nat. rewrite add_0_l.
-              rewrite H6. propositional.
+              rewrite H11. propositional.
               lia. lia.
             - eapply filter_In. propositional.
               repeat decomp_goal_index. propositional.
@@ -1695,18 +1705,18 @@ Proof.
             2: { eapply Z.ltb_ge in Heq4. lia. }
             destruct (z <? Z.of_nat _)%Z eqn:Heq5.
             2: { eapply Z.ltb_ge in Heq5. lia. }
-            erewrite eq_partial_interpret_reindexer_concat_l in H6;
+            erewrite eq_partial_interpret_reindexer_concat_l in H11;
               auto; try apply Henv.
             3: apply Hsh1.
             3: { econstructor. }
-            erewrite eq_partial_interpret_reindexer_concat_l in H6;
+            erewrite eq_partial_interpret_reindexer_concat_l in H11;
               auto; try apply Henv.
             3: apply Hsh1.
             3: { econstructor. }
             rewrite add_0_r in *.
             rewrite app_nil_r in *.
             erewrite result_has_shape_result_shape_Z in Hinj by eauto.
-            simpl Z.to_nat in Hinj. eapply Hinj in H6.
+            simpl Z.to_nat in Hinj. eapply Hinj in H11.
             invert H6.
             propositional.
             erewrite eq_partial_interpret_reindexer_concat_l;
@@ -1714,10 +1724,11 @@ Proof.
             3: apply Hsh1.
             3: { econstructor. }
             rewrite add_0_r.
-            rewrite H7. propositional.
+            rewrite H8. propositional.
             erewrite result_has_shape_result_shape_Z by eauto.
             eapply filter_In. propositional.
             repeat decomp_goal_index. propositional.
+            eassumption.
             eapply filter_In. propositional.
             repeat decomp_goal_index. propositional.
             eapply filter_In. propositional.
@@ -1725,9 +1736,11 @@ Proof.
             erewrite result_has_shape_result_shape_Z by eauto.
             eapply filter_In. propositional.
             repeat decomp_goal_index. propositional.
+            eassumption.
             erewrite result_has_shape_result_shape_Z by eauto.
             eapply filter_In. propositional.
-            repeat decomp_goal_index. propositional. }
+            repeat decomp_goal_index. propositional.
+            eassumption. }
           invert Hsh1. invert Hsh2.
           simpl map. posnats.
           rewrite <- add_succ_l.
@@ -1745,7 +1758,7 @@ Proof.
             simpl.
             econstructor; eauto.
             apply Henv.
-            auto. auto. auto. lia. auto. }
+            auto. auto. auto. assumption. lia. auto. }
           { repeat erewrite <- map_cons.
             simpl length in *.
             rewrite <- filter_until_cons by lia.
@@ -1757,22 +1770,21 @@ Proof.
             simpl.
             econstructor; eauto.
             apply Henv.
-            auto. auto. auto. }
+            auto. auto. auto. assumption. }
           { apply cap_empty_exclusion. propositional.
             - rewrite <- @In_iff_in in *.
               rewrite <- @in_extract_Some in *.
               rewrite in_map_iff in *. invs'.
               repeat decomp_index. simpl map in *.
               repeat decomp_index.
-              pose proof H4 as H4'.
-              rewrite <- H5 in H4'.
-              rewrite <- map_cons in H4',H5.
-              rewrite <- filter_until_cons in H4',H5 by lia.
-              erewrite eq_partial_interpret_reindexer_concat_l in H4'.
-              3: { econstructor. reflexivity. eapply H11. eauto. }
+              pose proof H6 as H6'.
+              rewrite <- H8 in H6'.
+              rewrite <- map_cons in H6',H8.
+              rewrite <- filter_until_cons in H6',H8 by lia.
+              erewrite eq_partial_interpret_reindexer_concat_l in H6'.
+              3: { econstructor. reflexivity. apply H21. eauto. }
               3: { apply VectorConsShape. reflexivity.
                    eauto. eauto. }
-
               2: { eapply filter_In. propositional.
                    erewrite result_has_shape_result_shape_Z.
                    2: { econstructor. reflexivity. eauto. eauto. }
@@ -1782,9 +1794,9 @@ Proof.
               2: { auto. }
               2: { auto. }
               2: { auto. }
-              rewrite <- map_cons in H4'.
-              rewrite <- filter_until_cons in H4' by lia.
-              erewrite eq_partial_interpret_reindexer_padl in H4',H5; eauto; try lia.
+              rewrite <- map_cons in H6'.
+              rewrite <- filter_until_cons in H6' by lia.
+              erewrite eq_partial_interpret_reindexer_padl in H6',H8; eauto; try lia.
               2: { apply Henv. }
               2: { apply Henv. }
               erewrite result_has_shape_result_shape_Z in Hinj.
@@ -1792,16 +1804,16 @@ Proof.
                    econstructor; eauto.
                    econstructor; eauto. }
               rewrite Nat2Z.id in *. cbn [length] in *.
-              pose proof H4' as H4''.
-              eapply Hinj in H4'.
-              invert H4'. invs'. lia.
-              rewrite H6 in H4''.
-              rewrite <- H4'' in H5.
+              pose proof H6' as H6''.
+              eapply Hinj in H6'.
+              invert H6'. invs'. lia.
+              rewrite H11 in H6''.
+              rewrite <- H6'' in H8.
               discriminate.
               eapply filter_In. propositional.
               repeat decomp_goal_index.
               propositional. lia.
-              rewrite <- H21.
+              rewrite <- H27.
               simpl.
               rewrite app_comm_cons.
               rewrite nth_error_app1. auto.
@@ -1811,7 +1823,7 @@ Proof.
               eapply filter_In. propositional.
               repeat decomp_goal_index.
               propositional. lia. lia.
-              rewrite <- H21.
+              rewrite <- H27.
               cbn [result_lookup_Z_option].
               rewrite nth_error_app2.
               erewrite (result_has_shape_length (_ :: _)).
@@ -1822,12 +1834,13 @@ Proof.
               simpl Z.add at 1.
               cbv match. eauto.
               destruct ((Z.pos p5 + Z.of_nat _)%Z) eqn:?; try lia.
-              eauto. simpl. lia.
+              eauto. simpl. lia. eassumption.
             - rewrite <- @In_iff_in in *.
               rewrite <- @in_extract_Some in *.
               rewrite in_map_iff in *. invs'.
               repeat decomp_index. simpl map in *.
               repeat decomp_index.
+              (*continue here*)
               pose proof H4 as H4'.
               rewrite <- H5 in H4'.
               rewrite <- map_cons in H4',H5.
