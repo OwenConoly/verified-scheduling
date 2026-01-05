@@ -134,6 +134,18 @@ Proof.
     + eapply IHl in H0. sets.
 Qed.
 
+Lemma snd_vars_of_reindexer_vars_of_Zexpr_subseteq :
+  forall l x1,
+    In x1 (map snd l) ->
+    constant (vars_of_Zexpr x1) \subseteq (vars_of_reindexer l).
+Proof.
+  induct l; intros.
+  - simpl in *. propositional.
+  - simpl in *. cases a. simpl in *. invert H.
+    + sets.
+    + eapply IHl in H0. sets.
+Qed.
+
 Theorem lower_correct_exists :
   forall e,
     forall v ec r,
@@ -1410,8 +1422,9 @@ Proof.
     split. eauto. split. eauto.
     eapply eq_Z_tuple_index_list_id.
   - simpl in *. invs. eq_size_of. invs'. invert Hpad.
-    + eq_size_of. invs'. rename H0 into Hsize. pose proof Hsize as Hsh.
-      eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
+    + eq_size_of. invs'. rename H2 into Hsize. pose proof Hsize as Hsh.
+      eapply size_of_includes in Hsh. 2: apply empty_includes.
+      eapply size_of_eval_expr_result_has_shape in Hsh; eauto; [].
       pose proof Hsize as Heval.
       eapply IHeval_expr in Heval.
       2: { eauto. }
@@ -1426,8 +1439,9 @@ Proof.
       2: { eauto. }
       2: { eauto. }
       eauto.
-    + eq_size_of. invs'. pose proof H0 as Hsize. pose proof Hsize as Hsh.
-      eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
+    + eq_size_of. invs'. pose proof H2 as Hsize. pose proof Hsize as Hsh.
+      eapply size_of_includes in Hsh. 2: apply empty_includes.
+      eapply size_of_eval_expr_result_has_shape in Hsh; eauto; [].
       pose proof Hsize as Heval.
       eapply IHeval_expr in Heval.
       2: { eauto. }
@@ -1445,7 +1459,8 @@ Proof.
   - simpl in *. invs. invert Hpad.
     eq_size_of. invs'.
     rename H2 into Hsize. pose proof Hsize as Hsh.
-    eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
+    eapply size_of_includes in Hsh. 2: apply empty_includes.
+    eapply size_of_eval_expr_result_has_shape in Hsh; eauto; [].
     pose proof Hsize as Heval.
     eapply IHeval_expr in Heval; eauto.
     pose proof Halloc as Halloc2.
@@ -1456,27 +1471,32 @@ Proof.
       try apply Henv; try apply Hrdx; eauto.
   - simpl in *. invs. invert Hpad. eq_size_of. invs'.
     rename H6 into Hsize. pose proof Hsize as Hsh.
-    eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
-    rename H3 into Hk. apply eval_Zexpr_Z_eval_Zexpr in Hk.
-    cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *. invs'.
+    eapply size_of_includes in Hsh. 2: apply empty_includes.
+    eapply size_of_eval_expr_result_has_shape in Hsh; eauto; [].
+    rename H3 into Hk. pose proof Hk as Hk'.
+    eapply eval_Zexpr_includes_valuation in Hk'. 2: apply empty_includes.
+    apply eval_Zexpr_Z_eval_Zexpr in Hk'. rewrite Hk' in *. invs'. clear Hk'.    
+    apply eval_Zexpr_Z_eval_Zexpr in Hk. cbv [eval_Zexpr_Z_total] in *.
     
     pose proof Hsize as Heval.
     eapply IHeval_expr in Heval; eauto.
     pose proof Halloc as Halloc2.
     eapply well_formed_allocation_result_V in Halloc2. invert Halloc2. invs'.
     eapply well_formed_reindexer_split;
-      try apply Hrdx; try apply Henv; eauto. apply Hrdx.
+      try apply Hrdx; try apply Henv; eauto.
+    apply Hrdx.
     eapply well_formed_allocation_split;
       try apply Hrdx; try apply Henv; eauto.
   - simpl in *. invs. invert Hpad.
-    rename H5 into Hsize. pose proof Hsize as Hsh.
-    eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
-    rename H4 into Hk. pose proof Hk as Hk'.
+    rename H4 into Hsize. pose proof Hsize as Hsh.
+    eapply size_of_includes in Hsh. 2: apply empty_includes.
+    eapply size_of_eval_expr_result_has_shape in Hsh; eauto; [].
+    rename H3 into Hk. pose proof Hk as Hk'.
     eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
     apply eval_Zexpr_Z_eval_Zexpr in Hk'.
     rewrite Hk' in *. invs'. apply eval_Zexpr_Z_eval_Zexpr in Hk.
     cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
-    pose proof H6 as Hpad.
+    pose proof H7 as Hpad.
     eapply has_pad_gen_pad in Hpad; eauto.
     simpl in Hpad. invs'.
 
@@ -1485,9 +1505,9 @@ Proof.
     rewrite <- (firstn_skipn (length l - (Z.to_nat kz)) l).
     rewrite <- (rev_involutive (skipn _ _)).
     rewrite <- firstn_rev.
-    eapply forall_firstn_ge with (m:= Z.to_nat kz) in H3.
+    eapply forall_firstn_ge with (m:= Z.to_nat kz) in H4.
     2: { lia. }
-    eapply forall_eq_gen_pad in H3. rewrite H3.
+    eapply forall_eq_gen_pad in H4. rewrite H4.
     simpl gen_pad_list. rewrite rev_repeat.
     
     rewrite length_firstn. rewrite length_rev.
@@ -1507,16 +1527,21 @@ Proof.
       rewrite filter_negb_is_None_result_lookup_Z_option_gen_pad.
       unfold partial_injective. simpl. propositional.
       destruct l1; destruct l2; eauto.
-      invert H4. discriminate.
-      invert H4. discriminate.
+      destruct H5 as (H5&_). invert H5.
+      destruct H5 as (H5&_). invert H5.
       destruct p0. destruct p1.
       eapply HeqZlist.
       erewrite <- eq_Z_tuple_index_list_cons_tup in *.
-      propositional. subst. reflexivity.
+      invs'. auto using eq_zexpr_sub.
       destruct l1; simpl; rewrite Hmap; eauto.
-      destruct p0. simpl. unfold subst_var_in_Z_tup at 1. reflexivity.
+      destruct p0. simpl. unfold subst_var_in_Z_tup at 1. simpl.
+      f_equal. f_equal. f_equal. f_equal. apply subst_var_in_Zexpr_id.
+      erewrite eval_Zexpr_vars_empty by eauto.
+      auto.
       erewrite Hvarsarg. destruct l1. reflexivity.
-      destruct p0. reflexivity.
+      destruct p0. simpl.
+      erewrite (eval_Zexpr_vars_empty k) by eauto.
+      rewrite app_no_dups_empty_r.  reflexivity.
       unfold nondestructivity. unfold tensor_to_array_delta.
       rewrite filter_negb_is_None_result_lookup_Z_option_gen_pad.
       unfold tensor_to_array_delta_by_indices. simpl. rewrite dom_empty.
@@ -1543,14 +1568,14 @@ Proof.
     rewrite length_app. simpl. rewrite length_firstn.
     rewrite repeat_length. erewrite result_has_shape_length by eauto.
     rewrite min_l by lia. rewrite sub_add. reflexivity. lia.
-    apply Henv. eauto. lia. apply Hrdx.
+    apply Henv. eauto. lia. eassumption. lia. apply Hrdx.
 
     rewrite <- (firstn_skipn (length l-(Z.to_nat kz)) l).
     rewrite <- (rev_involutive (skipn _ _)).
     rewrite <- firstn_rev.
-    eapply forall_firstn_ge with (m:= Z.to_nat kz) in H3.
+    eapply forall_firstn_ge with (m:= Z.to_nat kz) in H4.
     2: { lia. }
-    eapply forall_eq_gen_pad in H3. rewrite H3.
+    eapply forall_eq_gen_pad in H4. rewrite H4.
     simpl gen_pad_list. rewrite rev_repeat.
     
     rewrite length_firstn. rewrite length_rev.
@@ -1578,17 +1603,18 @@ Proof.
     simpl. eapply Forall_repeat. eapply result_has_shape_gen_pad.
     rewrite length_app. simpl. rewrite length_firstn.
     rewrite repeat_length. erewrite result_has_shape_length by eauto.
-    rewrite min_l by lia. rewrite sub_add. reflexivity. lia.
+    rewrite min_l by lia. rewrite sub_add. reflexivity. lia. lia.
     apply Hrdx. eauto. apply Henv. apply Hrdx. apply Hrdx.
   - simpl in *. invs. invert Hpad.
-    rename H5 into Hsize. pose proof Hsize as Hsh.
+    rename H4 into Hsize. pose proof Hsize as Hsh.
+    eapply size_of_includes in Hsh. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
-    rename H4 into Hk. pose proof Hk as Hk'.
+    rename H3 into Hk. pose proof Hk as Hk'.
     eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
     apply eval_Zexpr_Z_eval_Zexpr in Hk'.
     rewrite Hk' in *. invs'. apply eval_Zexpr_Z_eval_Zexpr in Hk.
     cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
-    pose proof H6 as Hpad.
+    pose proof H7 as Hpad.
     eapply has_pad_gen_pad in Hpad; eauto.
     simpl in Hpad. invs'.
 
@@ -1620,17 +1646,24 @@ Proof.
       erewrite filter_negb_is_None_result_lookup_Z_option_gen_pad.
       unfold partial_injective. simpl. propositional.
       destruct l1; destruct l2; eauto.
-      invert H4. discriminate.
-      invert H4. discriminate.
+      destruct H5 as (H5&_). invert H5.
+      destruct H5 as (H5&_). invert H5.
       destruct p0. destruct p1. eapply HeqZlist.
       erewrite <- eq_Z_tuple_index_list_cons_tup in *.
-      propositional. subst. eapply eq_zexpr_sub; eauto.
-      subst. reflexivity.
+      invs'. auto using eq_zexpr_sub.
       destruct l1; rewrite Hmap. eauto. eauto. 
-      destruct p0. simpl. unfold subst_var_in_Z_tup at 1. reflexivity.
+      destruct p0. simpl. unfold subst_var_in_Z_tup at 1. simpl.
+      f_equal. f_equal. f_equal. f_equal. apply subst_var_in_Zexpr_id.
+      erewrite eval_Zexpr_vars_empty by eauto.
+      auto.
+      f_equal. apply subst_var_in_Zexpr_id.
+      erewrite eval_Zexpr_vars_empty by eauto.
+      auto.
       eauto.
       destruct l1; rewrite Hvarsarg; eauto.
-      destruct p0. simpl. rewrite app_no_dups_empty_r. reflexivity.
+      destruct p0. simpl.
+      erewrite (eval_Zexpr_vars_empty k) by eauto.
+      do 2 rewrite app_no_dups_empty_r. reflexivity.
       unfold nondestructivity in *.
       unfold tensor_to_array_delta.
       rewrite filter_negb_is_None_result_lookup_Z_option_gen_pad.
@@ -1648,7 +1681,7 @@ Proof.
     rewrite length_app. simpl. rewrite length_skipn.
     rewrite repeat_length. erewrite result_has_shape_length by eauto.
     instantiate (1 := m). lia.
-    apply Henv. eauto. eauto. lia. apply Hrdx. 
+    apply Henv. eauto. eauto. lia. lia. eassumption. lia. apply Hrdx. 
 
     rewrite <- (firstn_skipn (Z.to_nat kz) l).
     eapply forall_firstn_ge with (m:= Z.to_nat kz) in H.
@@ -1668,13 +1701,14 @@ Proof.
     eapply forall_skipn. eapply result_has_shape_forall. eauto.
     rewrite length_app. simpl. rewrite length_skipn.
     rewrite repeat_length. erewrite result_has_shape_length by eauto.
-    instantiate (1 := m). lia. lia.
+    instantiate (1 := m). lia. auto. lia.
     apply Hrdx. eauto. eauto. apply Henv. apply Hrdx. apply Hrdx.
 
   - invert Hsize. eq_size_of. invs'.
-    rename H1 into Hsize. pose proof Hsize as Hsh.
+    rename H7 into Hsize. pose proof Hsize as Hsh.
+    eapply size_of_includes in Hsh. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
-    rename H5 into Hk. pose proof Hk as Hk'.
+    rename H4 into Hk. pose proof Hk as Hk'.
     eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
     apply eval_Zexpr_Z_eval_Zexpr in Hk'.
     rewrite Hk' in *. invs'. apply eval_Zexpr_Z_eval_Zexpr in Hk.
@@ -1688,20 +1722,26 @@ Proof.
           propositional.
         - eapply HeqZlist. cases l1; cases l2.
           eauto.
-          invert H. discriminate. 
-          invert H. discriminate. 
+          destruct H as (H&_). invert H.
+          destruct H as (H&_). invert H.
           cases p0. cases p1.
           erewrite <- eq_Z_tuple_index_list_cons_tup in H. invs'.
-          erewrite <- eq_Z_tuple_index_list_cons_tup. split. eauto. split.
-          lia. eauto.
+          erewrite <- eq_Z_tuple_index_list_cons_tup.
+          auto using eq_zexpr_add.
         - rewrite Hmap by eauto. cases l; eauto. simpl.
-          cases p0. simpl. reflexivity.
-        - rewrite Hvarsarg. cases l; eauto. cases p0. reflexivity.
+          cases p0. cbv [subst_var_in_Z_tup]. simpl.
+          f_equal. f_equal. f_equal. f_equal. apply subst_var_in_Zexpr_id.
+          erewrite eval_Zexpr_vars_empty by eauto.
+          auto.
+        - rewrite Hvarsarg. cases l; eauto. cases p0. simpl.
+          erewrite (eval_Zexpr_vars_empty k) by eauto.
+          rewrite app_no_dups_empty_r.
+          reflexivity.
         - unfold nondestructivity. unfold tensor_to_array_delta. simpl.
           unfold tensor_to_array_delta_by_indices. simpl. rewrite dom_empty.
           split; intros. sets.
           eapply well_formed_allocation_result_V in Halloc. invs.
-          eapply lookup_Some_dom in H1. sets. eauto. }
+          eapply lookup_Some_dom in H0. sets. eauto. }
       { unfold well_formed_allocation.
         cases (shape_to_index (result_shape_Z (V []))
                               (shape_to_vars (result_shape_Z (V [])))).
@@ -1719,21 +1759,19 @@ Proof.
     + eq_size_of. invs'. invert Hsh. lia.
       pose proof Hsize as Heval.
       eapply IHeval_expr in Heval; eauto.
-      { cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
-        pose proof Halloc as Halloc2.
+      { pose proof Halloc as Halloc2.
         eapply well_formed_allocation_result_V in Halloc2. invs'.
-        rewrite <- (Z2Nat.id kz) by lia.
         eapply well_formed_reindexer_padr. eauto.
         simpl gen_pad_list in *. econstructor; eauto.
-        eauto. lia. apply Henv. eauto. apply Hrdx. }
-      { cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
-        eapply well_formed_allocation_padr. econstructor; eauto.
-        eauto. simpl gen_pad_list in *. eauto. apply Hrdx. apply Henv.
+        eauto. auto. lia. lia. apply Henv. eauto. apply Hrdx. }
+      { eapply well_formed_allocation_padr. econstructor; eauto.
+        eauto. lia. simpl gen_pad_list in *. eauto. apply Hrdx. apply Henv.
         apply Hrdx. apply Hrdx. apply Hrdx. }
   - invert Hsize. eq_size_of. invs'.
-    rename H1 into Hsize. pose proof Hsize as Hsh.
+    rename H7 into Hsize. pose proof Hsize as Hsh.
+    eapply size_of_includes in Hsh. 2: apply empty_includes.
     eapply size_of_eval_expr_result_has_shape in Hsh; eauto.
-    rename H5 into Hk. pose proof Hk as Hk'.
+    rename H4 into Hk. pose proof Hk as Hk'.
     eapply eval_Zexpr_includes_valuation in Hk'; try apply empty_includes.
     apply eval_Zexpr_Z_eval_Zexpr in Hk'.
     rewrite Hk' in *. invs'. apply eval_Zexpr_Z_eval_Zexpr in Hk.
@@ -1747,24 +1785,29 @@ Proof.
           propositional.
         - eapply HeqZlist. cases l1; cases l2.
           eauto.
-          invert H. discriminate.
-          invert H. discriminate.
+          destruct H as (H&_). invert H.
+          destruct H as (H&_). invert H.
           cases p0. cases p1.
           erewrite <- eq_Z_tuple_index_list_cons_tup in H. invs'.
-          erewrite <- eq_Z_tuple_index_list_cons_tup. split.
-          eapply eq_zexpr_add; eauto. split.
-          reflexivity.
-          assumption.
+          erewrite <- eq_Z_tuple_index_list_cons_tup.
+          auto using eq_zexpr_add.
         - rewrite Hmap by eauto. cases l; eauto. simpl.
-          cases p0. reflexivity.
+          cases p0. cbv [subst_var_in_Z_tup]. simpl.
+          f_equal. f_equal. f_equal. f_equal. apply subst_var_in_Zexpr_id.
+          erewrite eval_Zexpr_vars_empty by eauto.
+          auto.
+          f_equal. apply subst_var_in_Zexpr_id.
+          erewrite eval_Zexpr_vars_empty by eauto.
+          auto.
         - rewrite Hvarsarg. cases l; eauto. cases p0. simpl.
-          rewrite app_no_dups_empty_r. reflexivity.
+          erewrite (eval_Zexpr_vars_empty k) by eauto.
+          do 2 rewrite app_no_dups_empty_r. reflexivity.
         - unfold nondestructivity.
           unfold tensor_to_array_delta, tensor_to_array_delta_by_indices.
           simpl. rewrite dom_empty. split; intros.
           sets.
           eapply well_formed_allocation_result_V in Halloc. invs'.
-          eapply lookup_Some_dom in H1. sets. eauto.
+          eapply lookup_Some_dom in H0. sets. eauto.
       }
       { unfold well_formed_allocation.
         cases (shape_to_index (result_shape_Z (V []))
@@ -1786,16 +1829,14 @@ Proof.
 
       pose proof Hsize as Heval.
       eapply IHeval_expr in Heval; eauto.
-      { cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
-        pose proof Halloc as Halloc2.
+      { pose proof Halloc as Halloc2.
         eapply well_formed_allocation_result_V in Halloc2. invs'.
         eapply well_formed_reindexer_padl. apply Hrdx.
         simpl map in *. eauto. apply Henv. eauto.
-        lia. apply Hrdx. apply Hrdx. apply Hrdx. apply Hrdx. eauto.
+        lia. lia. apply Hrdx. apply Hrdx. apply Hrdx. apply Hrdx. eauto.
         eapply Hrdx. eauto. apply Hrdx.
       }
-      { cbv [eval_Zexpr_Z_total] in *. rewrite Hk in *.
-        pose proof Halloc as Halloc2.
+      { pose proof Halloc as Halloc2.
         eapply well_formed_allocation_result_V in Halloc2.
         invs. eapply well_formed_allocation_padl. eauto. eauto.
         apply Hrdx. lia. apply Hrdx. eauto.
@@ -1848,17 +1889,26 @@ Proof.
         2: { econstructor. eauto. }
         2: { simpl. eapply EvalAssignV. eauto. rewrite Heq. inversion 1.
              eapply H2.
-             eapply eval_Zexpr_Z_flatten_index_flatten.
-             eapply eval_Zexprlist_map_partially_eval_Zexpr.
-             eapply forall_no_vars_eval_Zexpr_Z_total.
-             decomp_well_formed_reindexer.
-             eapply Forall_map. eapply Forall_forall.
-             intros.
-             eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
-             eapply subseteq_transitivity.
-             eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
-             eauto.
-             eassumption. }
+             { eapply eval_Zexpr_Z_flatten_index_flatten.
+               - eapply eval_Zexprlist_map_partially_eval_Zexpr.
+                 eapply forall_no_vars_eval_Zexpr_Z_total.
+                 decomp_well_formed_reindexer.
+                 eapply Forall_map. eapply Forall_forall.
+                 intros.
+                 eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+                 eapply subseteq_transitivity.
+                 eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+                 eauto.
+               - eapply eval_Zexprlist_map_partially_eval_Zexpr.
+                 eapply forall_no_vars_eval_Zexpr_Z_total.
+                 decomp_well_formed_reindexer.
+                 eapply Forall_map. eapply Forall_forall.
+                 intros.
+                 eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+                 eapply subseteq_transitivity.
+                 eapply snd_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+                 eauto. }
+             eauto. }
         eexists. eexists. eapply EvalAssignV.
         unfold shape_to_index, shape_to_vars, result_shape_Z in *.
         simpl in *. rewrite Heq in *. unfold lookup_total in *.
@@ -1866,40 +1916,67 @@ Proof.
         rewrite <- Heq in *.
 
         decomp_well_formed_reindexer.
-        eapply eval_Zexpr_Z_flatten_index_flatten.
-        eapply eval_Zexprlist_map_partially_eval_Zexpr.
-        eapply forall_no_vars_eval_Zexpr_Z_total.
-        eapply Forall_map. eapply Forall_forall.
-        intros.
-        eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
-        eapply subseteq_transitivity.
-        eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
-        eauto.
+        { eapply eval_Zexpr_Z_flatten_index_flatten.
+          - eapply eval_Zexprlist_map_partially_eval_Zexpr.
+            eapply forall_no_vars_eval_Zexpr_Z_total.
+            eapply Forall_map. eapply Forall_forall.
+            intros.
+            eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+            eapply subseteq_transitivity.
+            eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+            eauto.
+          - eapply eval_Zexprlist_map_partially_eval_Zexpr.
+            eapply forall_no_vars_eval_Zexpr_Z_total.
+            eapply Forall_map. eapply Forall_forall.
+            intros.
+            eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+            eapply subseteq_transitivity.
+            eapply snd_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+            eauto. }
         eassumption.
-
         rewrite <- Heq.
         rewrite map_snd_map_partially_eval_Z_tup.
         rewrite map_fst_map_partially_eval_Z_tup. sets.
-        rewrite <- Heq in *.
-        eapply eval_Zexprlist_map_partially_eval_Zexpr.
-        eapply forall_no_vars_eval_Zexpr_Z_total.
-        decomp_well_formed_reindexer.
-        rewrite map_fst_map_partially_eval_Z_tup.
-        eapply Forall_map. eapply Forall_forall. intros.
-        eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
-        eapply subseteq_transitivity.
-        eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
-        eauto.
-        eapply eval_Zexprlist_map_partially_eval_Zexpr.
-        eapply forall_no_vars_eval_Zexpr_Z_total.
-        decomp_well_formed_reindexer.
-        rewrite map_fst_map_partially_eval_Z_tup.
-        eapply Forall_map. eapply Forall_forall. intros.
-        eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
-        eapply subseteq_transitivity.
-        eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
-        eauto.
-        rewrite <- Heq in *. eauto.
+        ** rewrite <- Heq in *.
+           eapply eval_Zexprlist_map_partially_eval_Zexpr.
+           eapply forall_no_vars_eval_Zexpr_Z_total.
+           decomp_well_formed_reindexer.
+           rewrite map_snd_map_partially_eval_Z_tup.
+           eapply Forall_map. eapply Forall_forall. intros.
+           eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+           eapply subseteq_transitivity.
+           eapply snd_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+           eauto.
+        ** rewrite <- Heq in *.
+           eapply eval_Zexprlist_map_partially_eval_Zexpr.
+           eapply forall_no_vars_eval_Zexpr_Z_total.
+           decomp_well_formed_reindexer.
+           rewrite map_fst_map_partially_eval_Z_tup.
+           eapply Forall_map. eapply Forall_forall. intros.
+           eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+           eapply subseteq_transitivity.
+           eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+           eauto.
+        ** rewrite <- Heq in *.
+           eapply eval_Zexprlist_map_partially_eval_Zexpr.
+           eapply forall_no_vars_eval_Zexpr_Z_total.
+           decomp_well_formed_reindexer.
+           rewrite map_snd_map_partially_eval_Z_tup.
+           eapply Forall_map. eapply Forall_forall. intros.
+           eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+           eapply subseteq_transitivity.
+           eapply snd_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+           eauto.
+        ** rewrite <- Heq in *.
+           eapply eval_Zexprlist_map_partially_eval_Zexpr.
+           eapply forall_no_vars_eval_Zexpr_Z_total.
+           decomp_well_formed_reindexer.
+           rewrite map_fst_map_partially_eval_Z_tup.
+           eapply Forall_map. eapply Forall_forall. intros.
+           eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+           eapply subseteq_transitivity.
+           eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+           eauto.
       * invs. pose proof Hrdx as Hsnd.
         rewrite eval_Zexprlist_map_match_fst_map_eval_Zexpr_Z_tup_total
           in H3.
