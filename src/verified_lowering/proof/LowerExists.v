@@ -35,7 +35,7 @@ Hint Extern 3 (Datatypes.length _ = Datatypes.length _) =>
        rewrite length_map; rewrite length_nat_range_rec;
        eapply length_mesh_grid_indices; eassumption : reindexers.
 Arguments flatten : simpl nomatch.
-About eval_Sexpr_eval_Sstmt.
+
 Lemma eval_Sexpr_eval_Sstmt_exists
      : forall (v : valuation) (ec : expr_context) 
          (s : Sexpr) (r : scalar_result),
@@ -489,8 +489,6 @@ Proof.
          invs'.
          eexists. eexists.
          eapply EvalForStep. eassumption. eassumption. lia.
-         pose proof Hfirst.
-         Check Hfirst.
          eapply Hfirst.
          unfold shift_top_dim_reindexer in *.
          unfold lookup_total. rewrite H.
@@ -1987,16 +1985,25 @@ Proof.
         2: { econstructor. eauto. }
         2: { simpl. eapply EvalReduceV. eauto. rewrite Heq. inversion 1.
              eauto.
-             eapply eval_Zexpr_Z_flatten_index_flatten.
-             eapply eval_Zexprlist_map_partially_eval_Zexpr.
-             eapply forall_no_vars_eval_Zexpr_Z_total.
-             decomp_well_formed_reindexer.
-             eapply Forall_map. eapply Forall_forall.
-             intros.
-             eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
-             eapply subseteq_transitivity.
-             eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
-             eauto.
+             { eapply eval_Zexpr_Z_flatten_index_flatten.
+               - eapply eval_Zexprlist_map_partially_eval_Zexpr.
+                 eapply forall_no_vars_eval_Zexpr_Z_total.
+                 decomp_well_formed_reindexer.
+                 eapply Forall_map. eapply Forall_forall.
+                 intros.
+                 eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+                 eapply subseteq_transitivity.
+                 eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+                 eauto.
+               - eapply eval_Zexprlist_map_partially_eval_Zexpr.
+                 eapply forall_no_vars_eval_Zexpr_Z_total.
+                 decomp_well_formed_reindexer.
+                 eapply Forall_map. eapply Forall_forall.
+                 intros.
+                 eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+                 eapply subseteq_transitivity.
+                 eapply snd_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+                 eauto. }
              eassumption. }
         eexists. eexists. eapply EvalReduceV.
         unfold shape_to_index, shape_to_vars, result_shape_Z in *.
@@ -2005,39 +2012,68 @@ Proof.
         rewrite <- Heq in *.
 
         decomp_well_formed_reindexer.
-        eapply eval_Zexpr_Z_flatten_index_flatten.
-        eapply eval_Zexprlist_map_partially_eval_Zexpr.
-        eapply forall_no_vars_eval_Zexpr_Z_total.
-        eapply Forall_map. eapply Forall_forall.
-        intros.
-        eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
-        eapply subseteq_transitivity.
-        eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
-        eauto.
+        { eapply eval_Zexpr_Z_flatten_index_flatten.
+          - eapply eval_Zexprlist_map_partially_eval_Zexpr.
+            eapply forall_no_vars_eval_Zexpr_Z_total.
+            eapply Forall_map. eapply Forall_forall.
+            intros.
+            eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+            eapply subseteq_transitivity.
+            eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+            eauto.
+          - eapply eval_Zexprlist_map_partially_eval_Zexpr.
+            eapply forall_no_vars_eval_Zexpr_Z_total.
+            eapply Forall_map. eapply Forall_forall.
+            intros.
+            eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+            eapply subseteq_transitivity.
+            eapply snd_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+            eauto. }
         eassumption.
 
         rewrite <- Heq.
         rewrite map_snd_map_partially_eval_Z_tup.
         rewrite map_fst_map_partially_eval_Z_tup. sets.
-        rewrite <- Heq in *.
-        eapply eval_Zexprlist_map_partially_eval_Zexpr.
-        eapply forall_no_vars_eval_Zexpr_Z_total.
-        decomp_well_formed_reindexer.
-        rewrite map_fst_map_partially_eval_Z_tup.
-        eapply Forall_map. eapply Forall_forall. intros.
-        eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
-        eapply subseteq_transitivity.
-        eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
-        eauto.
-        eapply eval_Zexprlist_map_partially_eval_Zexpr.
-        eapply forall_no_vars_eval_Zexpr_Z_total.
-        decomp_well_formed_reindexer.
-        rewrite map_fst_map_partially_eval_Z_tup.
-        eapply Forall_map. eapply Forall_forall. intros.
-        eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
-        eapply subseteq_transitivity.
-        eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
-        eauto.
-        rewrite <- Heq in *. eauto.
+        
+        ** rewrite <- Heq in *.
+           eapply eval_Zexprlist_map_partially_eval_Zexpr.
+           eapply forall_no_vars_eval_Zexpr_Z_total.
+           decomp_well_formed_reindexer.
+           rewrite map_snd_map_partially_eval_Z_tup.
+           eapply Forall_map. eapply Forall_forall. intros.
+           eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+           eapply subseteq_transitivity.
+           eapply snd_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+           eauto.
+        ** rewrite <- Heq in *.
+           eapply eval_Zexprlist_map_partially_eval_Zexpr.
+           eapply forall_no_vars_eval_Zexpr_Z_total.
+           decomp_well_formed_reindexer.
+           rewrite map_fst_map_partially_eval_Z_tup.
+           eapply Forall_map. eapply Forall_forall. intros.
+           eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+           eapply subseteq_transitivity.
+           eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+           eauto.
+        ** rewrite <- Heq in *.
+           eapply eval_Zexprlist_map_partially_eval_Zexpr.
+           eapply forall_no_vars_eval_Zexpr_Z_total.
+           decomp_well_formed_reindexer.
+           rewrite map_snd_map_partially_eval_Z_tup.
+           eapply Forall_map. eapply Forall_forall. intros.
+           eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+           eapply subseteq_transitivity.
+           eapply snd_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+           eauto.
+        ** rewrite <- Heq in *.
+           eapply eval_Zexprlist_map_partially_eval_Zexpr.
+           eapply forall_no_vars_eval_Zexpr_Z_total.
+           decomp_well_formed_reindexer.
+           rewrite map_fst_map_partially_eval_Z_tup.
+           eapply Forall_map. eapply Forall_forall. intros.
+           eapply vars_of_Zexpr_subseteq_partially_eval_Zexpr.
+           eapply subseteq_transitivity.
+           eapply fst_vars_of_reindexer_vars_of_Zexpr_subseteq. eauto.
+           eauto.
         Unshelve. all: exact nil.
 Qed.
