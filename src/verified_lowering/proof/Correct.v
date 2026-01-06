@@ -42,7 +42,7 @@ Theorem lower_correct_weak_top :
     forall v ec r,
       (* functional evaluation of ATL *)
       eval_expr v ec e r ->
-      forall l, size_of e l ->
+      forall l, size_of $0 e l ->
       forall p st h reindexer asn sh,
         (* our environment is well-formed *)
         well_formed_environment st h p sh v (vars_of e) ec ->
@@ -102,7 +102,7 @@ Theorem lower_correct_top :
     forall r,
       (* functional evaluation of ATL *)
       eval_expr $0 $0 e r ->
-      forall l, size_of e l ->
+      forall l, size_of $0 e l ->
       forall p st h asn,
         (h,st) =
           match (shape_to_index
