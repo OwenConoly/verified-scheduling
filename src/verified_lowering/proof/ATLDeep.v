@@ -239,7 +239,6 @@ Inductive size_of v : ATLexpr -> list nat -> Prop :=
 | SizeOfGen : forall i lo loz hi hiz body sh,
     eval_Zexpr v lo loz ->
     eval_Zexpr v hi hiz ->
-    (loz <= hiz)%Z ->
     size_of _ body sh ->
     size_of _ (Gen i lo hi body) (Z.to_nat (hiz - loz) :: sh)
 | SizeOfSum : forall i lo hi body sh,
@@ -261,7 +260,6 @@ Inductive size_of v : ATLexpr -> list nat -> Prop :=
     size_of _ (Flatten e) (n * m :: sh)
 | SizeOfSplit : forall e n sh k kz,
     eval_Zexpr v k kz ->
-    (0 < kz)%Z ->
     size_of _ e (n::sh) ->
     size_of _ (Split k e) (n //n (Z.to_nat kz) :: Z.to_nat kz :: sh)
 | SizeOfTranspose : forall e n m sh,
@@ -270,21 +268,17 @@ Inductive size_of v : ATLexpr -> list nat -> Prop :=
 | SizeOfTruncr : forall k kz e m sh,
     eval_Zexpr v k kz ->
     size_of _ e (m::sh) ->
-    (0 <= kz <= Z.of_nat m)%Z ->
     size_of _ (Truncr k e) (m - Z.to_nat kz :: sh)
 | SizeOfTruncl : forall k kz e m sh,
     eval_Zexpr v k kz ->
     size_of _ e (m :: sh) ->
-    (0 <= kz <= Z.of_nat m)%Z ->
     size_of _ (Truncl k e) (m - Z.to_nat kz :: sh)
 | SizeOfPadr : forall k kz e m sh,
     eval_Zexpr v k kz ->
-    (0 <= kz)%Z ->
     size_of _ e (m :: sh) ->
     size_of _ (Padr k e) (m + Z.to_nat kz :: sh)
 | SizeOfPadl : forall k kz e m sh,
     eval_Zexpr v k kz ->
-    (0 <= kz)%Z ->
     size_of _ e (m :: sh) ->
     size_of _ (Padl k e) (m + Z.to_nat kz :: sh)
 | SizeOfScalar : forall s,
@@ -294,13 +288,21 @@ Local Hint Constructors eval_Zexpr eval_Bexpr eval_Sexpr size_of.
 Fixpoint nonneg_bounds v e :=
   match e with
   | Gen _ lo hi body =>
-      nonneg_bounds body /\
-        exists loz hiz, eval_Zexpr v lo loz /\ eval_Zexpr_Z v hi hiz /\ loz <= hiz
-  | Split k body => nonneg_bounds body /\ exists kz, eval_Zexpr k kz /\ 0 < k
-  | Truncr k body => nonneg_bounds body /\ exists kz, eval_Zexpr k kz /\ 0 <= kz <
-  | Lbind _ e1 e2 | Concat e1 e2 => nonneg_bounds e1 /\ nonneg_bounds e2
-  | Sum _ _ _ body | Guard _ body | Flatten _ body | Transpose body =>
-                                                       nonneg_bounds body
+      nonneg_bounds v body /\
+        exists loz hiz, eval_Zexpr v lo loz /\ eval_Zexpr v hi hiz /\ (loz <= hiz)%Z
+  | Split k body => nonneg_bounds v body /\ exists kz, eval_Zexpr v k kz /\ (0 < kz)%Z
+  | Truncr k body | Truncl k body =>
+                      nonneg_bounds v body /\
+                        match sizeof body with
+                        | m :: _ => exists kz mz,
+                            eval_Zexpr v k kz /\ eval_Zexpr v m mz /\ (0 <= kz < mz)%Z
+                        | [] => False
+                        end
+  | Padr k body | Padl k body =>
+                    nonneg_bounds v body /\ exists kz, eval_Zexpr v k kz /\ (0 <= kz)%Z
+  | Lbind _ e1 e2 | Concat e1 e2 => nonneg_bounds v e1 /\ nonneg_bounds v e2
+  | Sum _ _ _ body | Guard _ body | Flatten body | Transpose body =>
+                                                     nonneg_bounds v body
   | Scalar _ => True
   end.
 
@@ -521,6 +523,16 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma nonneg_bounds_includes v1 v2 e :
+  v1 $<= v2 ->
+  nonneg_bounds v1 e ->
+  nonneg_bounds v2 e.
+Proof.
+  intros H1 H2. induction e; simpl in *; invs';
+    try match goal with | H: match ?x with _ => _ end |- _ => destruct x end; invs';
+    eauto 10 using eval_Zexpr_includes_valuation.
+Qed.
+
 Lemma size_of_includes v1 v2 e sz :
   v1 $<= v2 ->
   size_of v1 e sz ->
@@ -550,23 +562,30 @@ Ltac eq_size_of :=
         clear H2
   end.
 
-Theorem size_of_sizeof : forall v e1 l,
-    size_of v e1 l ->
+Theorem size_of_sizeof : forall v e l,
+    nonneg_bounds v e ->
+    size_of v e l ->
     exists lz,
-      eval_Zexprlist v (sizeof e1) lz /\
+      eval_Zexprlist v (sizeof e) lz /\
         lz = map Z.of_nat l.
 Proof.
-  induction e1; intros; simpl; invert H;
+  induction e; intros ? H1 H2; simpl in *; invert H2; invs';
   repeat match goal with
-         | IH: forall _, _ -> _, H: _ |- _ => specialize (IH _ H)
+         | IH: forall _, _ -> _ -> _, H1: _, H2: _ |- _ => specialize (IH _ H1 H2)
   end;
-  simpl in *;
-  invs';
   repeat match goal with
     | H: map _ ?x = _ :: _ |- _ =>
         is_var x; destruct x; [discriminate H|]; simpl in H; invert H
     end;
+  eq_eval_Z;
+  simpl in *;
   invs';
+  repeat match goal with
+    | H: _ = sizeof _ |- _ => rewrite <- H in *
+    end;
+  invs';
+  eq_eval_Z;
+  simpl in *;
   eauto 7.
   all: eexists; split; [solve[eauto] |].
   all: f_equal; try lia.
@@ -754,11 +773,13 @@ Qed.
 Lemma result_has_shape_for_sum :
   forall e,
     (forall (v : valuation) (sz : list nat),
+        nonneg_bounds v e ->
         size_of v e sz ->
         forall (ec : expr_context) (r : result),
           eval_expr v ec e r ->
           result_has_shape r sz) ->
     forall v n sz r ec i lo hi loz hiz,
+      nonneg_bounds v e ->
       size_of v e sz ->
       eval_Zexpr_Z v lo = Some loz ->
       eval_Zexpr_Z v hi = Some hiz ->
@@ -768,19 +789,20 @@ Lemma result_has_shape_for_sum :
 Proof.
   intros ? ? ? ?.
   induct n; propositional.
-  - invert H4.
-    rewrite H1, H2 in *. invs'. lia.
-    rewrite H1, H2 in *. invs'.
+  - invert H5.
+    rewrite H2, H3 in *. invs'. lia.
+    rewrite H2, H3 in *. invs'.
     eq_size_of.
     eapply result_has_shape_gen_pad.
-  - invert H4.
-    rewrite H1,H2 in *. invs'.
+  - invert H5.
+    rewrite H2,H3 in *. invs'.
     eapply result_has_shape_add_result. eassumption.
-    2: { eapply IHn in H18. eassumption. eassumption.
-         simpl. rewrite H1. reflexivity.
+    2: { eapply IHn in H19. eassumption. eassumption. eassumption.
+         simpl. rewrite H2. reflexivity.
          eauto. lia. } 
-    eapply H. 2: eassumption.
-    { eapply size_of_includes. 2: eassumption. apply includes_add_new. sets. }
-    eapply size_of_includes in H0; eauto.
+    eapply H. 3: eassumption.
+    { eapply nonneg_bounds_includes; [|eassumption]. sets. }
+    { eapply size_of_includes; [|eassumption]. sets. }
+    eapply size_of_includes in H1; eauto.
     eq_size_of. apply result_has_shape_gen_pad.
 Qed.      

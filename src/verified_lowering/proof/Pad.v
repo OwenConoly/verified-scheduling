@@ -83,6 +83,7 @@ Inductive is_pad :
 .
 *)
 (* We should only truncate program-introduced 0-values *)
+Search (eval_Zexprlist _). Search (Forall2 (eval_Zexpr
 Inductive has_pad :
   valuation -> fmap string pad_type -> ATLexpr ->
   pad_type -> Prop :=
@@ -91,7 +92,8 @@ Inductive has_pad :
     (c <= Z.to_nat (eval_Zexpr_Z_total $0 hi - eval_Zexpr_Z_total $0 lo)%Z) ->
     (k + c <=
        Z.to_nat (eval_Zexpr_Z_total $0 hi - eval_Zexpr_Z_total $0 lo)%Z) ->
-    size_of $0 e l ->
+    sizeof $0 e = l ->
+    eval_Zexprlist v l lz ->
     (forall iz,
         (eval_Zexpr_Z_total $0 lo + Z.of_nat k <=
            iz < eval_Zexpr_Z_total $0 lo + Z.of_nat k + Z.of_nat ll)%Z ->
@@ -104,7 +106,7 @@ Inductive has_pad :
         (eval_Zexpr_Z_total $0 lo <= iz < eval_Zexpr_Z_total $0 hi)%Z ->
         (iz - eval_Zexpr_Z_total $0 lo < Z.of_nat k)%Z \/
           (eval_Zexpr_Z_total $0 hi - Z.of_nat c <= iz)%Z ->
-        has_pad (v $+ (i,iz)) g e (shape_to_pad_type l)) ->
+        has_pad (v $+ (i,iz)) g e (shape_to_pad_type (eval_Zexprlist_Z $0 l))) ->
     ll + rr = (Z.to_nat (eval_Zexpr_Z_total $0 hi -
                         eval_Zexpr_Z_total $0 lo -
                         Z.of_nat k -
