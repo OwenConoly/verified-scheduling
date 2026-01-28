@@ -443,6 +443,7 @@ Qed.
 
 Lemma nondestructivity_alloc_heap :
   forall e1 sz1 st'0 h p v x l2 asm nz z reindexer l1,
+  nonneg_bounds $0 e1 ->
   size_of $0 e1 (z::sz1) ->
   (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
   nondestructivity st'0 h p reindexer l2 v asm ->
@@ -451,7 +452,7 @@ Lemma nondestructivity_alloc_heap :
   nondestructivity st'0 (alloc_array_in_heap [Z.to_nat nz] h x) x
                       (fun l : list (Zexpr * Zexpr) => l) (V l1) v Assign.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? ? ? ? ? Hsize Henv Hassign Hz Hsh.
+  intros ? ? ? ? ? ? ? ? ? ? ? ? ? Hbds Hsize Henv Hassign Hz Hsh.
   unfold nondestructivity in *. invs.
   split; intros.
   - unfold alloc_array_in_heap in *. rewrite lookup_add_eq in * by auto.
@@ -472,7 +473,7 @@ Proof.
     eapply lookup_None_dom in H4. exfalso. apply H4.
     rewrite dom_alloc_array. erewrite <- In_iff_in.
     unfold flat_sizeof in *.
-    pose proof size_of_sizeof as Hsz. specialize Hsz with (1 := Hsize).
+    pose proof size_of_sizeof as Hsz. specialize Hsz with (1 := Hbds) (2 := Hsize).
     destruct Hsz as (lz&Hsz&?). subst. simpl in Hsz. invert Hsz.
     rewrite <- H1 in *.
     pose proof eval_Zexpr_Z_fold_left_ZTimes as H'.
@@ -524,7 +525,9 @@ vars_of_reindexer (reindexer []) \subseteq dom v ->
              vars_of_reindexer (reindexer []) \cup vars_of_reindexer l) ->
 nondestructivity st h p reindexer (V (l1 ++ l2)) v asm ->
 h $? p = Some x ->
+nonneg_bounds $0 e1 ->
 size_of $0 e1 (dim1 :: rest1) ->
+nonneg_bounds $0 e2 ->
 size_of $0 e2 (Z.to_nat dim2z :: rest2) ->
 result_has_shape (V l2) (Z.to_nat dim2z :: rest1) ->
 result_has_shape (V l1) (dim1 :: rest1) ->
@@ -558,12 +561,12 @@ eval_Zexpr $0 dim2 dim2z ->
        end) (V l2) v asm.
 Proof.
   intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Henv Hinj HeqZlist Hvarsub Hmap
-    Hvarsarg Hassign Hheap Hsize1 Hsize2 Hsh2 Hsh1 Hsh Hdim2nonneg Heqdim2.
+    Hvarsarg Hassign Hheap Hbds1 Hsize1 Hbds2 Hsize2 Hsh2 Hsh1 Hsh Hdim2nonneg Heqdim2.
   unfold nondestructivity in *. invs.
   split; intros.
   - rewrite lookup_add_eq in * by auto. invert H1.
     pose proof size_of_sizeof as Hsz.
-    specialize (Hsz _ _ _ Hsize1). destruct Hsz as (lz&Hsz&?). subst.
+    specialize (Hsz _ _ _ Hbds1 Hsize1). destruct Hsz as (lz&Hsz&?). subst.
     simpl in Hsz. invert Hsz. rewrite <- H1 in *.
     erewrite lookup_array_add_weak_l.
     2: { erewrite result_has_shape_result_shape_Z by eauto.
@@ -1557,7 +1560,7 @@ Proof.
 Qed.
 
 Lemma nondestructivity_concat_r_ :
-  forall st h p v e1 e2 l1 l2 reindexer asm x rest1 rest2 dim1 dim1z dim2 dim2z,
+  forall st h p v l1 l2 reindexer asm x rest1 dim1 dim1z dim2 dim2z,
 (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
 partial_injective
            (partial_interpret_reindexer reindexer (result_shape_Z (V (l1 ++ l2))) v)
@@ -1578,8 +1581,6 @@ vars_of_reindexer (reindexer []) \subseteq dom v ->
              vars_of_reindexer (reindexer []) \cup vars_of_reindexer l) ->
 nondestructivity st h p reindexer (V (l1 ++ l2)) v asm ->
 h $? p = Some x ->
-size_of $0 e1 (Z.to_nat dim1z :: rest1) ->
-size_of $0 e2 (Z.to_nat dim2z :: rest2) ->
 result_has_shape (V l2) (Z.to_nat dim2z :: rest1) ->
 result_has_shape (V l1) (Z.to_nat dim1z :: rest1) ->
 result_has_shape (V (l1 ++ l2)) (Z.to_nat dim1z + Z.to_nat dim2z :: rest1) ->
@@ -1607,9 +1608,9 @@ eval_Zexpr $0 dim2 dim2z ->
            (d + dim1)%z) :: xs
        end) (V l2) v asm.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Henv Hinj HeqZlist
+  intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? Henv Hinj HeqZlist
     Hvarsub Hmap Hvarsarg Hassign Hheap
-    Hsize1 Hsize2 Hsh2 Hsh1 Hsh Hdim1nonneg Hdim2nonneg Heqdim1 Heqdim2.
+    Hsh2 Hsh1 Hsh Hdim1nonneg Hdim2nonneg Heqdim1 Heqdim2.
   unfold nondestructivity in *. invs.
   split; intros.
   - rewrite lookup_add_eq in * by auto. invert H1.
@@ -1696,7 +1697,7 @@ Proof.
 Qed.
 
 Lemma nondestructivity_concat_l_ :
-  forall st h p v e1 e2 l1 l2 reindexer asm x rest1 rest2 dim1 dim1z dim2 dim2z,
+  forall st h p v l1 l2 reindexer asm x rest1 dim1 dim1z dim2 dim2z,
 (forall var : var, contains_substring "?" var -> ~ var \in dom v) ->
 partial_injective
            (partial_interpret_reindexer reindexer (result_shape_Z (V (l1 ++ l2))) v)
@@ -1717,8 +1718,6 @@ vars_of_reindexer (reindexer []) \subseteq dom v ->
              vars_of_reindexer (reindexer []) \cup vars_of_reindexer l) ->
 nondestructivity st h p reindexer (V (l1 ++ l2)) v asm ->
 h $? p = Some x ->
-size_of $0 e1 (Z.to_nat dim1z :: rest1) ->
-size_of $0 e2 (Z.to_nat dim2z :: rest2) ->
 result_has_shape (V l2) (Z.to_nat dim2z :: rest1) ->
 result_has_shape (V l1) (Z.to_nat dim1z :: rest1) ->
 result_has_shape (V (l1 ++ l2)) (Z.to_nat dim1z + Z.to_nat dim2z :: rest1) ->
@@ -1734,9 +1733,9 @@ eval_Zexpr $0 dim2 dim2z ->
        | (v0, d) :: xs => (v0, (d + dim2)%z) :: xs
        end) (V l1) v asm.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Henv Hinj HeqZlist
+  intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? Henv Hinj HeqZlist
     Hvarsub Hmap Hvarsarg Hassign Hheap
-    Hsize1 Hsize2 Hsh2 Hsh1 Hsh Hdim1nonneg Hdim2nonneg Heqdim1 Heqdim2.
+    Hsh2 Hsh1 Hsh Hdim1nonneg Hdim2nonneg Heqdim1 Heqdim2.
   unfold nondestructivity in *. invs.
   split; intros.
   - eapply H; eauto.

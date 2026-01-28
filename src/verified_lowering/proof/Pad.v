@@ -83,7 +83,6 @@ Inductive is_pad :
 .
 *)
 (* We should only truncate program-introduced 0-values *)
-Search (eval_Zexprlist _). Search (Forall2 (eval_Zexpr
 Inductive has_pad :
   valuation -> fmap string pad_type -> ATLexpr ->
   pad_type -> Prop :=
@@ -92,8 +91,7 @@ Inductive has_pad :
     (c <= Z.to_nat (eval_Zexpr_Z_total $0 hi - eval_Zexpr_Z_total $0 lo)%Z) ->
     (k + c <=
        Z.to_nat (eval_Zexpr_Z_total $0 hi - eval_Zexpr_Z_total $0 lo)%Z) ->
-    sizeof $0 e = l ->
-    eval_Zexprlist v l lz ->
+    size_of $0 e l ->
     (forall iz,
         (eval_Zexpr_Z_total $0 lo + Z.of_nat k <=
            iz < eval_Zexpr_Z_total $0 lo + Z.of_nat k + Z.of_nat ll)%Z ->
@@ -106,7 +104,7 @@ Inductive has_pad :
         (eval_Zexpr_Z_total $0 lo <= iz < eval_Zexpr_Z_total $0 hi)%Z ->
         (iz - eval_Zexpr_Z_total $0 lo < Z.of_nat k)%Z \/
           (eval_Zexpr_Z_total $0 hi - Z.of_nat c <= iz)%Z ->
-        has_pad (v $+ (i,iz)) g e (shape_to_pad_type (eval_Zexprlist_Z $0 l))) ->
+        has_pad (v $+ (i,iz)) g e (shape_to_pad_type l)) ->
     ll + rr = (Z.to_nat (eval_Zexpr_Z_total $0 hi -
                         eval_Zexpr_Z_total $0 lo -
                         Z.of_nat k -
@@ -768,14 +766,15 @@ Proof. lia. Qed.
 
 Lemma has_pad_size_of_relate_pads_gen_pad :
   forall e v size g pads,
+    nonneg_bounds $0 e ->
     size_of $0 e size ->
     has_pad v g e pads ->
     relate_pads pads
                 (gen_pad (filter_until size 0))
                 (filter_until size 0).
 Proof.
-  induct e; intros.
-  - invert H. invert H0. invs. 
+  induct e; intros; simpl in *; invs'.
+  - invert H0. invert H1. invs. 
     cases (Z.to_nat (hiz - loz)).
     + simpl. repeat rewrite skipn_nil. repeat rewrite firstn_nil. eauto.
     + cbn -[rev].
@@ -790,52 +789,52 @@ Proof.
                    Z.of_nat (Datatypes.S rr) <=
                    eval_Zexpr_Z_total $0 hi - Z.of_nat c -
                      Z.of_nat (Datatypes.S rr) <
-                   eval_Zexpr_Z_total $0 hi - Z.of_nat c)%Z) by lia.
-        eapply H16 in H. eapply IHe in H; eauto.
+                   eval_Zexpr_Z_total $0 hi - Z.of_nat c)%Z) as H' by lia.
+        eapply H19 in H'. eapply IHe in H'; eauto.
         eapply Forall_repeat.
         eq_size_of. eauto.
       * assert (eval_Zexpr_Z_total $0 lo + Z.of_nat k <=
                   eval_Zexpr_Z_total $0 lo + Z.of_nat k <
-         eval_Zexpr_Z_total $0 lo + Z.of_nat k + Z.of_nat (Datatypes.S ll))%Z.
+         eval_Zexpr_Z_total $0 lo + Z.of_nat k + Z.of_nat (Datatypes.S ll))%Z as H'.
         lia.
-        eapply H14 in H.
-        eapply IHe in H; eauto.
+        eapply H17 in H'.
+        eapply IHe in H'; eauto.
         split. eapply Forall_repeat. eq_size_of. eauto.
         cases rr. rewrite min_0_r. econstructor.
         assert ((eval_Zexpr_Z_total $0 hi - Z.of_nat c -
                    Z.of_nat (Datatypes.S rr) <=
                    eval_Zexpr_Z_total $0 hi - Z.of_nat c -
                      Z.of_nat (Datatypes.S rr) <
-                   eval_Zexpr_Z_total $0 hi - Z.of_nat c)%Z) by lia.
-        eapply H16 in H0. eapply IHe in H0; eauto.
+                   eval_Zexpr_Z_total $0 hi - Z.of_nat c)%Z) as H'' by lia.
+        eapply H19 in H''. eapply IHe in H''; eauto.
         eapply Forall_repeat. eq_size_of. eauto.
-  - invert H. invert H0.
+  - invert H0. invert H1.
     + eq_size_of. rewrite <- gen_pad_filter_until_0.
       eapply relate_pads_filter_until_0. eapply result_has_shape_gen_pad.
       eapply relate_pads_gen_pad_id.
-    + eapply IHe. eauto. apply (H8 (eval_Zexpr_Z_total v lo)). lia.
-  - invert H. simpl in *. invert H0.
+    + eapply IHe. eauto. eauto. apply (H9 (eval_Zexpr_Z_total v lo)). lia.
+  - invert H0. simpl in *. invert H1.
     + eq_size_of. rewrite <- gen_pad_filter_until_0.
       eapply relate_pads_filter_until_0. eapply result_has_shape_gen_pad.
       eapply relate_pads_gen_pad_id.
     + eapply IHe; eauto.
-  - invert H. invert H0. eapply IHe2. eauto. eauto.
-  - invert H0. invert H.
-    eq_size_of. invert H. invert H0.
+  - invert H0. invert H1. eapply IHe2. eauto. eauto. eauto.
+  - invert H0. invert H1.
+    eq_size_of. invs'.
     simpl.
-    cases n.
-    * cases m.
+    cases dim1.
+    * cases dim2.
       simpl. repeat rewrite skipn_nil. repeat rewrite firstn_nil. eauto.
       remember rev.
       simpl. repeat rewrite <- repeat_cons.  subst.
       rewrite rev_repeat. repeat rewrite skipn_repeat.
-      repeat rewrite firstn_repeat. simpl in H13.
+      repeat rewrite firstn_repeat.
       replace l1 with 0 in * by lia. replace r1 with 0 in * by lia.
       replace x with 0 in * by lia. replace y with 0 in * by lia.
       repeat rewrite min_0_r.
       split. simpl. eauto.
       repeat rewrite min_r by lia.
-      eapply IHe2 in H4; eauto. cbn -[rev] in H4.
+      eapply IHe2 in H6; eauto. cbn -[rev] in H6.
       invs.
       rewrite <- @repeat_cons in *. rewrite @rev_repeat in *.
       split. eapply Forall_repeat; eauto.
@@ -846,7 +845,7 @@ Proof.
       rewrite min_r in * by lia. eauto.
     * eapply IHe1 in H5; eauto.
       eapply IHe2 in H6; eauto.
-      cases m.
+      cases dim2.
       -- cbn -[rev] in H5,H6.
          clear H6.
          simpl.
@@ -872,8 +871,8 @@ Proof.
          split. eapply Forall_repeat. eauto.
          split. eapply Forall_repeat. eauto.
          split. eauto. eauto.
-  - invert H. simpl in *. invs.
-    invert H0. eq_size_of. invert H.
+  - invert H0. simpl in *. invs.
+    invert H1. eq_size_of. invs'.
     eapply IHe in H2; eauto.
     simpl.
     cases n0.
