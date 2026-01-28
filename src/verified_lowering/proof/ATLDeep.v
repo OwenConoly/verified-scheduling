@@ -291,6 +291,19 @@ Inductive size_of v : ATLexpr -> list nat -> Prop :=
     size_of _ (Scalar s) [].
 Local Hint Constructors eval_Zexpr eval_Bexpr eval_Sexpr size_of.
 
+Fixpoint nonneg_bounds v e :=
+  match e with
+  | Gen _ lo hi body =>
+      nonneg_bounds body /\
+        exists loz hiz, eval_Zexpr v lo loz /\ eval_Zexpr_Z v hi hiz /\ loz <= hiz
+  | Split k body => nonneg_bounds body /\ exists kz, eval_Zexpr k kz /\ 0 < k
+  | Truncr k body => nonneg_bounds body /\ exists kz, eval_Zexpr k kz /\ 0 <= kz <
+  | Lbind _ e1 e2 | Concat e1 e2 => nonneg_bounds e1 /\ nonneg_bounds e2
+  | Sum _ _ _ body | Guard _ body | Flatten _ body | Transpose body =>
+                                                       nonneg_bounds body
+  | Scalar _ => True
+  end.
+
 Inductive eval_stmt (v : valuation) :
   stack -> heap -> stmt -> stack -> heap -> Prop :=
 | EvalAssignS :
