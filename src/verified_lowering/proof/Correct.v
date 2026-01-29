@@ -42,6 +42,7 @@ Theorem lower_correct_weak_top :
     forall v ec r,
       (* functional evaluation of ATL *)
       eval_expr v ec e r ->
+      nonneg_bounds $0 e ->
       forall l, size_of $0 e l ->
       forall p st h reindexer asn sh,
         (* our environment is well-formed *)
@@ -87,7 +88,7 @@ Theorem lower_correct_weak_top :
                    end)
 .
 Proof.
-  intros e v ec r Heval ls Hsize p st h reindexer asm sh
+  intros e v ec r Heval Hbds ls Hsize p st h reindexer asm sh
          Henv Hrdx Halloc Hctx pads g Hpad Hrelate.
   pose proof Heval.
   eapply lower_correct_exists in H; eauto. invs. pose proof H.
@@ -102,6 +103,7 @@ Theorem lower_correct_top :
     forall r,
       (* functional evaluation of ATL *)
       eval_expr $0 $0 e r ->
+      nonneg_bounds $0 e ->
       forall l, size_of $0 e l ->
       forall p st h asn,
         (h,st) =
@@ -146,7 +148,7 @@ Proof.
   eapply lower_correct_weak_top; eauto.
   - unfold result_shape_Z, shape_to_index, shape_to_vars in *.
     cases r.
-    + simpl in *. invert H1.
+    + simpl in *. invert H2.
       unfold well_formed_environment.
       rewrite dom_add. 
       repeat rewrite dom_empty.
@@ -160,7 +162,7 @@ Proof.
       split. sets.
       auto.
     + simpl in *. cases v.
-      * invert H1.
+      * invert H2.
         unfold alloc_array_in_heap. simpl.
         unfold well_formed_environment.
         rewrite dom_add. 
@@ -174,7 +176,7 @@ Proof.
         split. sets.
         split. sets.
         auto.
-      * invert H1.
+      * invert H2.
         unfold alloc_array_in_heap. simpl.
         unfold well_formed_environment.
         rewrite dom_add. 
@@ -195,47 +197,47 @@ Proof.
     + simpl. sets.
     + unfold nondestructivity.
       destruct (result_shape_Z r) eqn:Hr.
-      * simpl in *. invert H1. rewrite dom_add. rewrite lookup_add_eq by auto.
+      * simpl in *. invert H2. rewrite dom_add. rewrite lookup_add_eq by auto.
         rewrite dom_empty. rewrite cup_empty_r. rewrite lookup_empty.
         rewrite dom_empty.
-        split; intros. discriminate. invert H1. eauto.
-      * simpl in H1. invert H1. unfold alloc_array_in_heap.
+        split; intros. discriminate. invert H2. eauto.
+      * simpl in H2. invert H2. unfold alloc_array_in_heap.
         rewrite dom_empty. rewrite dom_add. rewrite lookup_add_eq by auto.
         rewrite dom_empty. rewrite cup_empty_r. rewrite lookup_empty.
         split; intros.
         2: discriminate.
-        invert H1. pose proof Hr as Hrr.
+        invert H2. pose proof Hr as Hrr.
         unfold result_shape_Z in Hr. destruct (result_shape_nat r).
         invert Hr. inversion Hr. subst.
         pose proof (lookup_alloc_array (fold_left mul (n :: l1) 1) x).
-        invert H1; eauto.
-        eapply lookup_None_dom in H4. rewrite dom_alloc_array in H4.
-        exfalso. apply H4. clear H4.
-        unfold tensor_to_array_delta in H6. rewrite Hrr in *.
-        unfold tensor_to_array_delta_by_indices in H6.
-        erewrite partial_dom_fold_left_array_add in H6.
-        rewrite dom_empty in H6. rewrite cup_empty_r in H6.
+        invert H2; eauto.
+        eapply lookup_None_dom in H5. rewrite dom_alloc_array in H5.
+        exfalso. apply H5. clear H5.
+        unfold tensor_to_array_delta in H7. rewrite Hrr in *.
+        unfold tensor_to_array_delta_by_indices in H7.
+        erewrite partial_dom_fold_left_array_add in H7.
+        rewrite dom_empty in H7. rewrite cup_empty_r in H7.
         erewrite <- In_iff_in in *.
-        eapply in_extract_Some in H6. eapply in_map_iff in H6. invs.
-        rewrite partial_interpret_reindexer_id_flatten in H4. invert H4.
-        rewrite filter_idempotent in H6.
+        eapply in_extract_Some in H7. eapply in_map_iff in H7. invs.
+        rewrite partial_interpret_reindexer_id_flatten in H5. invert H5.
+        rewrite filter_idempotent in H7.
         rewrite Z_of_nat_fold_left_mul.
         eapply in_mesh_grid_flatten_in_range.
         eapply Forall_map. eapply Forall_forall. lia.
         decomp_index. eauto.
-        rewrite filter_idempotent in H6.
+        rewrite filter_idempotent in H7.
         decomp_index. eauto. rewrite dom_empty. sets.
         eapply partial_injective_id_reindexer. rewrite dom_empty. sets.
   - unfold result_shape_Z, shape_to_index, shape_to_vars in *.
     cases r.
-    + simpl in *. invert H1. unfold well_formed_allocation.
+    + simpl in *. invert H2. unfold well_formed_allocation.
       simpl. rewrite lookup_add_eq by auto. eauto.
     + cases v.
-      * simpl in *. invert H1. unfold well_formed_allocation.
+      * simpl in *. invert H2. unfold well_formed_allocation.
         simpl. unfold alloc_array_in_heap in *. simpl.
         rewrite lookup_add_eq by auto.
         eexists. split. eauto. sets.
-      * invert H1.
+      * invert H2.
         unfold well_formed_allocation.
         unfold shape_to_index, shape_to_vars.
         set (mesh_grid (map Z.of_nat (result_shape_nat (V (r :: v))))).
