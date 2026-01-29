@@ -295,7 +295,7 @@ Fixpoint nonneg_bounds v e :=
                       nonneg_bounds v body /\
                         match sizeof body with
                         | m :: _ => exists kz mz,
-                            eval_Zexpr v k kz /\ eval_Zexpr v m mz /\ (0 <= kz < mz)%Z
+                            eval_Zexpr v k kz /\ eval_Zexpr v m mz /\ (0 <= kz <= mz)%Z
                         | [] => False
                         end
   | Padr k body | Padl k body =>
