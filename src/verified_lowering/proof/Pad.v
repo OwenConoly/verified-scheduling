@@ -2137,8 +2137,8 @@ Proof.
       simpl repeat. rewrite app_nil_r.
       rewrite <- map_rev. rewrite skipn_map. rewrite firstn_map.
       unfold nat_range.
-      replace (skipn (c / kk) (rev (nat_range_rec (mm / kk) 0))) with
-        (rev (nat_range_rec (mm / kk - c / kk) 0)).
+      replace (skipn (c / kk) (rev (seq 0 (mm / kk)))) with
+        (rev (seq 0 (mm / kk - c / kk))).
       2: { rewrite skipn_rev. rewrite length_nat_range_rec.
            rewrite firstn_nat_range_rec. rewrite min_l. reflexivity.
            lia. }
@@ -4609,8 +4609,6 @@ Proof.
     eapply result_has_shape_rev in Hsh'.
     rewrite rev_involutive in Hsh'.
     pose proof Hsize' as Hsh''.
-    eapply result_has_shape_filter_until_0 in Hsh''.
-    repeat rewrite map_cons in Hsh''.
     eapply result_has_shape_rev in Hsh''.
     eapply result_has_shape_truncl_list with (k:=Z.to_nat kz) in Hsh''.
     eapply result_has_shape_result_shape_nat in Hsh',Hsh''.
@@ -4647,7 +4645,6 @@ Proof.
     2: eauto.
     2: eauto.
     simpl in *. invs.
-    rewrite truncl_list_skipn.
     rewrite gen_pad_filter_until_0.
     rewrite H4.
     rewrite <- gen_pad_filter_until_0.
@@ -4715,8 +4712,6 @@ Proof.
     pose proof Hsh as Hsh'.
     eapply result_has_shape_rev in Hsh'.
     pose proof Hsize' as Hsh''.
-    eapply result_has_shape_filter_until_0 in Hsh''.
-    repeat rewrite map_cons in Hsh''.
     eapply result_has_shape_truncl_list
       with (k:=Z.to_nat kz) in Hsh''.
     eapply result_has_shape_rev in Hsh''.
@@ -4751,7 +4746,6 @@ Proof.
     2: eauto.
     2: eauto.
     simpl in Hsize''. invs.
-    rewrite truncl_list_skipn in *.
 
     rewrite gen_pad_filter_until_0.
     rewrite H4.

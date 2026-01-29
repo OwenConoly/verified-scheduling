@@ -271,7 +271,7 @@ Lemma well_formed_allocation_truncr :
       reindexer
       (V
          (rev
-            (truncl_list
+            (skipn
                (Z.to_nat kz)
                (rev (x ++ gen_pad_list (Z.to_nat kz :: l0))))))
       st h p v ->

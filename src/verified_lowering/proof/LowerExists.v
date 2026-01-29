@@ -1543,13 +1543,11 @@ Proof.
     rewrite rev_app_distr.
     rewrite truncl_list_app.
     2: { rewrite length_rev. simpl. rewrite repeat_length. lia. }
-    rewrite truncl_list_skipn.
     rewrite skipn_all2.
     2: { rewrite length_rev. simpl. rewrite repeat_length. lia. }
     replace m with (length l).
     2: { erewrite result_has_shape_length by eauto. reflexivity. }
-    rewrite <- skipn_rev. simpl.
-    rewrite <- truncl_list_skipn. eauto.
+    rewrite <- skipn_rev. simpl. eauto.
     eapply forall_result_has_shape.
     eapply Forall_app. split.
     eapply forall_firstn. eapply result_has_shape_forall. eauto.
@@ -1578,14 +1576,13 @@ Proof.
     rewrite rev_app_distr.
     rewrite truncl_list_app.
     2: { rewrite length_rev. simpl. rewrite repeat_length. lia. }
-    rewrite truncl_list_skipn.
     rewrite skipn_all2.
     2: { rewrite length_rev. simpl. rewrite repeat_length. lia. }
     replace m with (length l).
     2: { erewrite result_has_shape_length by eauto. reflexivity. }
     simpl.
     rewrite <- skipn_rev. simpl.
-    rewrite <- truncl_list_skipn. eauto. apply Hrdx.
+    eauto. apply Hrdx.
     eapply forall_result_has_shape.
     eapply Forall_app. split.
     eapply forall_firstn. eapply result_has_shape_forall. eauto.
@@ -1662,7 +1659,7 @@ Proof.
       eapply Hnondstr; eauto.
     }
     eapply well_formed_reindexer_truncl.
-    rewrite <- truncl_list_skipn. eauto. simpl.
+    eauto. simpl.
     eapply forall_result_has_shape.
     eapply Forall_app. split.
     simpl. eapply Forall_repeat. eapply result_has_shape_gen_pad.
@@ -1683,7 +1680,7 @@ Proof.
 
     rewrite min_l by lia.    
     eapply well_formed_allocation_truncl.
-    erewrite <- truncl_list_skipn. eauto. apply Hrdx.
+    eauto. apply Hrdx.
     simpl. eapply forall_result_has_shape.
     eapply Forall_app. split.
     simpl. eapply Forall_repeat. eapply result_has_shape_gen_pad.

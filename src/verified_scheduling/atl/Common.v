@@ -500,7 +500,7 @@ Proof.
         rewrite Nat2Z.id. zify. lia.
     + zify. lia.
 Qed.
-Check nth_gen_helper_some.
+
 Lemma get_genr_some {X} `{TensorElem X} :
   forall I n m (body : Z -> X),
     (m < n)%Z ->

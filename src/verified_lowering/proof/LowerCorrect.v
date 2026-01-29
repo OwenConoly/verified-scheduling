@@ -2581,12 +2581,12 @@ Proof.
                    (shape_to_index
                       (result_shape_Z
                          (V (rev
-                               (truncl_list
+                               (skipn
                                   (Z.to_nat kz)
                                   (rev l)))))
                       (shape_to_vars
                          (result_shape_Z
-                            (V (rev (truncl_list
+                            (V (rev (skipn
                                        (Z.to_nat
                                           kz)
                                        (rev l)))))))).
@@ -2594,7 +2594,6 @@ Proof.
             2: { eapply result_has_shape_rev.
                  eapply result_has_shape_truncl_list.
                  eapply result_has_shape_rev.
-                 erewrite <- result_has_shape_filter_until_0.
                  simpl in *. eauto. }
             unfold result_shape_Z, shape_to_index, shape_to_vars in Heq1.
             simpl in *. 
@@ -2621,7 +2620,6 @@ Proof.
           2: { eapply result_has_shape_rev.
                eapply result_has_shape_truncl_list.
                eapply result_has_shape_rev.
-               erewrite <- result_has_shape_filter_until_0.
                simpl in *. eauto. }
           erewrite Exists_map.
           eapply Exists_impl; [|apply exists_filter_until_0].
@@ -2689,7 +2687,6 @@ Proof.
        erewrite result_has_shape_result_shape_Z.
        2: { eapply result_has_shape_rev.
             eapply result_has_shape_truncl_list.
-            erewrite <- result_has_shape_filter_until_0.
             eapply result_has_shape_rev.
             repeat rewrite map_cons in Hsh.
             eauto. }
@@ -2729,7 +2726,6 @@ Proof.
      erewrite result_has_shape_result_shape_Z.
      2: { eapply result_has_shape_rev.
           eapply result_has_shape_truncl_list.
-          erewrite <- result_has_shape_filter_until_0.
           eapply result_has_shape_rev.
           repeat rewrite map_cons in Hsh.
           eassumption. }
@@ -3076,7 +3072,6 @@ Proof.
           end.
           { erewrite result_has_shape_result_shape_Z in Heq1.
             2: { eapply result_has_shape_truncl_list.
-                 erewrite <- result_has_shape_filter_until_0.
                  simpl in *. eauto. }
             simpl in *.
             cases (m - Z.to_nat kz).
@@ -3099,7 +3094,6 @@ Proof.
           simpl. reflexivity.
           erewrite result_has_shape_result_shape_Z.
           2: { eapply result_has_shape_truncl_list.
-               erewrite <- result_has_shape_filter_until_0.
                simpl in *. eauto. }
           erewrite Exists_map.
           eapply Exists_impl; [|apply exists_filter_until_0].
