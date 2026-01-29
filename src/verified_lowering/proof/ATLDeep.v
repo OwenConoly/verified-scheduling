@@ -563,13 +563,13 @@ Ltac eq_size_of :=
   end.
 
 Theorem size_of_sizeof : forall v e l,
-    nonneg_bounds v e ->
     size_of v e l ->
+    nonneg_bounds v e ->
     exists lz,
       eval_Zexprlist v (sizeof e) lz /\
         lz = map Z.of_nat l.
 Proof.
-  induction e; intros ? H1 H2; simpl in *; invert H2; invs';
+  induction e; intros ? H1 H2; simpl in *; invert H1; invs';
   repeat match goal with
          | IH: forall _, _ -> _ -> _, H1: _, H2: _ |- _ => specialize (IH _ H1 H2)
   end;

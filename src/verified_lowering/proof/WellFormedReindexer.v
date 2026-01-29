@@ -473,7 +473,7 @@ Proof.
     eapply lookup_None_dom in H4. exfalso. apply H4.
     rewrite dom_alloc_array. erewrite <- In_iff_in.
     unfold flat_sizeof in *.
-    pose proof size_of_sizeof as Hsz. specialize Hsz with (1 := Hbds) (2 := Hsize).
+    pose proof size_of_sizeof as Hsz. specialize Hsz with (1 := Hsize) (2 := Hbds).
     destruct Hsz as (lz&Hsz&?). subst. simpl in Hsz. invert Hsz.
     rewrite <- H1 in *.
     pose proof eval_Zexpr_Z_fold_left_ZTimes as H'.
@@ -566,7 +566,7 @@ Proof.
   split; intros.
   - rewrite lookup_add_eq in * by auto. invert H1.
     pose proof size_of_sizeof as Hsz.
-    specialize (Hsz _ _ _ Hbds1 Hsize1). destruct Hsz as (lz&Hsz&?). subst.
+    specialize (Hsz _ _ _ Hsize1 Hbds1). destruct Hsz as (lz&Hsz&?). subst.
     simpl in Hsz. invert Hsz. rewrite <- H1 in *.
     erewrite lookup_array_add_weak_l.
     2: { erewrite result_has_shape_result_shape_Z by eauto.

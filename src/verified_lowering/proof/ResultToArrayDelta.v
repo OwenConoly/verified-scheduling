@@ -1386,13 +1386,14 @@ Qed.
 
 Ltac rewr_sizeof :=
   match goal with
-  | H: context[sizeof _] |- _ =>
-      match type of H with
+  | H: context[sizeof ?e] |- _ =>
+      lazymatch type of H with
       | eval_Zexprlist _ (sizeof _) _ => fail
+      | _ = sizeof _ => fail
       | _ => idtac
       end;
       let Hsizeof := fresh "Hsizeof" in
-      pose proof (size_of_sizeof _ _ _ ltac:(eassumption) ltac:(eassumption)) as Hsizeof;
+      pose proof (size_of_sizeof _ e _ ltac:(eassumption) ltac:(eassumption)) as Hsizeof;
       destruct Hsizeof as (?&Hsizeof&?); subst;
       simpl in Hsizeof;
       try invert1 Hsizeof;
