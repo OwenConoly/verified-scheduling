@@ -1482,12 +1482,10 @@ Proof.
     apply eval_Zexpr_Z_eval_Zexpr in H12. eq_eval_Z.
     eapply result_has_shape_truncl_list.
     eapply result_has_shape_rev.
-    erewrite <- result_has_shape_filter_until_0.
     eapply IHe; eauto.
   - invs. rewr_sizeof. invs'. eq_eval_Z. invert H.
     apply eval_Zexpr_Z_eval_Zexpr in H12. eq_eval_Z.
     eapply result_has_shape_truncl_list.
-    erewrite <- result_has_shape_filter_until_0.
     eapply IHe; eauto.
   - invs. eq_eval_Z. invert H.
     eq_size_of. invert H.

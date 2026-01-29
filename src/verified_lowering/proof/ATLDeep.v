@@ -890,7 +890,7 @@ Definition add_list_result sh :=
 Lemma invert_eval_sum' v ctx i lo hi body r :
   eval_expr v ctx (Sum i lo hi body) r ->
   exists loz hiz summands sz,
-    size_of body sz /\
+    size_of v body sz /\
       length summands = Z.to_nat (hiz - loz) /\
       eval_Zexpr_Z v lo = Some loz /\
       eval_Zexpr_Z v hi = Some hiz /\
@@ -924,7 +924,7 @@ Proof.
 Qed.
 
 Lemma mk_eval_sum sz v ctx i lo hi body r loz hiz summands :
-  size_of body sz ->
+  size_of v body sz ->
   eval_Zexpr_Z v lo = Some loz ->
   eval_Zexpr_Z v hi = Some hiz ->
   add_list_result sz summands r ->
