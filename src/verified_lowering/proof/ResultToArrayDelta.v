@@ -1384,6 +1384,16 @@ Proof.
     propositional.
 Qed.
 
+Ltac rewr_sizeof' e :=
+  let Hsizeof := fresh "Hsizeof" in
+  pose proof (size_of_sizeof _ e _ ltac:(eassumption) ltac:(eassumption)) as Hsizeof;
+  destruct Hsizeof as (?&Hsizeof&?); subst;
+  simpl in Hsizeof;
+  try invert1 Hsizeof;
+  repeat match goal with
+    | H: _ = sizeof _ |- _ => rewrite <- H in *
+    end.
+
 Ltac rewr_sizeof :=
   match goal with
   | H: context[sizeof ?e] |- _ =>
@@ -1392,26 +1402,19 @@ Ltac rewr_sizeof :=
       | _ = sizeof _ => fail
       | _ => idtac
       end;
-      let Hsizeof := fresh "Hsizeof" in
-      pose proof (size_of_sizeof _ e _ ltac:(eassumption) ltac:(eassumption)) as Hsizeof;
-      destruct Hsizeof as (?&Hsizeof&?); subst;
-      simpl in Hsizeof;
-      try invert1 Hsizeof;
-      repeat match goal with
-        | H: _ = sizeof _ |- _ => rewrite <- H in *
-        end
+      rewr_sizeof' e
+  | |- context[sizeof ?e] => rewr_sizeof' e
   end.
 
 Lemma size_of_eval_expr_result_has_shape :
-  forall e v sz,
+  forall e v sz ec r,
+    eval_expr v ec e r ->
     nonneg_bounds v e ->
     size_of v e sz ->
-    forall ec r,
-      eval_expr v ec e r ->
       result_has_shape r sz.
 Proof.
   intros e. induct e; intros; simpl in *.
-  - (* GEN *) invs. invert H1.
+  - (* GEN *) invs. invert H.
     + (* EMPTY GEN *)
       rename H10 into Hlo. rename H11 into Hhi.
       eapply eval_Zexpr_Z_eval_Zexpr in Hhi,Hlo.
@@ -1427,7 +1430,7 @@ Proof.
       2: { simpl. rewrite Hlo,Hhi. eauto. }
       lia.
       clear Heq. clear n.
-      eapply IHe. 3: eassumption.
+      eapply IHe. eassumption.
       { eapply nonneg_bounds_includes; [|eassumption]. sets. }
       { eapply size_of_includes. 2: eassumption. sets. }
       pose proof (eval_expr_for_gen_result_has_shape
@@ -1435,68 +1438,69 @@ Proof.
       assert (eval_Zexpr_Z v (lo + | 1 |)%z = Some (loz0+1)%Z).
       simpl. eapply eval_Zexpr_Z_eval_Zexpr in Hhi. rewrite Hlo. eauto.
       assert ((hiz0 - (loz0 + 1))%Z = Z.of_nat n). lia.
-      specialize (H0 ltac:(assumption) ltac:(assumption) ltac:(assumption) ltac:(assumption)).
+      specialize (H ltac:(assumption) ltac:(assumption) ltac:(assumption) ltac:(assumption)).
       eapply Forall_forall. intros ? Hin.
       eapply In_nth with (d:= S (SS 0)) in Hin. invs.
-      eapply IHe. 3: eapply H0.
-      { eapply nonneg_bounds_includes; [|eassumption]. sets. }
-      { eapply size_of_includes; [|eassumption]. sets. }
+      eapply IHe. eapply H. 
       eapply length_eval_expr_gen in H20; eauto.
       2: { simpl. rewrite Hlo,Hhi. reflexivity. }
       lia.
+      { eapply nonneg_bounds_includes; [|eassumption]. sets. }
+      { eapply size_of_includes; [|eassumption]. sets. }
   - (* SUM *)
-    invert H0. invert H1.
+    invert H1. invert H.
     + (* STEP SUM *)
       eapply result_has_shape_add_result.
       eassumption.
-      eapply IHe. 3: eassumption.
+      eapply IHe. eassumption.
       { eapply nonneg_bounds_includes; [|eassumption]. sets. }
       { eapply size_of_includes; [|eassumption]. sets. }
       eapply result_has_shape_for_sum.
-      apply IHe. 6: eassumption. all: eauto.
+      { intros. eapply IHe; eauto. }
+      6: eassumption. all: eauto.
       simpl. rewrite H5. reflexivity.
       rewrite Z2Nat.id. reflexivity. lia.
     + (* EMPTY SUM *)
       eq_size_of.
       eapply result_has_shape_gen_pad.
-  - invs. invert H1.
+  - invs. invert H.
     eq_size_of.
     apply result_has_shape_gen_pad.
     eauto.
-  - invs. invert H1. eauto.
-  - invs. invert H1. eauto using result_has_shape_concat.
-  - invs. invert H1. eauto using result_has_shape_flatten.
-  - invs. eq_eval_Z. invert H1.
+  - invs. invert H. eauto.
+  - invs. invert H. eauto using result_has_shape_concat.
+  - invs. invert H. eauto using result_has_shape_flatten.
+  - invs. eq_eval_Z. invert H.
     apply eval_Zexpr_Z_eval_Zexpr in H3. rewrite H3 in *. invs.
     eapply result_has_shape_split_result. lia. eauto.
-  - invs. invert H1.
-    eq_size_of. invert H0.
+  - invs. invert H.
+    eq_size_of. invs'.
     eapply result_has_shape_transpose_result.
     eapply IHe. 3: eassumption. eauto. eauto.
-  - invs. rewr_sizeof. invs'. eq_eval_Z. invert H1.
+  - invs. rewr_sizeof. invs'. eq_eval_Z. invert H.
     eapply result_has_shape_rev.
     apply eval_Zexpr_Z_eval_Zexpr in H12. eq_eval_Z.
     eapply result_has_shape_truncl_list.
     eapply result_has_shape_rev.
     erewrite <- result_has_shape_filter_until_0.
     eapply IHe; eauto.
-  - invs. rewr_sizeof. invs'. eq_eval_Z. invert H1.
+  - invs. rewr_sizeof. invs'. eq_eval_Z. invert H.
     apply eval_Zexpr_Z_eval_Zexpr in H12. eq_eval_Z.
     eapply result_has_shape_truncl_list.
     erewrite <- result_has_shape_filter_until_0.
     eapply IHe; eauto.
-  - invs. eq_eval_Z. invert H1.
+  - invs. eq_eval_Z. invert H.
     eq_size_of. invert H.
     apply eval_Zexpr_Z_eval_Zexpr in H5. eq_eval_Z.
     eapply result_has_shape_concat.
     eapply IHe; eauto.
     eapply result_has_shape_repeat_gen_pad.
-  - invs. eq_eval_Z. invert H1.
+  - invs. eq_eval_Z. invert H.
     eq_size_of. invert H.
     apply eval_Zexpr_Z_eval_Zexpr in H5. eq_eval_Z.
     rewrite Nat.add_comm.
     eapply result_has_shape_concat.
     eapply result_has_shape_repeat_gen_pad.
     eapply IHe; eauto.
-  - invs. invert H1. econstructor.
+  - invs. invert H. econstructor.
 Qed.

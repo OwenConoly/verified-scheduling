@@ -298,8 +298,8 @@ Proof.
      { assert (eval_expr v ec (Gen i lo hi body) (V (r::l))).
        econstructor; eauto.
        eapply result_has_shape_self.
-       eapply size_of_eval_expr_result_has_shape. 3: eassumption.
-       simpl. eauto 9. eauto. }
+       eapply size_of_eval_expr_result_has_shape; eauto.
+       simpl. eauto 9. }
      pose proof Halloc as Halloc1.
      eapply well_formed_allocation_result_V in Halloc; try apply Hrdx.
      invs'.
@@ -907,7 +907,7 @@ Proof.
      assert (result_has_shape s ls) as Hsh.
      { assert (eval_expr v ec (Sum i lo hi body) s).
        econstructor; eauto.
-       eapply size_of_eval_expr_result_has_shape. 3: eassumption. all: eauto. }
+       eapply size_of_eval_expr_result_has_shape; eauto. }
        pose proof H6 as Hshh.
        eapply result_has_shape_add_result_result in Hshh.
        2: { eassumption. }

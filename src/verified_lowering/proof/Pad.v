@@ -18,6 +18,7 @@ From ATL Require Import ATL Map Sets FrapWithoutSets Div Tactics.
 From Lower Require Import Zexpr Bexpr Array Range Sexpr Result ListMisc Meshgrid VarGeneration
      Constant ATLDeep ResultToArrayDelta.
 
+Local Hint Resolve nonneg_bounds_includes size_of_includes : core.
 Open Scope string_scope.
 
 Inductive pad_type :=
@@ -1264,9 +1265,7 @@ Proof.
     simpl in *|-.
     pose proof H3 as Hsize.
     eapply size_of_includes in Hsize. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsize.
-    3: { eauto. }
-    2: { eapply nonneg_bounds_includes; [|eassumption]. sets. }
+    eapply size_of_eval_expr_result_has_shape in Hsize; eauto.
 
     assert (0 < n0 \/ n0 = 0) as Hcasen by lia.
     assert (0 < m0 \/ m0 = 0) as Hcasem by lia.
@@ -1700,8 +1699,7 @@ Proof.
     apply eval_Zexpr_Z_eval_Zexpr in Hk. rewrite Hk in *. rename kz0 into kz.
     pose proof H8 as Hsh'''.
     eapply size_of_includes in Hsh'''. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsh'''. 3: eassumption.
-    2: { eapply nonneg_bounds_includes; [|eassumption]. sets. }
+    eapply size_of_eval_expr_result_has_shape in Hsh'''; eauto.
     repeat rewrite map_cons in *. pose proof H6 as HP.
     eapply IHeval_expr in H6; eauto.
     simpl in *. cases rsh. invert Hsh.
@@ -3254,9 +3252,7 @@ Proof.
         invs. eauto.
         eapply H21. lia. lia.
         eauto. eauto. eauto. eauto. eauto.
-        eapply size_of_eval_expr_result_has_shape. 3: eassumption.
-        eapply nonneg_bounds_includes; [|eassumption]. sets.
-        eapply size_of_includes; [|eassumption]. sets. }
+        eapply size_of_eval_expr_result_has_shape; eauto. }
 
       
       eapply IHeval_expr2 in Hsh'; clear IHeval_expr2.
@@ -3277,9 +3273,7 @@ Proof.
         eapply IHeval_expr1.
         eapply H21. lia.
         lia. eauto. eauto. eauto. eauto. eauto.
-        eapply size_of_eval_expr_result_has_shape. 3: eassumption.
-        eapply nonneg_bounds_includes; [|eassumption]. sets.
-        eapply size_of_includes; [|eassumption]. sets.
+        eapply size_of_eval_expr_result_has_shape; eauto.
         eauto.
       * rewrite firstn_app.
         rewrite length_app. rewrite length_rev. simpl.
@@ -3292,10 +3286,7 @@ Proof.
         eauto. eauto. 
         eauto.
         eauto.
-        eapply size_of_eval_expr_result_has_shape.
-        3: eassumption.
-        eapply nonneg_bounds_includes; [|eassumption]. sets.
-        eapply size_of_includes; [|eassumption]. sets.
+        eapply size_of_eval_expr_result_has_shape; eauto.
       * posnats. pose proof H17 as H'.
         rewrite skipn_app in *.
         rewrite firstn_app in *. rewrite length_skipn in *.
@@ -3457,10 +3448,7 @@ Proof.
             eapply IHeval_expr1.
             eauto. eapply H21. lia. lia. eauto. eauto.
             eauto. eauto. eauto. 
-            eapply size_of_eval_expr_result_has_shape.
-            3: eassumption.
-            eapply nonneg_bounds_includes; [|eassumption]. sets.
-            eapply size_of_includes; [|eassumption]. sets.
+            eapply size_of_eval_expr_result_has_shape; eauto.
             constructor.
             rewrite firstn_nil. split; eauto.
             cases ll. simpl. eauto.
@@ -3494,9 +3482,7 @@ Proof.
           eapply relate_pads_gen_pad.
           eapply IHeval_expr1. eauto.
           eapply H21. lia. lia. eauto. eauto. eauto. eauto. eauto.
-          eapply size_of_eval_expr_result_has_shape. 3: eassumption.
-          eapply nonneg_bounds_includes; [|eassumption]. sets.
-          eapply size_of_includes; [|eassumption]. sets.
+          eapply size_of_eval_expr_result_has_shape; eauto.
           constructor.
           simpl length in *.
           
@@ -3707,8 +3693,8 @@ Proof.
       eapply size_of_includes in Hsize. 2: apply empty_includes.
       eapply size_of_eval_expr_result_has_shape in Hsize.
       simpl in *.
-      3: { econstructor; eauto using size_of_includes, empty_includes. }
-      2: { simpl in *. eapply nonneg_bounds_includes; [|eassumption]. sets. }
+      2: { econstructor; eauto. }
+      2: { eauto. }
       pose proof Hsh as Hsh'. pose proof Hsize as Hsize'.
       eapply result_has_shape_result_shape_nat in Hsh', Hsize'.
       rewrite Hsh' in Hsize'. clear Hsh'.
@@ -3778,11 +3764,9 @@ Proof.
     pose proof Hsize1 as Hsh1. pose proof Hsize2 as Hsh2.
     
     eapply size_of_includes in Hsh1. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsh1.
-    3: eassumption. 2: eapply nonneg_bounds_includes; [|eassumption]; solve[sets].
+    eapply size_of_eval_expr_result_has_shape in Hsh1; eauto.
     eapply size_of_includes in Hsh2. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsh2.
-    3: eassumption. 2: eapply nonneg_bounds_includes; [|eassumption]; solve[sets].
+    eapply size_of_eval_expr_result_has_shape in Hsh2; eauto.
     eapply result_has_shape_length in Hsh. rewrite length_app in *.
     pose proof Hsh1 as Hsh1''. pose proof Hsh2 as Hsh2''.
     pose proof Hsh' as HH. pose proof Hsh'' as HHH.
@@ -3812,8 +3796,7 @@ Proof.
       split.
       pose proof Hsize1 as Hsh1'''.
       eapply size_of_includes in Hsh1'''. 2: apply empty_includes.
-      eapply size_of_eval_expr_result_has_shape in Hsh1'''.
-      3: eassumption. 2: eapply nonneg_bounds_includes; [|eassumption]; solve[sets].
+      eapply size_of_eval_expr_result_has_shape in Hsh1'''; eauto.
       invert Hsh1'''.
       replace l0 with 0 by lia. simpl. econstructor.
       simpl.
@@ -3821,8 +3804,7 @@ Proof.
       2: eassumption.
       pose proof Hsize2 as Hsh2'''.
       eapply size_of_includes in Hsh2'''. 2: apply empty_includes.
-      eapply size_of_eval_expr_result_has_shape in Hsh2'''.
-      3: eassumption. 2: eapply nonneg_bounds_includes; [|eassumption]; solve[sets].
+      eapply size_of_eval_expr_result_has_shape in Hsh2'''; eauto.
       replace (rev l2 ++ [r])%list with (rev (r::l2)) in * by auto.
       simpl map in Hsh2'''.
       eapply result_has_shape_forall in Hsh2'''.      
@@ -3959,9 +3941,7 @@ Proof.
     cases rsh.
     unfold transpose_result in Hsh. invert Hsh.
     eapply size_of_includes in Hsize'. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsize'.
-    3: { eassumption. }
-    2: { eapply nonneg_bounds_includes; [|eassumption]. sets. }
+    eapply size_of_eval_expr_result_has_shape in Hsize'; eauto.
 
     pose proof Hsize' as Hsh'.
     eapply result_has_shape_transpose_result in Hsh'.
@@ -4412,9 +4392,7 @@ Proof.
     cases rsh.
     unfold transpose_result in Hsh. invert Hsh.
     eapply size_of_includes in Hsize'. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsize'.
-    3: { eassumption. }
-    2: { eapply nonneg_bounds_includes; [|eassumption]. sets. }
+    eapply size_of_eval_expr_result_has_shape in Hsize'; eauto.
     
     pose proof Hsize' as Hsh'.
     eapply result_has_shape_transpose_result in Hsh'.
@@ -4625,8 +4603,7 @@ Proof.
 
     pose proof Hsize as Hsize'.
     eapply size_of_includes in Hsize'. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsize'.
-    3: eassumption. 2: eapply nonneg_bounds_includes; [|eassumption]; solve[sets].
+    eapply size_of_eval_expr_result_has_shape in Hsize'; eauto.
     cases rsh. invert Hsh.
     pose proof Hsh as Hsh'.
     eapply result_has_shape_rev in Hsh'.
@@ -4733,8 +4710,7 @@ Proof.
     
     pose proof Hsize as Hsize'.
     eapply size_of_includes in Hsize'. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsize'. 3: eassumption.
-    2: eapply nonneg_bounds_includes; [|eassumption]; solve[sets].
+    eapply size_of_eval_expr_result_has_shape in Hsize'; eauto.
     cases rsh. invert Hsh.
     pose proof Hsh as Hsh'.
     eapply result_has_shape_rev in Hsh'.
@@ -4867,8 +4843,7 @@ Proof.
 
     pose proof Hsize as Hsize'.
     eapply size_of_includes in Hsize'. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsize'. 3: eassumption.
-    2: eapply nonneg_bounds_includes; [|eassumption]; solve[sets].
+    eapply size_of_eval_expr_result_has_shape in Hsize'; eauto.
     pose proof Hsh as Hsh'.
     pose proof Hsh as Hsh''.
     eapply result_has_shape_app_l in Hsh'.
@@ -4989,8 +4964,7 @@ Proof.
     
     pose proof Hsize as Hsize'.
     eapply size_of_includes in Hsize'. 2: apply empty_includes.
-    eapply size_of_eval_expr_result_has_shape in Hsize'. 3: eassumption.
-    2: { eapply nonneg_bounds_includes; [|eassumption]. sets. }
+    eapply size_of_eval_expr_result_has_shape in Hsize'; eauto.
     pose proof Hsh as Hsh'.
     pose proof Hsh as Hsh''.
     eapply result_has_shape_app_l in Hsh'.
