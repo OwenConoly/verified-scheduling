@@ -25,38 +25,34 @@ Open Scope string_scope.
 
 Set Default Proof Mode "Classic".
 
+Record arb_dim_tensor := { dim: nat; val: dim_n dim }.
+
 Fixpoint rt var ts n :=
   match ts with
   | nil => pATLexpr var n
   | t :: ts' => pExpr_type var t -> rt var ts' n
   end.
 
-(* Definition Var' {t var} (x : var t) : pExpr_type var t := *)
-(*   match t return var t -> pExpr_type var t with *)
-(*   | tZar => ATLPhoas.ZVar *)
-(*   | tB => fun _ => BBop BEq ZZ0 ZZ0 *)
-(*   | tensor_n n => Var *)
-(*   end x. *)
+Definition Var' {t var} (x : var t) : pExpr_type var t :=
+  match t return var t -> pExpr_type var t with
+  | tZ => ATLPhoas.ZVar
+  | tB => fun _ => BBop BEq ZZ0 ZZ0
+  | tensor_n n => Var
+  end x.
 
-(* Fixpoint ec_of_vars (names_vals : list (string * Result.result)) := *)
-(*   match names_vals with *)
-(*   | [] => $0 *)
-(*   | (n, v) :: names_vals' => ec_of_vars names_vals' $+ (n, v) *)
-(*   end. *)
-
-Fixpoint fun_type' (var : type' -> Type) (ts : list type') (T : Type) : Type :=
-  match ts with
-  | [] => T
-  | t :: ts' => var t -> fun_type' var ts' T
+Fixpoint ec_of_vars (names_vals : list (string * Result.result)) :=
+  match names_vals with
+  | [] => $0
+  | (n, v) :: names_vals' => ec_of_vars names_vals' $+ (n, v)
   end.
 
-Fixpoint varify var ts T (f : fun_type' (pExpr_type var) ts T) : fun_type var ts T :=
+Fixpoint varify var ts T (f : fun_type (pExpr_type var) ts T) : fun_type var ts T :=
   match ts return fun_type (pExpr_type var) ts T -> fun_type var ts T with
   | [] => fun f => f
   | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
   end f.
-About fun_type.
-Derive (reified_matmul : forall var, fun_type var [tZarg; tZarg; tZarg; tensor_n 2; tensor_n 2] (pATLexpr var 2)) in
+
+Derive (reified_matmul : forall var, fun_type var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] (pATLexpr var 2)) in
   (interp_fvar_pATLexpr _ _ (reified_matmul interp_type) = matmul)
     as reified_matmul_correct.
 Proof.
