@@ -3336,13 +3336,6 @@ Fixpoint stringvar_fvar_ATLexpr {ts n} name (e : fvar_pATLexpr (fun _ => nat) ts
                 stringvar_fvar_ATLexpr (S name) (e name)
   end e.
 
-Fixpoint fvar_sound_sizeof {var ts n} (dummy : forall t : type, var t) sizeof_var
-  (e : fvar_pATLexpr var ts n) : option (list nat) :=
-  match ts return fvar_pATLexpr _ ts _ -> _ with
-  | [] => fun e => sound_sizeof dummy sizeof_var e
-  | t :: ts' => fun e => fvar_sound_sizeof dummy sizeof_var (e (dummy _))
-  end e.
-
 Inductive size_spec :=
 | size_nil
 | with_B_var (sz : size_spec)
@@ -3362,6 +3355,29 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
   | tZarg :: ts', with_Z_var min max sz => fun e => forall r,
       (min <= r < max)%Z ->
       fvar_idxs_in_bounds (sz r) (e r)           
+  (* | tB :: ts', with_B_var sz => *)
+  (*     (* fun e => forall r, fvar_idxs_in_bounds sz (e r)*) *)
+  (*     fun _ => False *)
+  | _, _ => fun _ => False
+  end e.
+
+Fixpoint fvar_sound_sizeof {var ts n} (dummy : forall t : type, var t) sizeof_var
+  (sizes : size_spec) (e : fvar_pATLexpr var ts n) : Prop :=
+  match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
+  | [], size_nil => fun e =>
+                     match sound_sizeof dummy sizeof_var e with
+                     | Some _ => True
+                     | None => False
+                     end
+  | tensor_n n :: ts', with_T_var sh sz =>
+      fun e =>
+        forall r,
+          fvar_sound_sizeof dummy sizeof_var sz (e r)
+  | tZarg :: ts', with_Z_var min max sz =>
+      fun e => forall r r',
+          sizeof_var r = Some r' ->
+          (min <= r' < max)%Z ->
+          fvar_sound_sizeof dummy sizeof_var (sz r') (e r)           
   (* | tB :: ts', with_B_var sz => *)
   (*     (* fun e => forall r, fvar_idxs_in_bounds sz (e r)*) *)
   (*     fun _ => False *)
@@ -3428,12 +3444,17 @@ Fixpoint spec_of' ts n name size (fd : ATLexpr) (fs : fun_type interp_type ts (d
 
 Definition spec_of ts n name size fd fs := spec_of' ts n name size fd fs $0 $0.
 
-Lemma fvar_sound_sizeof_wf n ts var1 var2 dummy1 sizeof1 dummy2 sizeof2 e1 e2 ctx :
+Lemma fvar_sound_sizeof_wf n ts var1 var2 dummy1 sizeof1 dummy2 sizeof2 sz e1 e2 ctx :
   wf_fvar_ATLexpr var1 var2 ctx ts n e1 e2 ->
   Forall (sizes_consistent sizeof1 sizeof2) ctx ->
-  fvar_sound_sizeof dummy1 sizeof1 e1 = fvar_sound_sizeof dummy2 sizeof2 e2.
+  fvar_sound_sizeof dummy1 sizeof1 sz e1 ->
+  fvar_sound_sizeof dummy2 sizeof2 sz e2.
 Proof.
-  intros H H'. induction H; simpl; eauto using sound_sizeof_wf. eapply H0. constructor; eauto. simpl.
+  intros H H'. revert sz. induction H; intros sz Hsz; simpl in *.
+  - destruct sz; auto. erewrite sound_sizeof_wf in Hsz by eauto. exact Hsz.
+  - destruct t; auto.
+    + destruct sz; auto. intros. eapply H0.
+      2: { eapply Hsz. eauto.; eauto.
 Qed.
 
 Lemma res_spec_of'_correct ts n name size fd e_nat e_res ctx_res sz :
