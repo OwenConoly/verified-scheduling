@@ -3361,25 +3361,6 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
   | _, _ => fun _ => False
   end e.
 
-Fixpoint fvar_sound_sizeof_nat {ts n} v (sizes : size_spec) (e : fvar_pATLexpr _ ts n) : Prop :=
-  match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
-  | [], size_nil => fun e =>
-                     match sound_sizeof (fun _ => O) (fun x => v $? (nat_to_string x)) e with
-                     | Some _ => True
-                     | None => False
-                     end
-  | tensor_n n :: ts', with_T_var sh sz =>
-      fun e =>
-        forall r,
-          fvar_sound_sizeof_nat v sz (e r)
-  | tZarg :: ts', with_Z_var min max sz =>
-      fun e => forall r rz,
-          v $? nat_to_string r = None ->
-          (min <= rz < max)%Z ->
-          fvar_sound_sizeof_nat (v $+ (nat_to_string r, rz)) (sz rz) (e r)           
-  | _, _ => fun _ => False
-  end e.
-
 Fixpoint fvar_sound_sizeof_shallow {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil => fun e =>
@@ -3457,47 +3438,6 @@ Fixpoint spec_of' ts n name size (fd : ATLexpr) (fs : fun_type interp_type ts (d
   end fd fs.
 
 Definition spec_of ts n name size fd fs := spec_of' ts n name size fd fs $0 $0.
-
-(* Lemma fvar_sound_sizeof_wf n ts var1 var2 dummy1 sizeof1 dummy2 sizeof2 sz e1 e2 ctx : *)
-(*   wf_fvar_ATLexpr var1 var2 ctx ts n e1 e2 -> *)
-(*   Forall (sizes_consistent sizeof1 sizeof2) ctx -> *)
-(*   fvar_sound_sizeof dummy1 sizeof1 sz e1 -> *)
-(*   fvar_sound_sizeof dummy2 sizeof2 sz e2. *)
-(* Proof. *)
-(*   intros H H'. revert sz. induction H; intros sz Hsz; simpl in *. *)
-(*   - destruct sz; auto. erewrite sound_sizeof_wf in Hsz by eauto. exact Hsz. *)
-(*   - destruct t; auto. *)
-(*     + destruct sz; auto. intros. eapply H0. *)
-(*       2: { eapply Hsz. eauto.; eauto. *)
-(* Qed. *)
-
-Lemma sizes_consistent_extends_left var1 f1 f2 (x : ctx_elt2 var1 interp_type_result) :
-  sizes_consistent f1 Some x ->
-  (forall x y, f1 x = Some y -> f2 x = Some y) ->
-  sizes_consistent f2 Some x.
-Proof. destruct x. destruct ctx_elt_t1; simpl; auto. Qed.
-
-Lemma fvar_sound_sizeof_shallow_nat ts n e_nat e_res size ctx :
-  wf_fvar_ATLexpr (fun _ => nat) interp_type_result ctx ts n e_nat e_res ->
-  Forall (sizes_consistent (fun x => valuation_of ctx $? nat_to_string x) Some) ctx ->
-  fvar_sound_sizeof_shallow size e_res ->
-  fvar_sound_sizeof_nat (valuation_of ctx) size e_nat.
-Proof.
-  intros H. revert size. induction H; simpl; intros size Hc Hsz.
-  - destruct size; auto.
-    destruct (sound_sizeof dummy_result _ _) eqn:?; [|contradiction].
-    eassert (sound_sizeof (fun _ => 0) _ _ = Some _) as E by prove_sound_sizeof.
-    rewrite E. constructor.
-  - destruct t; auto; destruct size; auto.
-    + intros. apply H0; auto. simpl. constructor; auto.
-      -- simpl. apply lookup_add_eq. reflexivity.
-      -- eapply Forall_impl; [|eassumption]. intros.
-         eapply sizes_consistent_extends_left.
-         ++ eassumption.
-         ++ simpl. intros. rewrite lookup_add_ne; [assumption|]. congruence.
-    + simpl in H0. eauto.
-      Unshelve. exact (V []).
-Qed.
 
 Lemma res_spec_of'_correct ts n name size fd e_nat e_res ctx_res :
   wf_fvar_ATLexpr _ interp_type_result ctx_res ts n e_nat e_res ->
