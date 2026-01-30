@@ -179,7 +179,7 @@ Ltac print_shallows :=
 Goal True. print_shallows. Abort.
 
 Ltac pattern_shallows x :=
-  pattern interp_type
+  pattern interp_type'
     (*copy-paste result of "print_shallows" on following lines*)
     (*TODO is there a less dumb way to do this?  Ltac metaprogramming?*)
 
@@ -266,14 +266,14 @@ Ltac get_fun x :=
 
 (*assumes that the reification target appears in the goal*)
 Ltac make_types_reifiable_in x :=
-  change R with (interp_type (tensor_n' O)) in x;
-  repeat change (list (interp_type (tensor_n' ?n))) with (interp_type (tensor_n' (S n))) in x;
+  change R with (interp_type' (tensor_n' O)) in x;
+  repeat change (list (interp_type' (tensor_n' ?n))) with (interp_type' (tensor_n' (S n))) in x;
   change RTensorElem with (dim_n_TensorElem O) in x;
   repeat change (@TensorTensorElem _ (dim_n_TensorElem ?n)) with
     (dim_n_TensorElem (S n)) in x;
   repeat change (@get _ _ ?v ?i) with (@gget_R (S O) v [i]) in x;
   repeat change (@gget_R ?n (@get _ _ ?v ?idx) ?idxs) with (@gget_R (S n) v (idx :: idxs)) in x;
-  change Z with (interp_type tZ') in x;
+  change Z with (interp_type' tZ') in x;
   cbv [gen sum Common.Truncr] in x;
   (*Z's are not allowed to be used as constants;
     in particular, they cannot be used to define nats*)
@@ -282,17 +282,17 @@ Ltac make_types_reifiable_in x :=
     | x := context[(Z.to_nat ?y)] |- _ =>
         let k := fresh "k" in set (k := Z.to_nat y)
     end;
-  repeat change (@genr (interp_type (tensor_n' ?n)) _) with (gen_n n) in x;
-  repeat change (@sumr (interp_type (tensor_n' ?n)) _) with (sum_n n) in x;
-  repeat change (@iverson (interp_type (tensor_n' ?n)) _) with (iverson_n n) in x;
-  repeat change (@Common.flatten (interp_type (tensor_n' ?n)) _) with (flatten_n n) in x;
-  repeat change (@truncr (interp_type (tensor_n' ?n)) _) with (truncr_n n) in x;
-  repeat change (@truncl (interp_type (tensor_n' ?n)) _) with (truncl_n n) in x;
-  repeat change (@transpose (interp_type (tensor_n' ?n)) _) with (transpose_n n) in x;
-  repeat change (@concat (interp_type (tensor_n' ?n)) _) with (concat_n n) in x;
-  repeat change (@tile (interp_type (tensor_n' ?n)) _) with (tile_n n) in x;
-  repeat change (@let_binding (interp_type (tensor_n' ?n)) (interp_type (tensor_n' ?m))) with (let_nm n m) in x;
-  change (@bin (interp_type (tensor_n' O)) _) with Rplus in x.
+  repeat change (@genr (interp_type' (tensor_n' ?n)) _) with (gen_n n) in x;
+  repeat change (@sumr (interp_type' (tensor_n' ?n)) _) with (sum_n n) in x;
+  repeat change (@iverson (interp_type' (tensor_n' ?n)) _) with (iverson_n n) in x;
+  repeat change (@Common.flatten (interp_type' (tensor_n' ?n)) _) with (flatten_n n) in x;
+  repeat change (@truncr (interp_type' (tensor_n' ?n)) _) with (truncr_n n) in x;
+  repeat change (@truncl (interp_type' (tensor_n' ?n)) _) with (truncl_n n) in x;
+  repeat change (@transpose (interp_type' (tensor_n' ?n)) _) with (transpose_n n) in x;
+  repeat change (@concat (interp_type' (tensor_n' ?n)) _) with (concat_n n) in x;
+  repeat change (@tile (interp_type' (tensor_n' ?n)) _) with (tile_n n) in x;
+  repeat change (@let_binding (interp_type' (tensor_n' ?n)) (interp_type' (tensor_n' ?m))) with (let_nm n m) in x;
+  change (@bin (interp_type' (tensor_n' O)) _) with Rplus in x.
 
 Ltac Reify x name :=
   set (y := x);
