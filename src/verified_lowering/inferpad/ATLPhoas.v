@@ -37,9 +37,10 @@ Fixpoint dim_n n :=
   | S n' => list (dim_n n')
   end.
 
+Variant Zval := funarg (x : Z) | itervar (x : Z).
 Definition interp_type t : Type :=
   match t with
-  | tZ => Z
+  | tZ => Zval
   | tB => bool
   | tensor_n n => dim_n n
   end.
@@ -250,10 +251,16 @@ Fixpoint stringvar_Z (e : pZexpr nat) : Zexpr :=
   | ZZopp x => Zexpr.ZMinus (ZLit 0) (stringvar_Z x)
   end.
 
-Fixpoint interp_pZexpr (e : pZexpr Z) : Z :=
+Definition interp_Zval (x : Zval) :=
+  match x with
+  | funarg y => y
+  | itervar y => y
+  end.
+
+Fixpoint interp_pZexpr (e : pZexpr Zval) : Z :=
   match e with
   | ZBop o x y => interp_Zbop o (interp_pZexpr x) (interp_pZexpr y)
-  | ZVar x => x
+  | ZVar x => interp_Zval x
   | ZZ0 => 0
   | ZZpos p => Zpos p
   | ZZneg p => Zneg p
@@ -261,19 +268,19 @@ Fixpoint interp_pZexpr (e : pZexpr Z) : Z :=
   | ZZopp x => - interp_pZexpr x
   end.
 
-Fixpoint sizeof_pZexpr {var} (e : pZexpr var) : option Z :=
+Fixpoint sizeof_pZexpr {var} (sizeof_var : var -> option Z) (e : pZexpr var) : option Z :=
   match e with
   | ZBop o x y =>
-      match sizeof_pZexpr x, sizeof_pZexpr y with
+      match sizeof_pZexpr sizeof_var x, sizeof_pZexpr sizeof_var y with
       | Some x', Some y' => Some (interp_Zbop o x' y')
       | _, _ => None
       end
-  | ZVar x => None
+  | ZVar x => sizeof_var x
   | ZZ0 => Some 0%Z
   | ZZpos p => Some (Zpos p)
   | ZZneg p => Some (Zneg p)
   | ZZ_of_nat n => Some (Z.of_nat n)
-  | ZZopp x => option_map (fun x => -x)%Z (sizeof_pZexpr x)
+  | ZZopp x => option_map (fun x => -x)%Z (sizeof_pZexpr sizeof_var x)
   end.
 
 Variant Bbop := BLt | BLe | BEq.
@@ -303,7 +310,7 @@ Fixpoint stringvar_B (e : pBexpr nat) : Bexpr :=
   | BBop o x y => (stringvar_Bbop o) (stringvar_Z x) (stringvar_Z y)
   end.                                                 
 
-Fixpoint interp_pBexpr (e : pBexpr Z) : bool :=
+Fixpoint interp_pBexpr (e : pBexpr Zval) : bool :=
   match e with
   | BBop o x y => interp_Bbop o (interp_pZexpr x) (interp_pZexpr y)
   | BAnd x y => interp_pBexpr x && interp_pBexpr y
@@ -495,9 +502,9 @@ Definition Wf_fvar_ATLExpr {ts n} (e : fvar_pATLExpr ts n) :=
 Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type n) : interp_type (tensor_n n) :=
   match e with
   | Gen lo hi body =>
-      genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr (body x))
+      genr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr (body (itervar x)))
   | Sum lo hi body =>
-      sumr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr (body x))
+      sumr (interp_pZexpr lo) (interp_pZexpr hi) (fun x => interp_pATLexpr (body (itervar x)))
   | Guard b e1 => iverson (interp_pBexpr b) (interp_pATLexpr e1)
   | Lbind x f => let_binding (interp_pATLexpr x) (fun x0 => interp_pATLexpr (f x0))
   | Concat x y => concat (interp_pATLexpr x) (interp_pATLexpr y)
@@ -520,10 +527,10 @@ Fixpoint interp_fvar_pATLexpr ts n (e : fvar_pATLexpr interp_type ts n) : fvar_t
   | t :: ts' => fun e => fun x => interp_fvar_pATLexpr ts' n (e x)
   end e.
 
-Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : option (list nat) :=
+Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> option Z) (e : pATLexpr var n) : option (list nat) :=
   match e with
   | Gen lo hi body =>
-      match sound_sizeof dummy (body (dummy _)), sizeof_pZexpr lo, sizeof_pZexpr hi with
+      match sound_sizeof dummy sizeof_var (body (dummy _)), sizeof_pZexpr sizeof_var lo, sizeof_pZexpr sizeof_var hi with
       | Some sz, Some lo', Some hi' =>
           let n := Z.to_nat (hi' - lo') in
           (*for reasons described below (truncl case),
@@ -534,16 +541,16 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
       | _, _, _ => None
       end
   | Sum lo hi body =>
-    sound_sizeof dummy (body (dummy _))
+    sound_sizeof dummy sizeof_var (body (dummy _))
   | Guard p body =>
-    sound_sizeof dummy body
+    sound_sizeof dummy sizeof_var body
   | Lbind e1 e2 =>
-      match sound_sizeof dummy e1 with
-      | Some _ => sound_sizeof dummy (e2 (dummy _))
+      match sound_sizeof dummy sizeof_var e1 with
+      | Some _ => sound_sizeof dummy sizeof_var (e2 (dummy _))
       | None => None
       end
   | Concat x y =>
-      match sound_sizeof dummy x, sound_sizeof dummy y with
+      match sound_sizeof dummy sizeof_var x, sound_sizeof dummy sizeof_var y with
       | Some (nx :: restx), Some (ny :: resty) =>
           if list_eq_dec Nat.eq_dec restx resty then
             Some (nx + ny :: restx)
@@ -552,12 +559,12 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
       | _, _ => None
       end
   | Flatten e =>
-    match sound_sizeof dummy e with
+    match sound_sizeof dummy sizeof_var e with
     | Some (a :: b :: rest) => Some (a * b :: rest)
     | _ => None
     end
   | Split k e =>
-    match sound_sizeof dummy e with
+    match sound_sizeof dummy sizeof_var e with
     | Some (a :: rest) =>
         if (0 <? k)%nat then
           Some (a //n k :: k :: rest)
@@ -565,12 +572,12 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
     | _ => None
     end
   | Transpose e =>
-    match sound_sizeof dummy e with
+    match sound_sizeof dummy sizeof_var e with
     | Some (a :: b :: rest) => Some (b :: a :: rest)
     | _ => None
     end
   | Truncr n e | Truncl n e =>
-    match sound_sizeof dummy e with
+    match sound_sizeof dummy sizeof_var e with
     | Some (m :: rest) =>
         (*note: ATLDeep.size_of only requires n <=? m.
           here, we also check n <? m, because we want to
@@ -584,12 +591,12 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
     | _ => None
     end
   | Padr n e =>
-    match sound_sizeof dummy e with
+    match sound_sizeof dummy sizeof_var e with
     | Some (m :: rest) => Some (m + n :: rest)
     | _ => None
     end
   | Padl n e =>
-    match sound_sizeof dummy e with
+    match sound_sizeof dummy sizeof_var e with
     | Some (m :: rest) => Some (n + m :: rest)
     | _ => None
     end                  
@@ -602,22 +609,22 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (e : pATLexpr var n) : o
         end
       else None
   | SBop _ x y =>
-      match sound_sizeof dummy x, sound_sizeof dummy y with
+      match sound_sizeof dummy sizeof_var x, sound_sizeof dummy sizeof_var y with
       | Some _, Some _ => Some []
       | _, _ => None
       end
   | SIZR _ => Some []
   end.
 
-Definition sizeof {var n} dummy (e : pATLexpr var n) :=
-  match sound_sizeof dummy e with
+Definition sizeof {var n} dummy sizeof_var (e : pATLexpr var n) :=
+  match sound_sizeof dummy sizeof_var e with
   | Some x => x
   | None => []
   end.
 
-Definition interp_type_result t :=
+Definition interp_type_result t : Type :=
   match t with
-  | tZ => Z
+  | tZ => Zval
   | tB => bool
   | tensor_n _ => result
   end.
@@ -640,7 +647,7 @@ Qed.
 
 Definition dummy_result (t : type) : interp_type_result t :=
   match t with
-  | tZ => 0%Z
+  | tZ => itervar 0
   | tB => false
   | tensor_n _ => V []
   end.
@@ -663,14 +670,20 @@ Fixpoint eval_get' x idxs :=
   | _, _ => SX
   end.
 
+Definition sizeof_Zval x :=
+  match x with
+  | itervar y => None
+  | funarg x => Some x
+  end.
+
 Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.result :=
   match e in pATLexpr _ n with
   | @Gen _ n lo hi body =>
-      V (map (fun x => result_of_pATLexpr (body x)) (zrange (interp_pZexpr lo) (interp_pZexpr hi)))
+      V (map (fun x => result_of_pATLexpr (body (itervar x))) (zrange (interp_pZexpr lo) (interp_pZexpr hi)))
   | Sum lo hi body =>
-      sum_with_sz (sizeof dummy_result e)
-        (interp_pZexpr lo) (interp_pZexpr hi) (fun x => result_of_pATLexpr (body x))
-  | Guard b e1 => if (interp_pBexpr b) then (result_of_pATLexpr e1) else gen_pad (sizeof dummy_result e1)
+      sum_with_sz (sizeof dummy_result sizeof_Zval e)
+        (interp_pZexpr lo) (interp_pZexpr hi) (fun x => result_of_pATLexpr (body (itervar x)))
+  | Guard b e1 => if (interp_pBexpr b) then (result_of_pATLexpr e1) else gen_pad (sizeof dummy_result sizeof_Zval e1)
   | Lbind x f => let_binding (result_of_pATLexpr x) (fun x0 => result_of_pATLexpr (f x0))
   | Concat x y =>
       match result_of_pATLexpr x, result_of_pATLexpr y with
@@ -688,7 +701,7 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       | _ => V []
       end
   | Transpose x =>
-      match result_of_pATLexpr x, sizeof dummy_result x with
+      match result_of_pATLexpr x, sizeof dummy_result sizeof_Zval x with
       | V xs, n :: m :: sh => transpose_result xs (m :: n :: sh)
       | _, _ => V []
       end
@@ -703,12 +716,12 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       | _ => V []
       end
   | Padl k x =>
-      match result_of_pATLexpr x, sizeof dummy_result x with
+      match result_of_pATLexpr x, sizeof dummy_result sizeof_Zval x with
       | V xs, _ :: sh => V (gen_pad_list (k :: sh) ++ xs)
       | _, _ => V []
       end
   | Padr k x =>
-      match result_of_pATLexpr x, sizeof dummy_result x with
+      match result_of_pATLexpr x, sizeof dummy_result sizeof_Zval x with
       | V xs, _ :: sh => V (xs ++ gen_pad_list (k :: sh))
       | _, _ => V []
       end
@@ -960,7 +973,7 @@ end.
 Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type_result)) : valuation :=
   match ctx with
   | {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
-      valuation_of ctx' $+ (nat_to_string x, y)
+      valuation_of ctx' $+ (nat_to_string x, interp_Zval y)
   | _ :: ctx' => valuation_of ctx'
   | nil => $0
   end.
@@ -977,7 +990,7 @@ Fixpoint ec_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type_result)) : expr_
 Lemma valuation_of_correct ctx x y :
   NoDup (@map _ nat (fun elt => elt.(ctx_elt_p1 _ _)) ctx) ->
   List.In {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} ctx ->
-  valuation_of ctx $? (nat_to_string x) = Some y.
+  valuation_of ctx $? (nat_to_string x) = Some (interp_Zval y).
 Proof.
   induction ctx.
   - simpl. intros. contradiction.
@@ -1088,7 +1101,7 @@ Qed.
 
 Definition dummy_shal t : interp_type t :=
   match t with
-  | tZ => 0%Z
+  | tZ => itervar 0%Z
   | tB => false
   | tensor_n O => 0%R
   | tensor_n (S _) => []
@@ -1108,40 +1121,175 @@ Ltac size_of_constr :=
   | |- size_of _ ?x => eassert (x = _) as ->; cycle 1; [econstructor|]
   end.
 
-Lemma sound_sizeof_wf_Z var1 var2 ctx e1 e2 :
+Definition sizes_consistent {var1 var2} (sizeof1 : _ -> option Z) sizeof2 (x : ctx_elt2 var1 var2) :=
+  match x with
+  | {| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => sizeof1 x1 = sizeof2 x2
+  | {| ctx_elt_t := tB; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => True
+  | {| ctx_elt_t := tensor_n _; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => True
+  end.
+
+Lemma sound_sizeof_wf_Z var1 var2 sizeof1 sizeof2 ctx e1 e2 :
   wf_Zexpr var1 var2 ctx e1 e2 ->
-  sizeof_pZexpr e1 = sizeof_pZexpr e2.
+  Forall (sizes_consistent sizeof1 sizeof2) ctx ->
+  sizeof_pZexpr sizeof1 e1 = sizeof_pZexpr sizeof2 e2.
 Proof.
-  induction 1; simpl; eauto.
+  intros H1 H2. induction H1; simpl; eauto.
   - destruct o; simpl; rewrite IHwf_Zexpr1, IHwf_Zexpr2; reflexivity.
-  - rewrite IHwf_Zexpr. reflexivity.
+  - rewrite Forall_forall in H2. apply H2 in H. simpl in *. assumption.
+  - rewrite IHwf_Zexpr by assumption. reflexivity.
 Qed.
 
-Lemma sound_sizeof_wf n var1 var2 dummy1 dummy2 e1 e2 ctx :
+Hint Unfold sizes_consistent : core.
+Lemma sound_sizeof_wf n var1 var2 sizeof1 sizeof2 dummy1 dummy2 e1 e2 ctx :
+  sizeof1 (dummy1 tZ) = sizeof2 (dummy2 tZ) ->
   wf_ATLexpr var1 var2 ctx n e1 e2 ->
-  sound_sizeof dummy1 e1 = sound_sizeof dummy2 e2.
+  Forall (sizes_consistent sizeof1 sizeof2) ctx ->
+  sound_sizeof dummy1 sizeof1 e1 = sound_sizeof dummy2 sizeof2 e2.
 Proof.
-  induction 1; simpl; auto;
+  intros H.
+  induction 1; simpl; intros; auto;
     repeat erewrite sound_sizeof_wf_Z by eauto;
     repeat match goal with
       | H: _ |- _ => erewrite H by eauto
       end;
     try reflexivity.
-  - (*why*) erewrite (sound_sizeof_wf_Z _ _ _ hi1) by eauto. reflexivity.
+  - (*why*) erewrite (sound_sizeof_wf_Z _ _ _ _ _ hi1) by eauto. reflexivity.
   - erewrite Forall2_length by eassumption. destruct (_ =? _)%nat; [|reflexivity].
-    destruct H; reflexivity.
+    destruct H0; reflexivity.
 Qed.
 
-Lemma sizeof_pZexpr_eval_Zexpr e e' :
-  sizeof_pZexpr e = Some e' ->
-  eval_Zexpr $0 (stringvar_Z e) e'.
+Lemma inv_wf_ATLexpr {var1 var2} ctx n e1 e2 :
+  wf_ATLexpr var1 var2 ctx n e1 e2 ->
+  match e1 in pATLexpr _ n0 return pATLexpr var2 n0 -> Prop with
+  | Gen lo1 hi1 body1 =>
+      fun e2 =>
+        exists lo2 hi2 body2,
+          wf_Zexpr var1 var2 ctx lo1 lo2 /\
+            wf_Zexpr var1 var2 ctx hi1 hi2 /\
+            (forall (x1 : var1 tZ) (x2 : var2 tZ),
+                wf_ATLexpr var1 var2
+                  ({| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) _
+                  (body1 x1) (body2 x2)) /\
+            e2 = Gen lo2 hi2 body2
+  | Sum lo1 hi1 body1 =>
+      fun e2 =>
+        exists lo2 hi2 body2,
+          wf_Zexpr var1 var2 ctx lo1 lo2 /\
+            wf_Zexpr var1 var2 ctx hi1 hi2 /\
+            (forall (x1 : var1 tZ) (x2 : var2 tZ),
+                wf_ATLexpr var1 var2
+                  ({| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) _
+                  (body1 x1) (body2 x2)) /\
+            e2 = Sum lo2 hi2 body2
+  | Guard b1 x1 =>
+      fun e2 =>
+        exists b2 x2,
+          wf_Bexpr var1 var2 ctx b1 b2 /\
+            wf_ATLexpr var1 var2 ctx _ x1 x2 /\
+            e2 = Guard b2 x2
+  | Lbind x1 f1 =>
+      fun e2 =>
+        exists x2 f2,
+          wf_ATLexpr var1 var2 ctx _ x1 x2 /\
+            (forall (x1' : var1 (tensor_n _)) (x2' : var2 (tensor_n _)),
+                wf_ATLexpr var1 var2
+                  ({| ctx_elt_t := tensor_n _; ctx_elt_p1 := x1'; ctx_elt_p2 := x2' |}
+                     :: ctx)
+                  _ (f1 x1') (f2 x2')) /\
+            e2 = Lbind x2 f2
+  | Concat x1 y1 =>
+      fun e2 =>
+        exists x2 y2,
+          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            wf_ATLexpr var1 var2 ctx (S _) y1 y2 /\
+            e2 = Concat x2 y2
+  | Flatten x1 =>
+      fun e2 =>
+        exists x2,
+          wf_ATLexpr var1 var2 ctx (S (S _)) x1 x2 /\
+            e2 = Flatten x2
+  | Split k x1 =>
+      fun e2 =>
+        exists x2,
+          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            e2 = Split k x2
+  | Transpose x1 =>
+      fun e2 =>
+        exists x2,
+          wf_ATLexpr var1 var2 ctx (S (S _)) x1 x2 /\
+            e2 = Transpose x2
+  | Truncr k x1 =>
+      fun e2 =>
+        exists x2,
+          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            e2 = Truncr k x2
+  | Truncl k x1 =>
+      fun e2 =>
+        exists x2,
+          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            e2 = Truncl k x2
+  | Padl k x1 =>
+      fun e2 =>
+        exists x2,
+          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            e2 = Padl k x2
+  | Padr k x1 =>
+      fun e2 =>
+        exists x2,
+          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            e2 = Padr k x2
+  | Var v1 =>
+      fun e2 =>
+        exists v2,
+          In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx /\
+            e2 = Var v2
+  | Get x1 idxs1 =>
+      fun e2 =>
+        exists x2 idxs2,
+          wf_ATLexpr var1 var2 ctx _ x1 x2 /\
+            Forall2 (wf_Zexpr var1 var2 ctx) idxs1 idxs2 /\
+            e2 = Get x2 idxs2
+  | SBop o x1 y1 =>
+      fun e2 =>
+        exists x2 y2,
+          wf_ATLexpr var1 var2 ctx 0 x1 x2 /\
+            wf_ATLexpr var1 var2 ctx 0 y1 y2 /\
+            e2 = SBop o x2 y2
+  | SIZR x1 =>
+      fun e2 =>
+        exists x2,
+          wf_Zexpr var1 var2 ctx x1 x2 /\
+            e2 = SIZR x2
+  end e2.
+Proof.
+  destruct 1; eauto 10.
+Qed.
+
+Lemma sound_sizeof_wf' n var1 var2 (*sizeof1*) sizeof2 dummy2 e1 e2 e2' ctx :
+  wf_ATLexpr var1 var2 ctx n e1 e2 ->
+  wf_ATLexpr var1 var2 ctx n e1 e2' ->
+  (* Forall (sizes_consistent sizeof1 sizeof2) ctx -> *)
+  sound_sizeof dummy2 sizeof2 e2 = sound_sizeof dummy2 sizeof2 e2'.
+Proof.
+  induction 1; intros H12'.
+  - apply inv_wf_ATLexpr in H12'. invs'. simpl.
+    erewrite H2.
+    2: { apply H5. }
+    erewrite sound_sizeof_wf_Z.
+    2: { Print sound_sizeof. Abort.
+
+
+Lemma sizeof_pZexpr_eval_Zexpr e e' sizeof_var v :
+  sizeof_pZexpr sizeof_var e = Some e' ->
+  (forall x y, sizeof_var x = Some y -> v $? (nat_to_string x) = Some y) ->
+  eval_Zexpr v (stringvar_Z e) e'.
 Proof.
   revert e'. induction e; simpl; intros; eauto;
     try congruence; cbv [option_map] in *;
   repeat match goal with
-  | H: context[match sizeof_pZexpr ?e with _ => _ end] |- _ =>
+  | H: context[match sizeof_pZexpr _ ?e with _ => _ end] |- _ =>
       let E := fresh "E" in
-      destruct (sizeof_pZexpr e) eqn:E; simpl in *; [|congruence]
+      destruct (sizeof_pZexpr _ e) eqn:E; simpl in *; [|congruence]
          end;
     invs';
     simpl in *;
@@ -1157,14 +1305,83 @@ Ltac prove_sound_sizeof :=
     (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf by eauto; eassumption) ||
     (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf by eauto; eassumption).
 
-Lemma sound_sizeof_size_of var2 (dummy2 : forall t, var2 t) dummy n e_nat ctx sz e e_string name name' :
-  wf_ATLexpr (fun _ => nat) var2 ctx n e_nat e ->
-  sound_sizeof dummy e_nat = Some sz ->
-  stringvar_ATLexpr (n := n) name e_nat = Some (name', e_string) ->
-  size_of e_string sz.
+Ltac specialize' H :=
+  let hyp := fresh "hyp" in
+  eassert _ as hyp;
+  [clear H|specialize (H hyp); clear hyp].  
+
+Ltac epose_dep H :=
+  repeat lazymatch type of H with
+    | ?A -> ?B => fail
+    | forall _, _ => epose proof (H _) as H
+    end.
+
+Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
 Proof.
-  intros H. revert dummy name sz name' e_string.
-  induction H; intros dummy name sz name' e_string Hsz Hs;
+  destruct t1, t2; try (left; reflexivity); try (right; congruence).
+  destruct (Nat.eq_dec n n0).
+  - subst. left. reflexivity.
+  - right. congruence.
+Defined.
+
+Definition zip_ctx_elts {var1 var2} (x1 : ctx_elt var1) (x2 : ctx_elt var2) : option (ctx_elt2 var1 var2) :=
+  match type_eq_dec x1.(ctx_elt_t0 _) x2.(ctx_elt_t0 _) with
+  | left pf => match pf in _ = X return var2 X -> _ with
+              | eq_refl => fun p2 => Some {| ctx_elt_p1 := x1.(ctx_elt0 _); ctx_elt_p2 := p2 |}
+              end x2.(ctx_elt0 _)
+  | right _ => None
+  end.
+
+Definition zip_ctxs {var1 var2} (ctx1 : list (ctx_elt var1)) (ctx2 : list (ctx_elt var2)) :=
+  flat_map (fun '(x1, x2) => match zip_ctx_elts x1 x2 with
+                          | Some x => [x]
+                          | None => []
+                          end)
+    (combine ctx1 ctx2).
+
+Definition mul_ctxs {var1 var2} (ctx1 : list (ctx_elt var1)) (ctx2 : list (ctx_elt var2)) :=
+  flat_map (fun '(x1, x2) => match zip_ctx_elts x1 x2 with
+                          | Some x => [x]
+                          | None => []
+                          end)
+    (list_prod ctx1 ctx2).
+
+Lemma wf_Zexpr_trans var1 var2 var3 ctx12 ctx23 e1 e2 e3 :
+  wf_Zexpr var1 var2 ctx12 e1 e2 ->
+  wf_Zexpr var2 var3 ctx23 e2 e3 ->
+  wf_Zexpr var1 var3 (mul_ctxs (map fst_ctx_elt' ctx12) (map snd_ctx_elt' ctx23)) e1 e3.
+Proof.
+  intros H12. revert ctx23 e3. induction H12; intros ctx23 e3 H23; invert H23; eauto.
+  constructor. Admitted.
+
+Lemma wf_ATLexpr_trans var1 var2 var3 ctx12 ctx23 n e1 e2 e3 :
+  wf_ATLexpr var1 var2 ctx12 n e1 e2 ->
+  wf_ATLexpr var2 var3 ctx23 n e2 e3 ->
+  wf_ATLexpr var1 var3 (zip_ctxs (map fst_ctx_elt' ctx12) (map snd_ctx_elt' ctx23)) n e1 e3.
+Proof.
+  intros H12. revert ctx23 e3. induction H12; intros ctx23 e3 H23; apply inv_wf_ATLexpr in H23; invs'.
+  - constructor.
+    + admit.
+    + admit.
+    + intros. epose proof (H2 _ _ _ _ (H5 _ _)) as H2. apply H2.
+  - constructor.
+    + admit.
+    + admit.
+    + intros. epose proof (H2 _ _ _ _ (H5 _ _)) as H2. apply H2.
+  - constructor; eauto.
+    + admit.
+Admitted.
+    
+Lemma sound_sizeof_size_of var2 (dummy2 : forall t, var2 t) dummy n e_nat ctx sz e e_string name name' sizeof1 sizeof2 v :
+  wf_ATLexpr (fun _ => nat) var2 ctx n e_nat e ->
+  sound_sizeof dummy sizeof1 e_nat = Some sz ->
+  Forall (sizes_consistent sizeof1 sizeof2) ctx ->
+  (forall x y, sizeof1 x = Some y -> v $? (nat_to_string x) = Some y) ->
+  stringvar_ATLexpr (n := n) name e_nat = Some (name', e_string) ->
+  size_of v e_string sz.
+Proof.
+  intros H Hsz Hctx Hv. revert Hsz. revert name sz name' e_string.
+  induction H; intros name sz name' e_string Hsz Hs;
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
           let E := fresh "E" in
@@ -1183,9 +1400,11 @@ Proof.
       end;
     try solve [size_of_constr; eauto; repeat (lia || f_equal)].
   - constructor.
-    + apply sizeof_pZexpr_eval_Zexpr. assumption.
-    + apply sizeof_pZexpr_eval_Zexpr. assumption.
-    + eapply H2. 1: apply dummy2. 2: apply E.
+    + eapply sizeof_pZexpr_eval_Zexpr; eassumption.
+    + eapply sizeof_pZexpr_eval_Zexpr; eassumption.
+    + eapply H2.  Locate "?=". Print Z.compare. 3: eassumption.
+      -- constructor; auto. simpl. 2: apply E. Check sound_sizeof_wf. Print sizes_consistent.
+      erewrite sound_sizeof_wf.
       prove_sound_sizeof.
   - constructor.
     eapply H2. 1: apply dummy2. 2: apply E.
@@ -2179,17 +2398,6 @@ Proof.
   simpl. intros a Ha. eauto.
 Qed.
 
-Ltac specialize' H :=
-  let hyp := fresh "hyp" in
-  eassert _ as hyp;
-  [clear H|specialize (H hyp); clear hyp].  
-
-Ltac epose_dep H :=
-  repeat lazymatch type of H with
-  | ?A -> ?B => fail
-  | forall _, _ => epose proof (H _) as H
-  end.
-
 Lemma scalar_mul_0_is_0 n sz v :
   n = length sz ->
   tensor_has_size' (n := n) sz v ->
@@ -3086,14 +3294,6 @@ Fixpoint fvar_sum_bounds_good {ts n} (e : fvar_pATLexpr interp_type ts n) : Prop
   | [] => fun e => sum_bounds_good e
   | t :: ts' => fun e => forall r, fvar_sum_bounds_good (e r)
   end e.
-
-Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
-Proof.
-  destruct t1, t2; try (left; reflexivity); try (right; congruence).
-  destruct (Nat.eq_dec n n0).
-  - subst. left. reflexivity.
-  - right. congruence.
-Defined.
 
 Fixpoint res_spec_of' ts n name size (fd : ATLexpr) (fs : fvar_pATLexpr interp_type_result ts n) (v : fmap string Z) (ec : fmap string Result.result) :=
   match ts return ATLexpr -> fun_type interp_type_result ts _ -> _ with
