@@ -1157,12 +1157,13 @@ Qed.
 
 Hint Unfold sizes_consistent : core.
 Lemma sound_sizeof_wf n var1 var2 sizeof1 sizeof2 dummy1 dummy2 e1 e2 ctx :
-  (sizeof1 (dummy1 tZ) = sizeof2 (dummy2 tZ)) ->
   wf_ATLexpr var1 var2 ctx n e1 e2 ->
+  (sizeof1 (dummy1 tZ) = sizeof2 (dummy2 tZ)) ->
   Forall (sizes_consistent sizeof1 sizeof2) ctx ->
   sound_sizeof dummy1 sizeof1 e1 = sound_sizeof dummy2 sizeof2 e2.
 Proof.
-  induction 2; simpl; intros; auto;
+  intros H1 H2. revert H1.
+  induction 1; simpl; intros; auto;
     repeat erewrite sound_sizeof_wf_Z by eauto;
     repeat match goal with
       | H: _ |- _ => erewrite H by eauto
@@ -1170,7 +1171,7 @@ Proof.
     try reflexivity.
   - (*why*) erewrite (sound_sizeof_wf_Z _ _ _ _ _ hi1) by eauto. reflexivity.
   - erewrite Forall2_length by eassumption. destruct (_ =? _)%nat; [|reflexivity].
-    destruct H0; reflexivity.
+    destruct H1; reflexivity.
 Qed.
 
 Lemma inv_wf_ATLexpr {var1 var2} ctx n e1 e2 :
@@ -1347,15 +1348,18 @@ Definition mul_ctxs {var1 var2} (ctx1 : list (ctx_elt var1)) (ctx2 : list (ctx_e
                           end)
     (list_prod ctx1 ctx2).
     
-Lemma sound_sizeof_size_of var2 (dummy2 : forall t, var2 t) dummy n e_nat ctx sz e2 e_string name name' sizeof1 sizeof2 v :
+Lemma sound_sizeof_size_of var2 (dummy2 : forall t, var2 t) n e_nat ctx sz e2 e_string name name' sizeof1 sizeof2 v :
   wf_ATLexpr (fun _ => tagged_nat) var2 ctx n e_nat e2 ->
-  sound_sizeof dummy sizeof1 e_nat = Some sz ->
+  (forall x, sizeof1 (itervarnat x) = sizeof2 (dummy2 tZ)) ->
+  sound_sizeof (fun _ => itervarnat 0) sizeof1 e_nat = Some sz ->
   Forall (sizes_consistent sizeof1 sizeof2) ctx ->
   (forall x y, sizeof1 x = Some y -> v $? (nat_to_string x) = Some y) ->
   stringvar_ATLexpr (n := n) name e_nat = Some (name', e_string) ->
   size_of v e_string sz.
 Proof.
-  intros H Hsz Hctx Hv. revert Hsz. revert name sz name' e_string.
+  intros H Hdummy Hsz Hctx Hv. revert Hsz. revert name sz name' e_string.
+  set (f := fun _ => itervarnat 0).
+  assert (dumb_hyp : sizeof1 (f tZ) = sizeof2 (dummy2 tZ)) by (subst f; simpl; auto).
   induction H; intros name sz name' e_string Hsz Hs;
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
@@ -1377,7 +1381,7 @@ Proof.
   - constructor.
     + eapply sizeof_pZexpr_eval_Zexpr; eassumption.
     + eapply sizeof_pZexpr_eval_Zexpr; eassumption.
-    + eapply H2. 3: eassumption. { constructor; eauto. simpl. simpl. prove_sound_sizeof.
+    + eapply H2. 3: eassumption. 1: eauto. prove_sound_sizeof.
   - constructor.
     eapply H2. 3: eassumption. 1: eauto. prove_sound_sizeof.
   - constructor; eauto.
@@ -1388,10 +1392,10 @@ Proof.
 Qed.
 
 Lemma sizeof_pZexpr_interp_pZexpr e e' :
-  sizeof_pZexpr Some e = Some e' ->
-  interp_pZexpr e = e'.
+  sizeof_pZexpr sizeof_result_tZ e = Some e' ->
+  result_of_pZexpr e = e'.
 Proof.
-  revert e'. induction e; simpl; intros;
+  revert e'. unfold result_of_pZexpr. induction e; simpl; intros;
     cbv [option_map] in *;
     repeat (destruct_one_match_hyp; simpl in *; try congruence; []); invs';
     simpl in *; eauto;
@@ -1400,8 +1404,8 @@ Proof.
       end;
     simpl in *;
     subst;
-    eauto;
-    congruence.
+    eauto.
+  destruct v; simpl in *; auto; congruence.
 Qed.
 
 Lemma sound_sizeof_gives_dim var dummy sizeof_var n (e : pATLexpr var n) sz :
@@ -1987,10 +1991,11 @@ Hint Resolve result_has_shape'_sum_with_shape : core.
 Hint Resolve result_has_shape_gen_pad result_has_shape_flatten result_has_shape_split_result result_has_shape_transpose_result result_has_shape_rev result_has_shape_repeat result_has_shape_truncl_list result_has_shape_app result_has_shape_concat : core.
 Hint Extern 7 (result_has_shape _ _) => apply result_has_shape'_iff.
 Hint Extern 7 (result_has_shape' _ _) => apply result_has_shape'_iff.
-
+Search sizes_consistent.
 Lemma sound_sizeof_tensor_has_size n var1 ctx e0 dummy1 sizeof_var sz (e : pATLexpr _ n) :
   wf_ATLexpr var1 interp_type_result ctx n e0 e ->
-  Forall (sizes_consistent sizeof_var Some) ctx ->
+  sizeof_var (dummy1 tZ) = None ->
+  Forall (sizes_consistent sizeof_var sizeof_result_tZ) ctx ->
   sound_sizeof dummy1 sizeof_var e0 = Some sz ->
   result_has_shape' sz (result_of_pATLexpr e).
 Proof.
@@ -2005,7 +2010,7 @@ Proof.
           apply Nat.leb_le in H
       end;
     repeat match goal with
-      | H: _ |- _ => specialize (H ltac:(assumption) _ eq_refl)
+      | H: _ |- _ => specialize (H _ ltac:(eassumption) eq_refl)
       end;
     cbv [sizeof]; simpl;
     repeat match goal with
@@ -2018,18 +2023,16 @@ Proof.
   - constructor.
     + rewrite zrange_seq.
       do 2 rewrite map_length. rewrite seq_length.
+      unfold result_of_pZexpr.
       erewrite sound_sizeof_wf_Z in * by eassumption.
-      do 2 erewrite sizeof_pZexpr_interp_pZexpr by eassumption.
+      do 2 erewrite sizeof_pZexpr_interp_pZexpr by eauto.
       reflexivity.
     + apply Forall_map. apply Forall_forall. intros x _. eapply H2.
       -- eauto.
       -- prove_sound_sizeof.
-  - destruct (interp_pBexpr _); auto.
+  - destruct (result_of_pBexpr _); auto.
   - congruence.
   - destruct (result_of_pATLexpr _); auto. destruct (result_of_pATLexpr _); auto.
-    Unshelve.
-    all: auto.
-    all: exact dummy_result.
 Qed.
 
 Lemma nth_error_zrange_is_Some min max n :
@@ -2038,7 +2041,7 @@ Lemma nth_error_zrange_is_Some min max n :
 Proof.
   intros H. rewrite zrange_seq. rewrite nth_error_map.
   rewrite nth_error_seq. destruct (_ <? _)%nat eqn:E; try reflexivity.
-  Search (_ <? _ = false)%nat. apply Nat.ltb_ge in E. lia.
+  apply Nat.ltb_ge in E. lia.
 Qed.
 
 Hint Extern 5 (_ <= _)%nat => lia.
@@ -2097,8 +2100,8 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
   match e with
   | Gen lo hi body | Sum lo hi body =>
       forall i,
-        (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
-        idxs_in_bounds (body i)
+        (result_of_pZexpr lo <= i < result_of_pZexpr hi)%Z ->
+        idxs_in_bounds (body (itervarZ i))
   | Guard p body =>
       (*i think this could be uncommented, at the cost of some inconvenience*)
       (*interp_pBexpr p = true ->*)
@@ -2115,7 +2118,7 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
       idxs_in_bounds v /\
       exists sh,
       result_has_shape' sh (result_of_pATLexpr v) /\
-        Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs) sh
+        Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map result_of_pZexpr idxs) sh
   | SBop o x y =>
       match o with
       | Div =>
@@ -2162,12 +2165,12 @@ Fixpoint sum_bounds_good {n} (e : pATLexpr interp_type n) :=
   end.
 
 Lemma eval_get_eval_get' ctx r sh idxs1 idxs2 :
-  NoDup (map fst_ctx_elt ctx) ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
   result_has_shape' sh r ->
   length sh = length idxs2 ->
-  Forall2 (wf_Zexpr (fun _ : type => nat) interp_type_result ctx) idxs1 idxs2 ->
-  Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs2) sh ->
-  eval_get (valuation_of ctx) r (map stringvar_Z idxs1) (eval_get' r (map interp_pZexpr idxs2)).
+  Forall2 (wf_Zexpr (fun _ => tagged_nat) interp_type_result ctx) idxs1 idxs2 ->
+  Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map result_of_pZexpr idxs2) sh ->
+  eval_get (valuation_of ctx) r (map stringvar_Z idxs1) (eval_get' r (map result_of_pZexpr idxs2)).
 Proof.
   intros H0 H1 H2 H3 H4. revert sh r H1 H2 H4. induction H3; intros sh r H1 H2 H4; simpl.
   - destruct sh; try discriminate. invert H1. constructor.
@@ -2183,9 +2186,9 @@ Proof.
 Qed.
 
 Lemma stringvar_ZLit_correct ctx e1 e2 z :
-  wf_Zexpr (fun _ : type => nat) interp_type_result ctx e1 e2 ->
+  wf_Zexpr (fun _ => tagged_nat) interp_type_result ctx e1 e2 ->
   stringvar_ZLit e1 = Some z ->
-  interp_pZexpr e2 = z.
+  result_of_pZexpr e2 = z.
 Proof.
   intros H. revert z. induction H; intros z Hz; simpl in *;
     cbv [option_map] in *;
@@ -2200,8 +2203,8 @@ Proof.
 Qed.
 
 Lemma stringvar_S_correct ctx n e_nat e_shal e_string :
-  NoDup (map fst_ctx_elt ctx) ->
-  wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
+  wf_ATLexpr (fun _ => tagged_nat) interp_type_result ctx n e_nat e_shal ->
   stringvar_S e_nat = Some e_string ->
   idxs_in_bounds e_shal ->
   match (result_of_pATLexpr e_shal) with
@@ -2218,7 +2221,7 @@ Proof.
       | H: context[match ?x with _ => _ end] |- _ => destruct x; try congruence; []
       end;
     invs'.
-  - remember (Var n0) eqn:E'. destruct H; try congruence. invert E'.
+  - remember (Var _) eqn:E'. destruct H; try congruence. invert E'.
     split; [reflexivity|].
     eassert (eval_get' _ _ = _) as ->; cycle 1.
     { econstructor.
@@ -2273,8 +2276,7 @@ Qed.
 
 Definition res_tensor_corresp (x : ctx_elt2 interp_type interp_type_result) :=
   match x with
-  | {| ctx_elt_t := tZarg; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => x1 = x2
-  | {| ctx_elt_t := tZiter; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => x1 = x2
+  | {| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => x1 = x2
   | {| ctx_elt_t := tB; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => x1 = x2
   | {| ctx_elt_t := tensor_n _; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} =>
       x1 = tensor_of_result x2
@@ -2284,19 +2286,20 @@ Definition res_tensor_corresp (x : ctx_elt2 interp_type interp_type_result) :=
 Lemma Zexprs_corresp_same ctx e1 e2 :
   Forall res_tensor_corresp ctx ->
   wf_Zexpr interp_type interp_type_result ctx e1 e2 ->
-  interp_pZexpr e1 = interp_pZexpr e2.
+  interp_pZexpr e1 = result_of_pZexpr e2.
 Proof.
-  intros Hctx. induction 1; simpl; f_equal; auto.
-  - rewrite Forall_forall in Hctx. apply Hctx in H. simpl in H. auto.
-  - rewrite Forall_forall in Hctx. apply Hctx in H. simpl in H. auto.
+  intros Hctx. unfold interp_pZexpr, result_of_pZexpr.
+  induction 1; simpl; f_equal; auto.
+  { rewrite Forall_forall in Hctx. apply Hctx in H. simpl in H. auto. }
 Qed.
 
 Lemma Bexprs_corresp_same ctx e1 e2 :
   Forall res_tensor_corresp ctx ->
   wf_Bexpr interp_type interp_type_result ctx e1 e2 ->
-  interp_pBexpr e1 = interp_pBexpr e2.
+  interp_pBexpr e1 = result_of_pBexpr e2.
 Proof.
-  intros Hctx. induction 1; simpl; f_equal; eauto using Zexprs_corresp_same.
+  intros Hctx. unfold interp_pBexpr, result_of_pBexpr.
+  induction 1; simpl; f_equal; eauto using Zexprs_corresp_same.
 Qed.
 
 Lemma tensor_has_size_mul {n} sz x (v : dim_n n) :
@@ -2741,7 +2744,7 @@ Qed.
 
 Lemma res_tensor_corresp_sizes_consistent x :
   res_tensor_corresp x ->
-  sizes_consistent Some Some x.
+  sizes_consistent Some sizeof_result_tZ x.
 Proof. destruct x; simpl. destruct ctx_elt_t1; intros; subst; auto. Qed.
 
 Lemma Forall_res_tensor_corresp_sizes_consistent xs :
