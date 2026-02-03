@@ -460,16 +460,7 @@ Section total_tiled.
 
     erewrite flatten_trunc_flatten_truncr.
     2: { consistent_shape; try reflexivity; try lia.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-
-         eapply znat_0lt.
-         rewrite Z.add_simpl_l.
-         eapply ceil_div_pos; lia.
          eapply Z.div_str_pos; lia.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         rewrite Z.add_simpl_l.
-         eapply ceil_div_pos; lia.
          eapply Z.div_str_pos; lia.
          eapply Z.lt_add_pos_r.
          eapply ceil_div_pos.
@@ -486,13 +477,7 @@ Section total_tiled.
     erewrite trunc_r_truncr.
     2: { erewrite consistent_length.
          2: { consistent_shape; try lia; try reflexivity.
-              eapply znat_0lt; eapply Z.div_str_pos; lia.
-              eapply znat_0lt. rewrite Z.add_simpl_l.
-              eapply ceil_div_pos; lia.
               eapply Z.div_str_pos; lia.
-              eapply znat_0lt; eapply Z.div_str_pos; lia.
-              eapply znat_0lt. rewrite Z.add_simpl_l.
-              eapply ceil_div_pos; lia.
               eapply Z.div_str_pos; lia.
               eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
               eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
@@ -510,13 +495,7 @@ Section total_tiled.
 
     erewrite consistent_length.
     2: { consistent_shape; try lia; try reflexivity.
-              eapply znat_0lt; eapply Z.div_str_pos; lia.
-              eapply znat_0lt. rewrite Z.add_simpl_l.
-              eapply ceil_div_pos; lia.
               eapply Z.div_str_pos; lia.
-              eapply znat_0lt; eapply Z.div_str_pos; lia.
-              eapply znat_0lt. rewrite Z.add_simpl_l.
-              eapply ceil_div_pos; lia.
               eapply Z.div_str_pos; lia.
               eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
               eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
@@ -544,11 +523,6 @@ Section total_tiled.
     eapply gen_eq_bound; intros.
     erewrite flatten_trunc_flatten_truncr.
     2: { consistent_shape; try reflexivity; try lia.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-
-         eapply znat_0lt.
-         rewrite Z.add_simpl_l.
-         eapply ceil_div_pos; lia.         
          eapply Z.div_str_pos; lia.
          eapply Z.lt_add_pos_r.
          eapply ceil_div_pos; lia. }
@@ -556,16 +530,7 @@ Section total_tiled.
 
     erewrite consistent_length.
     2: { consistent_shape; try lia; try reflexivity.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         erewrite ceil_floor_mod. rewrite Z.add_simpl_l.
-         eapply ceil_div_pos.
-         rewrite Nat2Z.inj_sub.
-         simpl. eauto. lia. lia. lia. lia. 
          eapply Z.div_str_pos; lia.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt. rewrite Z.add_simpl_l.
-         eapply ceil_div_pos; lia.
          eapply Z.div_str_pos; lia.
          eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
          erewrite ceil_floor_mod.
@@ -597,16 +562,7 @@ Section total_tiled.
     erewrite trunc_r_truncr.
     2: { erewrite consistent_length.
          2: { consistent_shape; try lia; try reflexivity.
-              eapply znat_0lt; eapply Z.div_str_pos; lia.
-              eapply znat_0lt.
-              erewrite ceil_floor_mod. rewrite Z.add_simpl_l.
-              eapply ceil_div_pos.
-              rewrite Nat2Z.inj_sub.
-              simpl. eauto. lia. lia. lia. lia. 
               eapply Z.div_str_pos; lia.
-              eapply znat_0lt; eapply Z.div_str_pos; lia.
-              eapply znat_0lt. rewrite Z.add_simpl_l.
-              eapply ceil_div_pos; lia.
               eapply Z.div_str_pos; lia.
               eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
               erewrite ceil_floor_mod.
@@ -629,16 +585,7 @@ Section total_tiled.
          
     erewrite consistent_length.
     2: { consistent_shape; try lia; try reflexivity.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         erewrite ceil_floor_mod. rewrite Z.add_simpl_l.
-         eapply ceil_div_pos.
-         rewrite Nat2Z.inj_sub.
-         simpl. eauto. lia. lia. lia. lia. 
          eapply Z.div_str_pos; lia.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt. rewrite Z.add_simpl_l.
-         eapply ceil_div_pos; lia.
          eapply Z.div_str_pos; lia.
          eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
          erewrite ceil_floor_mod.
@@ -696,16 +643,7 @@ Section total_tiled.
     
     erewrite consistent_length.
     2: { consistent_shape; try lia; try reflexivity.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         erewrite ceil_floor_mod. rewrite Z.add_simpl_l.
-         eapply ceil_div_pos.
-         rewrite Nat2Z.inj_sub.
-         simpl. eauto. lia. lia. lia. lia. 
          eapply Z.div_str_pos; lia.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt. rewrite Z.add_simpl_l.
-         eapply ceil_div_pos; lia.
          eapply Z.div_str_pos; lia.
          eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
          erewrite ceil_floor_mod.
@@ -740,13 +678,6 @@ Section total_tiled.
     erewrite trunc_r_truncr.
     2: { erewrite consistent_length.
          2: { consistent_shape; try lia; try reflexivity.
-              eapply znat_0lt; eapply Z.div_str_pos; lia.
-              eapply znat_0lt.
-              erewrite ceil_floor_mod. rewrite Z.add_simpl_l.
-              erewrite Z.div_small.
-              2: { eapply Z.mod_bound_pos. lia. lia. }
-              simpl. eapply ceil_div_pos.
-              rewrite Z.mod_mod. lia. lia. lia. lia. lia.
               eapply Z.div_str_pos; lia.
               eapply Z.lt_add_pos_r.
               eapply ceil_div_pos. lia. lia. }
@@ -766,13 +697,6 @@ Section total_tiled.
 
     erewrite consistent_length.
     2: { consistent_shape; try lia; try reflexivity.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         erewrite ceil_floor_mod. rewrite Z.add_simpl_l.
-         erewrite Z.div_small.
-         2: { eapply Z.mod_bound_pos. lia. lia. }
-         simpl. eapply ceil_div_pos.
-         rewrite Z.mod_mod. lia. lia. lia. lia. lia.
          eapply Z.div_str_pos; lia.
          eapply Z.lt_add_pos_r.
          eapply ceil_div_pos. lia. lia. }
@@ -793,12 +717,6 @@ Section total_tiled.
     erewrite trunc_r_truncr.
     2: { erewrite consistent_length.
     2: { consistent_shape; try lia; try reflexivity.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         erewrite ceil_floor_mod. rewrite Z.add_simpl_l.
-         eapply ceil_div_pos.
-         rewrite Nat2Z.inj_sub.
-         simpl. eauto. lia. lia. lia. lia. 
          eapply Z.div_str_pos; lia.
          rewrite znat_id_distr. repeat rewrite Nat2Z.id.
          rewrite sub_sub_distr.
@@ -806,12 +724,9 @@ Section total_tiled.
               eapply div_ceil_n_lower_bound; lia. }
          2: { lia. }
          rewrite Nat.sub_diag. simpl. lia.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         erewrite ceil_floor_mod.
-         erewrite Z.add_simpl_l.         
-         eapply ceil_div_pos; lia.
-         lia. lia.
+         eapply Z.div_str_pos; lia.
+         erewrite ceil_floor_mod by lia.
+         eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
          erewrite Z2Nat.inj_sub.
          2: { eapply Z.div_pos; lia. }
          rewrite Nat.add_sub_assoc.
@@ -821,9 +736,6 @@ Section total_tiled.
          rewrite Nat.add_sub_swap.
          2: { lia. }
          lia.
-         eapply Z.div_str_pos; lia.
-         erewrite ceil_floor_mod by lia.
-         eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
          erewrite ceil_floor_mod by lia.
          eapply Z.lt_add_pos_r. eapply ceil_div_pos.
          rewrite Nat2Z.inj_sub. simpl. lia. lia. lia.
@@ -846,12 +758,6 @@ Section total_tiled.
     
     erewrite consistent_length.
     2: { consistent_shape; try lia; try reflexivity.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         erewrite ceil_floor_mod. rewrite Z.add_simpl_l.
-         eapply ceil_div_pos.
-         rewrite Nat2Z.inj_sub.
-         simpl. eauto. lia. lia. lia. lia. 
          eapply Z.div_str_pos; lia.
          rewrite znat_id_distr. repeat rewrite Nat2Z.id.
          rewrite sub_sub_distr.
@@ -859,12 +765,9 @@ Section total_tiled.
               eapply div_ceil_n_lower_bound; lia. }
          2: { lia. }
          rewrite Nat.sub_diag. simpl. lia.
-         eapply znat_0lt; eapply Z.div_str_pos; lia.
-         eapply znat_0lt.
-         erewrite ceil_floor_mod.
-         erewrite Z.add_simpl_l.         
-         eapply ceil_div_pos; lia.
-         lia. lia.
+         eapply Z.div_str_pos; lia.
+         erewrite ceil_floor_mod by lia.
+         eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
          erewrite Z2Nat.inj_sub.
          2: { eapply Z.div_pos; lia. }
          rewrite Nat.add_sub_assoc.
@@ -874,9 +777,6 @@ Section total_tiled.
          rewrite Nat.add_sub_swap.
          2: { lia. }
          lia.
-         eapply Z.div_str_pos; lia.
-         erewrite ceil_floor_mod by lia.
-         eapply Z.lt_add_pos_r. eapply ceil_div_pos; lia.
          erewrite ceil_floor_mod by lia.
          eapply Z.lt_add_pos_r. eapply ceil_div_pos.
          rewrite Nat2Z.inj_sub. simpl. lia. lia. lia.
