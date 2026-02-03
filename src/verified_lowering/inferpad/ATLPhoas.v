@@ -232,6 +232,14 @@ Definition untag_Z x :=
   end.
 Coercion untag_Z : tagged_Z >-> Z.
 
+Variant tagged_nat := argvarnat (_ : nat) | itervarnat (_ : nat).
+Definition untag_nat x :=
+  match x with
+  | itervarnat x => x
+  | argvarnat x => x
+  end.
+Coercion untag_nat : tagged_nat >-> nat.
+
 Definition interp_type_tagged t : Type :=
   match t with
   | tZ => tagged_Z
@@ -239,7 +247,7 @@ Definition interp_type_tagged t : Type :=
   | tensor_n n => dim_n n
   end.
 
-Fixpoint stringvar_ZLit (e : pZexpr nat) : option Z :=
+Fixpoint stringvar_ZLit (e : pZexpr tagged_nat) : option Z :=
   match e with
   | ZBop o x y => match stringvar_ZLit x, stringvar_ZLit y with
                  | Some x', Some y' => Some (interp_Zbop o x' y')
@@ -253,7 +261,7 @@ Fixpoint stringvar_ZLit (e : pZexpr nat) : option Z :=
   | ZZopp x => option_map Z.opp (stringvar_ZLit x)
   end.
 
-Fixpoint stringvar_Z (e : pZexpr nat) : Zexpr :=
+Fixpoint stringvar_Z (e : pZexpr tagged_nat) : Zexpr :=
   match e with
   | ZBop o x y => (stringvar_Zbop o) (stringvar_Z x) (stringvar_Z y)
   | ZVar x => Zexpr.ZVar (nat_to_string x)
@@ -311,7 +319,7 @@ Inductive pBexpr { var } :=
 | BBop : Bbop -> pZexpr var -> pZexpr var -> pBexpr.
 Arguments pBexpr : clear implicits.
 
-Fixpoint stringvar_B (e : pBexpr nat) : Bexpr :=
+Fixpoint stringvar_B (e : pBexpr tagged_nat) : Bexpr :=
   match e with
   | BAnd x y => Bexpr.And (stringvar_B x) (stringvar_B y)
   | BBop o x y => (stringvar_Bbop o) (stringvar_Z x) (stringvar_Z y)
@@ -895,7 +903,7 @@ Qed.
 Local Notation "[[ x , y ]] <- a ; f" := (match a with Some (x, y) => f | None => None end)
                                            (right associativity, at level 70).
 
-Fixpoint stringvar_S {n} (e : pATLexpr (fun _ => nat) n) : option Sexpr :=
+Fixpoint stringvar_S {n} (e : pATLexpr (fun _ => tagged_nat) n) : option Sexpr :=
   match e with
   | SBop o x y =>
       match stringvar_S x, stringvar_S y with
@@ -913,17 +921,17 @@ Fixpoint stringvar_S {n} (e : pATLexpr (fun _ => nat) n) : option Sexpr :=
 
 (*yes, I'm using the same name generation for Z and tensor, even though they
  don't need to be distinct*)
-Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => nat) n) : option (nat * ATLexpr) :=
+Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => tagged_nat) n) : option (nat * ATLexpr) :=
   match e with
   | Gen lo hi body =>
-      match stringvar_ATLexpr (S name) (body name) with
+      match stringvar_ATLexpr (S name) (body (itervarnat name)) with
       | Some (name', body') =>
           Some (name',
               ATLDeep.Gen (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
       | None => None
       end
 | Sum lo hi body =>
-    [[name', body']] <- stringvar_ATLexpr (S name) (body name);
+    [[name', body']] <- stringvar_ATLexpr (S name) (body (itervarnat name));
 Some (name',
     ATLDeep.Sum (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
 | Guard b e1 =>
@@ -932,7 +940,7 @@ Some (name',
     ATLDeep.Guard (stringvar_B b) body')
 | Lbind x f =>
     [[name', x']] <- stringvar_ATLexpr (S name) x;
-[[name'', fx']] <- stringvar_ATLexpr name' (f name);
+[[name'', fx']] <- stringvar_ATLexpr name' (f (itervarnat name));
 Some (name'',
     ATLDeep.Lbind (nat_to_string name) x' fx')
 | Concat e1 e2 =>
@@ -976,7 +984,7 @@ Some (name',
 | Var x => None
 end.
 
-Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type_result)) : valuation :=
+Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => tagged_nat) interp_type_result)) : valuation :=
   match ctx with
   | {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
       valuation_of ctx' $+ (nat_to_string x, y)
@@ -984,7 +992,7 @@ Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type_result)) 
   | nil => $0
   end.
 
-Fixpoint valuation_of' (ctx : list (ctx_elt2 (fun _ => nat) interp_type_result)) : fmap var (option Z) :=
+Fixpoint valuation_of' (ctx : list (ctx_elt2 (fun _ => tagged_nat) interp_type_result)) : fmap var (option Z) :=
   match ctx with
   | {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
       valuation_of' ctx' $+ (nat_to_string x, sizeof_Z y)
@@ -992,7 +1000,7 @@ Fixpoint valuation_of' (ctx : list (ctx_elt2 (fun _ => nat) interp_type_result))
   | nil => $0
   end.
 
-Fixpoint ec_of (ctx : list (ctx_elt2 (fun _ => nat) interp_type_result)) : expr_context :=
+Fixpoint ec_of (ctx : list (ctx_elt2 (fun _ => tagged_nat) interp_type_result)) : expr_context :=
   match ctx with
   | {| ctx_elt_t := tensor_n n; ctx_elt_p1 := x; ctx_elt_p2 := y |} :: ctx' =>
       ec_of ctx' $+ (nat_to_string x, y)
@@ -1009,9 +1017,11 @@ Definition fst_ctx_elt' {var1 var2} (elt : ctx_elt2 var1 var2) :=
 Definition snd_ctx_elt' {var1 var2} (elt : ctx_elt2 var1 var2) :=
   {| ctx_elt0 := elt.(ctx_elt_p2 _ _) |}.
 
+Definition untagged_fst_ctx_elt {var2} (x : ctx_elt2 _ var2) := untag_nat (fst_ctx_elt x).
+
 (* as usual, i miss coqutil.  map.of_list.. *)
 Lemma valuation_of_correct ctx x y :
-  NoDup (map fst_ctx_elt ctx) ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
   List.In {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} ctx ->
   valuation_of ctx $? (nat_to_string x) = Some (untag_Z y).
 Proof.
@@ -1024,7 +1034,7 @@ Proof.
       -- rewrite lookup_add_ne; auto.
          intro H'. apply nat_to_string_injective in H'. subst.
          match goal with |H: ~_ |- _ => apply H end. apply in_map_iff. eexists.
-         split; [|eassumption]. simpl in *. reflexivity.
+         split; [|eassumption]. simpl in *. assumption.
 Qed.
 
 Definition option_coalesce {T} (x : option (option T)) :=
@@ -1034,7 +1044,7 @@ Definition option_coalesce {T} (x : option (option T)) :=
   end.
 
 Lemma valuation_of'_correct ctx x y :
-  NoDup (map fst_ctx_elt ctx) ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
   List.In {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} ctx ->
   valuation_of' ctx $? (nat_to_string x) = Some (sizeof_Z y).
 Proof.
@@ -1047,11 +1057,11 @@ Proof.
       -- rewrite lookup_add_ne; auto.
          intro H'. apply nat_to_string_injective in H'. subst.
          match goal with |H: ~_ |- _ => apply H end. apply in_map_iff. eexists.
-         split; [|eassumption]. simpl in *. reflexivity.
+         split; [|eassumption]. simpl in *. assumption.
 Qed.
 
 Lemma ec_of_correct ctx n x y :
-  NoDup (map fst_ctx_elt ctx) ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
   List.In {| ctx_elt_t := tensor_n n; ctx_elt_p1 := x; ctx_elt_p2 := y |} ctx ->
   ec_of ctx $? (nat_to_string x) = Some y.
 Proof.
@@ -1063,12 +1073,12 @@ Proof.
       destruct a. destruct ctx_elt_t1; auto. rewrite lookup_add_ne; auto.
       intro H'. apply nat_to_string_injective in H'. subst.
       match goal with |H: ~_ |- _ => apply H end. apply in_map_iff. eexists.
-      split; [|eassumption]. reflexivity.
+      split; [|eassumption]. assumption.
 Qed.
 
 Lemma stringvar_Z_correct ctx e_nat e_shal :
-  NoDup (map fst_ctx_elt ctx) ->
-  wf_Zexpr (fun _ => nat) interp_type_result ctx e_nat e_shal ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
+  wf_Zexpr (fun _ => tagged_nat) interp_type_result ctx e_nat e_shal ->
   eval_Zexpr (valuation_of ctx) (stringvar_Z e_nat) (interp_pZexpr e_shal).
 Proof.
   induction 2; simpl; eauto.
@@ -1078,8 +1088,8 @@ Proof.
 Qed.
 
 Lemma stringvar_B_correct ctx e_nat e_shal :
-  NoDup (map fst_ctx_elt ctx) ->
-  wf_Bexpr (fun _ => nat) interp_type_result ctx e_nat e_shal ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
+  wf_Bexpr (fun _ => tagged_nat) interp_type_result ctx e_nat e_shal ->
   eval_Bexpr (valuation_of ctx) (stringvar_B e_nat) (interp_pBexpr e_shal).
 Proof.
   induction 2; simpl.
@@ -1088,7 +1098,7 @@ Proof.
 Qed.
 
 Lemma dom_valuation_of ctx :
-  dom (valuation_of ctx) \subseteq constant (map nat_to_string (map fst_ctx_elt ctx)).
+  dom (valuation_of ctx) \subseteq constant (map nat_to_string (map untagged_fst_ctx_elt ctx)).
 Proof.
   induction ctx; simpl.
   - rewrite dom_empty. sets.
@@ -1097,7 +1107,7 @@ Proof.
 Qed.
 
 Lemma dom_ec_of ctx :
-  dom (ec_of ctx) \subseteq constant (map nat_to_string (map fst_ctx_elt ctx)).
+  dom (ec_of ctx) \subseteq constant (map nat_to_string (map untagged_fst_ctx_elt ctx)).
 Proof.
   induction ctx; simpl.
   - rewrite dom_empty. sets.
@@ -1302,7 +1312,7 @@ Proof.
   destruct 1; eauto 10.
 Qed.
 
-Lemma sizeof_pZexpr_eval_Zexpr e e' (sizeof_var : nat -> _) v :
+Lemma sizeof_pZexpr_eval_Zexpr e e' (sizeof_var : tagged_nat -> _) v :
   sizeof_pZexpr sizeof_var e = Some e' ->
   (forall x y, sizeof_var x = Some y -> v $? (nat_to_string x) = Some y) ->
   eval_Zexpr v (stringvar_Z e) e'.
@@ -1370,17 +1380,18 @@ Definition mul_ctxs {var1 var2} (ctx1 : list (ctx_elt var1)) (ctx2 : list (ctx_e
     (list_prod ctx1 ctx2).
     
 Lemma sound_sizeof_size_of var2 (dummy2 : forall t, var2 t) n e_nat ctx sz e2 e_string name name' sizeof1 sizeof2 v :
-  wf_ATLexpr (fun _ => nat) var2 ctx n e_nat e2 ->
-  (forall name0, name <= name0 -> sizeof1 name0 = None) ->
-  (None = sizeof2 (dummy2 tZ)) ->
-  sound_sizeof (fun _ => name) sizeof1 e_nat = Some sz ->
+  wf_ATLexpr (fun _ => tagged_nat) var2 ctx n e_nat e2 ->
+  (forall x, sizeof1 (itervarnat x) = sizeof2 (dummy2 tZ)) ->
+  sound_sizeof (fun _ => itervarnat 0) sizeof1 e_nat = Some sz ->
   Forall (sizes_consistent sizeof1 sizeof2) ctx ->
   (forall x y, sizeof1 x = Some y -> v $? (nat_to_string x) = Some y) ->
   stringvar_ATLexpr (n := n) name e_nat = Some (name', e_string) ->
   size_of v e_string sz.
 Proof.
-  intros H Hname Hdummy Hsz Hctx Hv. revert Hsz. revert name sz name' e_string Hname.
-  induction H; intros name sz name' e_string Hname Hsz Hs;
+  intros H Hdummy Hsz Hctx Hv. revert Hsz. revert name sz name' e_string.
+  set (f := fun _ => itervarnat 0).
+  assert (dumb_hyp : sizeof1 (f tZ) = sizeof2 (dummy2 tZ)) by (subst f; simpl; auto).
+  induction H; intros name sz name' e_string Hsz Hs;
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
           let E := fresh "E" in
@@ -1401,26 +1412,15 @@ Proof.
   - constructor.
     + eapply sizeof_pZexpr_eval_Zexpr; eassumption.
     + eapply sizeof_pZexpr_eval_Zexpr; eassumption.
-    + eapply H2. 4: eassumption.
-      3: { erewrite sound_sizeof_wf. 2: eauto.
-           3: { constructor; eauto. simpl. instantiate (1 := dummy2 _). rewrite <- Hdummy.
-                rewrite Hname by lia. reflexivity. }
-           2: { rewrite <- Hdummy. apply Hname. lia. }
-           erewrite <- sound_sizeof_wf. 2: eauto. 1: eassumption.
-           2: { constructor; eauto. simpl. rewrite <- Hdummy.
-                rewrite Hname by lia. reflexivity. }
-           simpl. rewrite <- Hdummy. rewrite Hname by lia. reflexivity. }
-      2: { intros. apply Hname. lia. }
-      constructor; eauto. simpl. rewrite <- Hdummy. rewrite Hname by lia. reflexivity.
-Admitted.
-(*   - constructor. *)
-(*     eapply H2. 3: eassumption. 1: eauto. prove_sound_sizeof. *)
-(*   - constructor; eauto. *)
-(*     eapply H1. 3: eassumption. 1: eauto. prove_sound_sizeof. *)
-(*   - congruence. *)
-(*     Unshelve. *)
-(*     all: auto. *)
-(* Qed. *)
+    + eapply H2. 3: eassumption. 1: eauto. prove_sound_sizeof.
+  - constructor.
+    eapply H2. 3: eassumption. 1: eauto. prove_sound_sizeof.
+  - constructor; eauto.
+    eapply H1. 3: eassumption. 1: eauto. prove_sound_sizeof.
+  - congruence.
+    Unshelve.
+    all: auto.
+Qed.
 
 Lemma sizeof_pZexpr_interp_pZexpr e e' :
   sizeof_pZexpr sizeof_Z e = Some e' ->
@@ -2195,10 +2195,10 @@ Fixpoint sum_bounds_good {n} (e : pATLexpr interp_type_tagged n) :=
   end.
 
 Lemma eval_get_eval_get' ctx r sh idxs1 idxs2 :
-  NoDup (map fst_ctx_elt ctx) ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
   result_has_shape' sh r ->
   length sh = length idxs2 ->
-  Forall2 (wf_Zexpr (fun _ => nat) interp_type_result ctx) idxs1 idxs2 ->
+  Forall2 (wf_Zexpr (fun _ => tagged_nat) interp_type_result ctx) idxs1 idxs2 ->
   Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs2) sh ->
   eval_get (valuation_of ctx) r (map stringvar_Z idxs1) (eval_get' r (map interp_pZexpr idxs2)).
 Proof.
@@ -2216,7 +2216,7 @@ Proof.
 Qed.
 
 Lemma stringvar_ZLit_correct ctx e1 e2 z :
-  wf_Zexpr (fun _ => nat) interp_type_result ctx e1 e2 ->
+  wf_Zexpr (fun _ => tagged_nat) interp_type_result ctx e1 e2 ->
   stringvar_ZLit e1 = Some z ->
   interp_pZexpr e2 = z.
 Proof.
@@ -2233,8 +2233,8 @@ Proof.
 Qed.
 
 Lemma stringvar_S_correct ctx n e_nat e_shal e_string :
-  NoDup (map fst_ctx_elt ctx) ->
-  wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
+  wf_ATLexpr (fun _ => tagged_nat) interp_type_result ctx n e_nat e_shal ->
   stringvar_S e_nat = Some e_string ->
   idxs_in_bounds e_shal ->
   match (result_of_pATLexpr e_shal) with
@@ -3044,9 +3044,9 @@ Proof.
 Qed.
 
 Lemma sizes_consistent_valuation_of' ctx v :
-  NoDup (map fst_ctx_elt ctx) ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
   valuation_of' ctx $<= v ->
-  Forall (sizes_consistent (fun x => option_coalesce (v $? nat_to_string x)) sizeof_Z) ctx.
+  Forall (sizes_consistent (fun x => option_coalesce (v $? nat_to_string (untag_nat x))) sizeof_Z) ctx.
 Proof.
   intros H Hinc. apply Forall_forall. intros x Hx.
   destruct x. destruct ctx_elt_t1; simpl; auto.
@@ -3056,7 +3056,7 @@ Qed.
 Hint Resolve sizes_consistent_valuation_of' : core.
 
 Lemma not_In_valuation_of'_None x ctx :
-  ~ In x (map fst_ctx_elt ctx) ->
+  ~ In x (map untagged_fst_ctx_elt ctx) ->
   valuation_of' ctx $? (nat_to_string x) = None.
 Proof.
   intros. induction ctx.
@@ -3069,11 +3069,11 @@ Qed.
 Opaque stringvar_S.
 Hint Resolve dummy_result : core.
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
-  wf_ATLexpr (fun _ => nat) interp_type_result ctx n e_nat e_shal ->
-  NoDup (map fst_ctx_elt ctx) ->
-  (forall name'', In name'' (map fst_ctx_elt ctx) -> name'' < name) ->
+  wf_ATLexpr (fun _ => tagged_nat) interp_type_result ctx n e_nat e_shal ->
+  NoDup (map untagged_fst_ctx_elt ctx) ->
+  (forall name'', In name'' (map untagged_fst_ctx_elt ctx) -> name'' < name) ->
   stringvar_ATLexpr name e_nat = Some (name', e_string) ->
-  sound_sizeof (fun _ => name) (fun x => option_coalesce (valuation_of' ctx $? nat_to_string x)) e_nat = Some sz ->
+  sound_sizeof (fun _ => itervarnat 0) (fun x => option_coalesce (valuation_of' ctx $? nat_to_string (untag_nat x))) e_nat = Some sz ->
   idxs_in_bounds e_shal ->
   eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr e_shal).
 Proof.
@@ -3108,10 +3108,11 @@ Proof.
         apply Hctx2 in H2'. lia. }
       split.
       { apply no_question_marks. }
-      epose proof (H2 _ (itervarZ _)) as H2.
+      epose proof (H2 (itervarnat _) (itervarZ _)) as H2.
       eapply H2; try eassumption; try eauto.
-      { constructor; auto. intros H'. apply Hctx2 in H'. lia. }
-      { intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
+      { constructor; auto. intros H'. apply Hctx2 in H'.
+        cbv [untagged_fst_ctx_elt] in H'. simpl in H'. lia. }
+      { cbv [untagged_fst_ctx_elt]. simpl. intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
       erewrite sound_sizeof_wf. 2: eauto.
       3: { simpl. constructor; eauto.
            2: { eapply sizes_consistent_valuation_of'; eauto.
@@ -3119,17 +3120,16 @@ Proof.
                 apply Hctx2 in H'. lia. }
            simpl. instantiate (1 := itervarZ _). simpl.
            rewrite lookup_add_eq by reflexivity. reflexivity. }
-      { erewrite <- sound_sizeof_wf. 2: eauto. eassumption. simpl.
-        - instantiate (1 := dummy_result). simpl.
-          rewrite not_In_valuation_of'_None; [reflexivity|].
-          intros H'. apply Hctx2 in H'. lia.
-        - constructor; eauto. simpl.
-          rewrite not_In_valuation_of'_None; [reflexivity|].
-          intros H'. apply Hctx2 in H'. lia. }
-      simpl. rewrite lookup_add_ne.
-      2: { intros H'. apply nat_to_string_injective in H'. lia. }
-      rewrite not_In_valuation_of'_None; [reflexivity|].
-      intros H'. apply Hctx2 in H'. lia.
+      { 
+      { erewrite <- sound_sizeof_wf. 2: eauto. 2: apply blah. 2: eauto.
+        3: { simpl. constructor; eauto. simpl.
+             
+           2: { eapply sizes_consistent_valuation_of'; eauto.
+                eapply includes_add_new. apply not_In_valuation_of'_None. intros H'.
+                apply Hctx2 in H'. lia. }
+           simpl. instantiate (1 := itervarZ _). simpl.
+           rewrite lookup_add_eq by reflexivity. reflexivity. }
+      
   - eapply mk_eval_sum.
     + eapply sound_sizeof_size_of. 6: eassumption. all: eauto.
       -- apply dummy_result.
