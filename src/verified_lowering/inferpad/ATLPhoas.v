@@ -3353,7 +3353,7 @@ Proof.
     all: try exact 0%Z || exact dummy_result || exact (fun _ => 0%nat) || exact (Result.S Result.SX).
 Qed.
 
-Fixpoint stringvar_fvar_ATLexpr {ts n} name (e : fvar_pATLexpr (fun _ => nat) ts n) : option ATLexpr :=
+Fixpoint stringvar_fvar_ATLexpr {ts n} name (e : fvar_pATLexpr (fun _ => tagged_nat) ts n) : option ATLexpr :=
   match ts return fvar_pATLexpr _ ts _ -> _ with
   | [] => fun e =>
            match stringvar_ATLexpr name e with
@@ -3361,7 +3361,7 @@ Fixpoint stringvar_fvar_ATLexpr {ts n} name (e : fvar_pATLexpr (fun _ => nat) ts
            | None => None
            end
   | t :: ts' => fun e =>
-                stringvar_fvar_ATLexpr (S name) (e name)
+                stringvar_fvar_ATLexpr (S name) (e (argvarnat name))
   end e.
 
 Inductive size_spec :=
@@ -3380,9 +3380,9 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
         forall r,
           result_has_shape' sh r ->
           fvar_idxs_in_bounds sz (e r)
-  | tZarg :: ts', with_Z_var min max sz => fun e => forall r,
+  | tZ :: ts', with_Z_var min max sz => fun e => forall r,
       (min <= r < max)%Z ->
-      fvar_idxs_in_bounds (sz r) (e r)           
+      fvar_idxs_in_bounds (sz r) (e (argvarZ r))           
   (* | tB :: ts', with_B_var sz => *)
   (*     (* fun e => forall r, fvar_idxs_in_bounds sz (e r)*) *)
   (*     fun _ => False *)
@@ -3392,7 +3392,7 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
 Fixpoint fvar_sound_sizeof_shallow {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil => fun e =>
-                     match sound_sizeof dummy_result Some e with
+                     match sound_sizeof dummy_result sizeof_Z e with
                      | Some _ => True
                      | None => False
                      end
@@ -3400,16 +3400,17 @@ Fixpoint fvar_sound_sizeof_shallow {ts n} (sizes : size_spec) (e : fvar_pATLexpr
       fun e =>
         forall r,
           fvar_sound_sizeof_shallow sz (e r)
-  | tZarg :: ts', with_Z_var min max sz =>
+  | tZ :: ts', with_Z_var min max sz =>
       fun e => forall r,
           (min <= r < max)%Z ->
-          fvar_sound_sizeof_shallow (sz r) (e r)           
+          fvar_sound_sizeof_shallow (sz r) (e (argvarZ r))           
   | _, _ => fun _ => False
   end e.
 
-Fixpoint fvar_sum_bounds_good {ts n} (e : fvar_pATLexpr interp_type ts n) : Prop :=
+Fixpoint fvar_sum_bounds_good {ts n} (e : fvar_pATLexpr interp_type_tagged ts n) : Prop :=
   match ts return fvar_pATLexpr _ ts _ -> _ with
   | [] => fun e => sum_bounds_good e
+  | tZ :: ts' => fun e => forall r, fvar_sum_bounds_good (e (argvarZ r))
   | t :: ts' => fun e => forall r, fvar_sum_bounds_good (e r)
   end e.
 
@@ -3417,16 +3418,15 @@ Fixpoint res_spec_of' ts n name size (fd : ATLexpr) (fs : fvar_pATLexpr interp_t
   match ts return ATLexpr -> fun_type interp_type_result ts _ -> _ with
   | [] => fun fd fs =>
       eval_expr v ec fd (result_of_pATLexpr fs)
-  | tZarg :: ts' => fun fd fs =>
+  | tZ :: ts' => fun fd fs =>
       match size with
       | with_Z_var min max size' =>
           forall (x : Z),
             (min <= x < max)%Z ->
-            res_spec_of' ts' n (S name) (size' x) fd (fs x) (v $+ (nat_to_string name, x)) ec
+            res_spec_of' ts' n (S name) (size' x) fd (fs (argvarZ x)) (v $+ (nat_to_string name, x)) ec
       | _ => False
       end
   | tB :: _ => fun _ _ => False
-  | tZiter :: _ => fun _ _ => False
   | tensor_n m :: ts' => fun fd fs =>
       match size with
       | with_T_var sh size' =>
@@ -3445,7 +3445,7 @@ Fixpoint spec_of' ts n name size (fd : ATLexpr) (fs : fun_type interp_type ts (d
            exists r,
              eval_expr v ec fd r /\
                tensor_of_result r = fs
-  | tZarg :: ts' => fun fd fs =>
+  | tZ :: ts' => fun fd fs =>
       match size with
       | with_Z_var min max size' =>
           forall (x : Z),
@@ -3454,7 +3454,6 @@ Fixpoint spec_of' ts n name size (fd : ATLexpr) (fs : fun_type interp_type ts (d
       | _ => False
       end
   | tB :: _ => fun _ _ => False
-  | tZiter :: _ => fun _ _ => False
   | tensor_n m :: ts' => fun fd fs =>
       match size with
       | with_T_var sh size' =>
@@ -3469,43 +3468,52 @@ Definition spec_of ts n name size fd fs := spec_of' ts n name size fd fs $0 $0.
 
 Lemma res_spec_of'_correct ts n name size fd e_nat e_res ctx_res :
   wf_fvar_ATLexpr _ interp_type_result ctx_res ts n e_nat e_res ->
-  NoDup (map fst_ctx_elt ctx_res) ->
-  (forall name'' : nat, In name'' (map fst_ctx_elt ctx_res) -> name'' < name) ->
+  NoDup (map untagged_fst_ctx_elt ctx_res) ->
+  Forall tags_consistent ctx_res ->
+  (forall name'' : nat, In name'' (map untagged_fst_ctx_elt ctx_res) -> name'' < name) ->
   fvar_sound_sizeof_shallow size e_res ->
   fvar_idxs_in_bounds size e_res ->
   stringvar_fvar_ATLexpr name e_nat = Some fd ->
   res_spec_of' ts n name size fd e_res (valuation_of ctx_res) (ec_of ctx_res).
 Proof.
   intros Hwf. revert size name.
-  induction Hwf; simpl; intros size name Hnd Hname Hsize Hbds Hstring.
+  induction Hwf; simpl; intros size name Hnd Htag Hname Hsize Hbds Hstring.
   - destruct (stringvar_ATLexpr _ _) as [(?&e_string)|] eqn:E; try congruence.
     invert Hstring. destruct size; try contradiction.
     destruct (sound_sizeof _ _ _) eqn:?; [|contradiction].
     eapply stringvar_ATLexpr_correct; try eassumption.
     prove_sound_sizeof.
   - destruct t; destruct size; try contradiction.
-    + intros x Hx. simpl in H0. eapply H0.
-      -- constructor; auto. intros H'. apply Hname in H'. lia.
-      -- intros name''. intros [H'|H']; auto. apply Hname in H'. lia.
+    + intros x Hx. simpl in H0.
+      epose proof (H0 (argvarnat _) (argvarZ _)) as H0. eapply H0.
+      -- constructor; auto. intros H'. apply Hname in H'.
+         cbv [untagged_fst_ctx_elt] in H'. simpl in H'. lia.
+      -- auto.
+      -- cbv [untagged_fst_ctx_elt]. simpl.
+         intros name''. intros [H'|H']; auto. apply Hname in H'. lia.
       -- auto.
       -- auto.
       -- assumption.
-    + intros x Hx. destruct Hbds as [? Hbds]. subst. simpl in H0. eapply H0.
-      -- constructor; auto. intros H'. apply Hname in H'. lia.
-      -- intros name''. intros [H'|H']; auto. apply Hname in H'. lia.
+    + intros x Hx. destruct Hbds as [? Hbds]. subst. simpl in H0.
+      epose proof (H0 (argvarnat _) _) as H0. eapply H0.
+      -- constructor; auto. cbv [untagged_fst_ctx_elt]. simpl.
+         intros H'. apply Hname in H'. lia.
+      -- auto.
+      -- cbv [untagged_fst_ctx_elt]. simpl.
+         intros name''. intros [H'|H']; auto. apply Hname in H'. lia.
       -- auto.
       -- auto.
       -- assumption.
 Qed.
 
-Fixpoint compat ts n size (e_shal : fvar_pATLexpr interp_type ts n) (e_res : fvar_pATLexpr interp_type_result ts n) :=
+Fixpoint compat ts n size (e_shal : fvar_pATLexpr interp_type_tagged ts n) (e_res : fvar_pATLexpr interp_type_result ts n) :=
   match ts, size return fvar_pATLexpr _ ts _ -> fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil => fun e_shal e_res =>
            tensor_of_result (result_of_pATLexpr e_res) = interp_pATLexpr e_shal
-  | tZarg :: ts', with_Z_var min max size => fun e_shal e_res =>
+  | tZ :: ts', with_Z_var min max size => fun e_shal e_res =>
                                           forall x,
                                             (min <= x < max)%Z ->
-                                            compat ts' _ (size x) (e_shal x) (e_res x)
+                                            compat ts' _ (size x) (e_shal (argvarZ x)) (e_res (argvarZ x))
   | tensor_n _ :: ts', with_T_var sh size => fun e_shal e_res =>
                                              forall x,
                                                result_has_shape' sh x ->
@@ -3515,7 +3523,7 @@ Fixpoint compat ts n size (e_shal : fvar_pATLexpr interp_type ts n) (e_res : fva
 
 Hint Unfold res_tensor_corresp : core.
 Lemma result_of_fvar_pATLexpr_correct' ctx ts n e_shal e_res size :
-  wf_fvar_ATLexpr interp_type interp_type_result ctx ts n e_shal e_res ->
+  wf_fvar_ATLexpr interp_type_tagged interp_type_result ctx ts n e_shal e_res ->
   fvar_sound_sizeof_shallow size e_res ->
   Forall res_tensor_corresp ctx ->
   fvar_idxs_in_bounds size e_res ->
