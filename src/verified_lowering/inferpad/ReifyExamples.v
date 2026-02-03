@@ -53,7 +53,7 @@ Fixpoint varify var ts T (f : fun_type (pExpr_type var) ts T) : fun_type var ts 
   end f.
 
 Derive (reified_matmul : forall var, fun_type var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] (pATLexpr var 2)) in
-  (interp_fvar_pATLexpr _ _ (reified_matmul interp_type) = matmul)
+  (interp_fvar_pATLexpr _ _ (reified_matmul interp_type_tagged) = matmul)
     as reified_matmul_correct.
 Proof.
   cbv [matmul].
@@ -66,8 +66,8 @@ Proof.
   Time simpl. Time reflexivity.
   Time Qed.
 
-Fixpoint stringvar_fun {ts n} (names : list nat) (big_name : nat) (f : fun_type (fun _ => nat) ts (pATLexpr (fun _ => nat) n)) : option ATLexpr :=
-  match ts return fun_type (fun _ => nat) ts (pATLexpr (fun _ => nat) n) -> _ with
+Fixpoint stringvar_fun {ts n} (names : list nat) (big_name : nat) (f : fun_type (fun _ => tagged_nat) ts (pATLexpr (fun _ => tagged_nat) n)) : option ATLexpr :=
+  match ts return fun_type (fun _ => tagged_nat) ts (pATLexpr (fun _ => tagged_nat) n) -> _ with
   | [] => fun f =>
            match stringvar_ATLexpr big_name f with
            | Some (_, e) => Some e
@@ -77,7 +77,7 @@ Fixpoint stringvar_fun {ts n} (names : list nat) (big_name : nat) (f : fun_type 
                 match names with
                 | [] => None
                 | name :: names' =>
-                    stringvar_fun names' big_name (f name)
+                    stringvar_fun names' big_name (f (argvarnat name))
                 end
   end f.
 
@@ -85,9 +85,9 @@ Derive string_matmul in (stringvar_fun (seq 0 5) 6 (reified_matmul _) = Some str
 Proof. simpl. subst string_matmul. reflexivity. Qed.
 
 Definition matmul_size :=
-  with_Z_var 0 10
-    (fun A => with_Z_var 0 10
-             (fun B => with_Z_var 0 10
+  with_Z_var 1 10
+    (fun A => with_Z_var 1 10
+             (fun B => with_Z_var 1 10
                       (fun C => with_T_var [Z.to_nat A; Z.to_nat B]
                                (with_T_var [Z.to_nat B; Z.to_nat C]
                                   size_nil)))).
@@ -105,9 +105,12 @@ Proof.
     end.
     simpl. reflexivity. }
   - simpl. apply WfByUnnatify. simpl. reflexivity.
-  - cbv beta. cbn [varify Var']. cbv [fvar_sound_sizeof]. Print sound_sizeof.
-    Print sizeof_pZexpr.
-    simpl. simpl. admit.
+  - simpl. intros.
+    replace (_ =? _)%nat with false.
+    2: { symmetry. apply Nat.eqb_neq. lia. }
+    replace (_ =? _)%nat with false.
+    2: { symmetry. apply Nat.eqb_neq. lia. }
+    constructor.
   - simpl. intros. admit.
   - simpl. intros. split; try lia. admit.
   - simpl. subst string_matmul. reflexivity.
