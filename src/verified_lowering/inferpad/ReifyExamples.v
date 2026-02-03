@@ -112,7 +112,7 @@ Proof.
     2: { symmetry. apply Nat.eqb_neq. lia. }
     constructor.
   - simpl. intros. admit.
-  - simpl. intros. split; try lia. admit.
+  - Print fvar_sum_bounds_good. simpl. intros. split; try lia. admit.
   - simpl. subst string_matmul. reflexivity.
 Admitted.
     

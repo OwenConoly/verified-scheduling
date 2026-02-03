@@ -2399,26 +2399,24 @@ Qed.
 
 Theorem consistent_pad_l {X} `{TensorElem X} :
   forall (v : list X) n k s,
-    0 < k ->
     consistent v (n,s) ->
     consistent (pad_l k v) (k+n,s).
 Proof.
   intros. unfold pad_l.
-  apply consistent_gen. lia. 
+  apply consistent_gen. inversion H0. simpl. lia. 
   intros. apply consistent_iverson. eapply consistent_get.
-  eauto. inversion H1. rewrite H7. lia.
+  eauto. inversion H0. subst. lia.
 Qed.
 
 Theorem consistent_pad_r {X} `{TensorElem X} :
   forall (v : list X) n k s,
-    0 < k ->
     consistent v (n,s) ->
     consistent (pad_r k v) (k+n,s).
 Proof.
   intros. unfold pad_r.
-  apply consistent_gen. lia. 
+  apply consistent_gen. inversion H0. subst. simpl. lia. 
   intros. apply consistent_iverson. eapply consistent_get.
-  eauto. inversion H1. rewrite H7. lia.
+  eauto. inversion H0. subst. lia.
 Qed.
 
 Lemma guard_comp_to_eq : forall k l i i1,
@@ -2517,18 +2515,15 @@ Proof.
 Qed.
 
 Theorem consistent_concat {X} `{TensorElem X} : forall (l1 l2 : list X) n m s k,
-    0 < n ->
-    0 < m ->
-    k = n + m ->
     consistent l1 (n,s) ->
     consistent l2 (m,s) ->
+    k = n + m ->
     consistent (l1 <++> l2) (k,s).
 Proof.
   intros.
   unfold concat.
-  inversion H3. inversion H4.
-  rewrite H10, H16.
-  apply consistent_gen. lia.
+  inversion H0. inversion H1. subst.
+  apply consistent_gen. simpl. lia.
   intros.
   eapply consistent_bin.
   eapply consistent_iverson. eapply consistent_get. subst. eauto.

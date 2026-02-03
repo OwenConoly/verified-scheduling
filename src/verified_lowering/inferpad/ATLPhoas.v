@@ -2023,7 +2023,7 @@ Hint Resolve result_has_shape_gen_pad result_has_shape_flatten result_has_shape_
 Hint Extern 7 (result_has_shape _ _) => apply result_has_shape'_iff.
 Hint Extern 7 (result_has_shape' _ _) => apply result_has_shape'_iff.
 Search sizes_consistent.
-Lemma sound_sizeof_tensor_has_size n var1 ctx e0 dummy1 sizeof_var sz (e : pATLexpr _ n) :
+Lemma sound_sizeof_result_has_shape n var1 ctx e0 dummy1 sizeof_var sz (e : pATLexpr _ n) :
   wf_ATLexpr var1 interp_type_result ctx n e0 e ->
   sizeof_var (dummy1 tZ) = None ->
   Forall (sizes_consistent sizeof_var sizeof_Z) ctx ->
@@ -2133,8 +2133,7 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
         (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
         idxs_in_bounds (body (itervarZ i))
   | Guard p body =>
-      (*i think this could be uncommented, at the cost of some inconvenience*)
-      (*interp_pBexpr p = true ->*)
+      interp_pBexpr p = true ->
       idxs_in_bounds body
   | Lbind e1 e2 =>
       idxs_in_bounds e1 /\ (forall x, idxs_in_bounds (e2 x))
@@ -2794,6 +2793,66 @@ Lemma blah' :
 Proof. reflexivity. Qed.
 Hint Immediate blah' : core.
 
+Lemma tensor_has_size'_genr n lo hi f len sz :
+  (forall i, (lo <= i < hi)%Z -> tensor_has_size' sz (f i)) ->
+  len = Z.to_nat (hi - lo) ->
+  tensor_has_size' (n := S n) (len :: sz) (genr lo hi f).
+Proof.
+  simpl. rewrite genr_is_map. rewrite length_map, length_zrange.
+  intros. split; [lia|]. 
+  apply Forall_Forall'. apply Forall_map. apply Forall_forall. intros x Hx.
+  apply In_zrange in Hx. auto.
+Qed.
+
+Lemma tensor_has_size'_sumr n lo hi sz f :
+  (lo < hi)%Z ->
+  (forall i, (lo <= i < hi)%Z -> tensor_has_size' sz (f i)) ->
+  tensor_has_size' (n := n) sz (sumr lo hi f).
+Proof.
+  intros. erewrite sumr_is_fold_right_map. Search bin.
+Abort.
+
+Hint Resolve consistent_iverson consistent_concat consistent_transpose consistent_truncr consistent_truncl consistent_flatten consistent_pad_l consistent_pad_r : consistent.
+Lemma sound_sizeof_tensor_has_size n e_shal sz ctx e_res :
+  wf_ATLexpr interp_type_tagged interp_type_result ctx n e_shal e_res ->
+  Forall (sizes_consistent sizeof_Z sizeof_Z) ctx ->
+  sum_bounds_good e_shal ->
+  sound_sizeof dummy_shal sizeof_Z e_shal = Some sz ->
+  consistent (interp_pATLexpr e_shal) (tuple_of_list sz).
+Proof.
+  intros H Hctx Hbds. revert sz. induction H; intros sz Hsz; simpl in Hsz; repeat (destruct_one_match_hyp; try congruence; []); simpl in Hbds; invs';
+    repeat match goal with
+      | H: (_ <? _)%nat = true |- _ =>
+          apply Nat.ltb_lt in H
+      | H: (_ =? _)%nat = true |- _ =>
+          apply Nat.eqb_eq in H; subst
+      | H: (_ =? _)%nat = false |- _ =>
+          apply Nat.eqb_neq in H
+      | H: (_ <=? _)%nat = true |- _ =>
+          apply Nat.leb_le in H
+      end;
+    repeat match goal with
+      | IH: _ -> _ -> forall _, _ -> _ |- _ =>
+          specialize (IH ltac:(eauto) ltac:(eauto) _ eq_refl);
+          simpl in IH
+      end;
+    cbn -[consistent];
+    eauto with consistent.
+  - do 2 erewrite sizeof_pZexpr_interp_pZexpr in * by eassumption. simpl.
+    apply consistent_genr.
+    + lia.
+    + intros. eapply H2; eauto. prove_sound_sizeof.
+  - invs'. apply consistent_sumr; auto. intros. eapply H2; eauto. prove_sound_sizeof.
+  - eapply H1; eauto. prove_sound_sizeof.
+  - rewrite Nat.mul_comm. eauto with consistent.
+  - simpl. epose proof consistent_tile as H'. epose_dep H'.
+    rewrite of_nat_div_distr in H'. rewrite Nat2Z.id in H'.
+    eapply H'; eauto.
+  - rewrite Nat.add_comm. eauto with consistent.
+  - congruence.
+    Unshelve. all: exact (dummy_result _).
+Qed.
+
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
   wf_ATLexpr interp_type_tagged interp_type_result ctx n e_shal e_res ->
   Forall res_tensor_corresp ctx ->
@@ -2837,7 +2896,7 @@ Proof.
          ++ auto.
          ++ apply tensor_of_result_size.
             --- apply sound_sizeof_gives_dim in Hsz. eauto.
-            --- eapply sound_sizeof_tensor_has_size; eauto. prove_sound_sizeof.
+            --- eapply sound_sizeof_result_has_shape; eauto. prove_sound_sizeof.
       -- apply sound_sizeof_nz in Hsz. assumption.
     + assumption.
     + cbv [sum_with_sz].
@@ -2851,7 +2910,7 @@ Proof.
          ++ erewrite scalar_mul_0_tensor_of_result.
             --- reflexivity.
             --- apply sound_sizeof_gives_dim in Hsz. auto.
-            --- eapply sound_sizeof_tensor_has_size; eauto. prove_sound_sizeof.
+            --- eapply sound_sizeof_result_has_shape; eauto. prove_sound_sizeof.
       -- rewrite map_map.
          apply map_ext_in. intros i Hi. apply In_zrange in Hi. eapply H2.
          ++ constructor; eauto. simpl. reflexivity.
@@ -2860,32 +2919,33 @@ Proof.
          ++ auto.
       -- apply result_has_shape'_iff. apply result_has_shape_gen_pad.
       -- apply Forall_map. apply Forall_forall. intros i _.
-         eapply sound_sizeof_tensor_has_size; eauto. prove_sound_sizeof.
+         eapply sound_sizeof_result_has_shape; eauto. prove_sound_sizeof.
       -- intros x y Hx Hy.
          pose proof (add_result_add_result' _ _ _ Hx Hy) as Hxy.
          rewrite result_has_shape'_iff in *.
          eapply result_has_shape_add_result; eauto.
       -- intros. eapply tensor_of_result_add_result'; eauto.
          apply sound_sizeof_gives_dim in Hsz. auto.
-  - erewrite <- Bexprs_corresp_same by eauto. destruct (interp_pBexpr b1); simpl.
-    + cbv [iverson]. rewrite mul_1_id. eauto 10.
-    + cbv [iverson]. erewrite <- IHwf_ATLexpr by eauto.
-      pose proof sound_sizeof_tensor_has_size as H'.
-      epose_dep H'. specialize (H' ltac:(eassumption) ltac:(eauto) ltac:(eauto) ltac:(eassumption)).
-      cbv [sizeof].
-      replace (sound_sizeof _ _ _) with (Some sz) by (symmetry; prove_sound_sizeof).
-      erewrite scalar_mul_0_tensor_of_result.
+  - erewrite <- Bexprs_corresp_same in * by eauto. destruct (interp_pBexpr b1); simpl.
+    + cbv [iverson]. rewrite mul_1_id. eauto.
+    + cbv [iverson]. clear IHwf_ATLexpr Hidxs.
+      cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto.
+      Fail rewrite Hsz.
+      change (fun x => interp_type_tagged x) with interp_type_tagged. rewrite Hsz.
+      erewrite scalar_mul_0_is_0.
       -- reflexivity.
       -- apply sound_sizeof_gives_dim in Hsz. auto.
-      -- assumption.
+      -- apply tensor_has_size'_of_consistent.
+         ++ apply sound_sizeof_gives_dim in Hsz. auto.
+         ++ eapply sound_sizeof_tensor_has_size; eauto.
   - cbv [let_binding]. eapply H1.
     + constructor; [|assumption]. simpl. eauto.
     + prove_sound_sizeof.
     + auto.
     + auto.
-  - pose proof sound_sizeof_tensor_has_size as Hx.
+  - pose proof sound_sizeof_result_has_shape as Hx.
     epose_dep Hx. specialize (Hx H ltac:(eauto) ltac:(eauto) ltac:(eauto)).
-    pose proof sound_sizeof_tensor_has_size as Hy.
+    pose proof sound_sizeof_result_has_shape as Hy.
     epose_dep Hy. specialize (Hy H0 ltac:(eauto) ltac:(eauto) ltac:(eauto)).
     pose proof E as E'. pose proof E1 as E1'.
     apply sound_sizeof_nz in E, E1. simpl in E, E1.
@@ -2909,7 +2969,7 @@ Proof.
     + auto.
     + auto.
   - pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    eapply sound_sizeof_result_has_shape in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     rewrite <- IHwf_ATLexpr. clear IHwf_ATLexpr.
     erewrite flatten_is_concat; cycle 1.
@@ -2928,7 +2988,7 @@ Proof.
     rewrite map_map.
     rewrite concat_map. reflexivity.
   - pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    eapply sound_sizeof_result_has_shape in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     rewrite <- IHwf_ATLexpr.
     cbv [split_result]. rewrite map_map.
@@ -2946,7 +3006,7 @@ Proof.
       rewrite <- firstn_map. rewrite <- skipn_map. rewrite map_app.
       rewrite map_repeat. reflexivity.
   - pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    eapply sound_sizeof_result_has_shape in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr. cbv [sizeof].
@@ -2983,7 +3043,7 @@ Proof.
       -- exfalso. simpl in E''. auto.
       -- simpl. rewrite length_map. invert H4. invert H2. reflexivity.
   - pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    eapply sound_sizeof_result_has_shape in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr.
@@ -2991,7 +3051,7 @@ Proof.
     rewrite map_rev. rewrite <- skipn_map. rewrite map_rev.
     reflexivity.
   - pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    eapply sound_sizeof_result_has_shape in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr.
@@ -2999,7 +3059,7 @@ Proof.
     rewrite <- skipn_map.
     reflexivity.
   - pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    eapply sound_sizeof_result_has_shape in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr. cbv [sizeof].
@@ -3011,7 +3071,7 @@ Proof.
       intros. apply tensor_of_result_size; auto. apply sound_sizeof_gives_dim in E.
       simpl in E. lia.
   - pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto.
+    eapply sound_sizeof_result_has_shape in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr. cbv [sizeof].
@@ -3038,7 +3098,7 @@ Proof.
   - pose proof E as E'. pose proof E0 as E0'.
     eapply sound_sizeof_gives_dim in E', E0'; eauto.
     destruct l, l0; try discriminate. clear E' E0'.
-    eapply sound_sizeof_tensor_has_size in E, E0; eauto.
+    eapply sound_sizeof_result_has_shape in E, E0; eauto.
     rewrite <- IHwf_ATLexpr1, <- IHwf_ATLexpr2.
     destruct (result_of_pATLexpr x2); [|invert0 E].
     destruct (result_of_pATLexpr y2); [|invert0 E0].
@@ -3160,7 +3220,7 @@ Proof.
       erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite Hsz.
       all: eauto.
       apply add_list_result_sum_with_sz.
-      intros. eapply sound_sizeof_tensor_has_size; eauto; simpl; auto.
+      intros. eapply sound_sizeof_result_has_shape; eauto; simpl; auto.
     + rewrite length_map. rewrite length_zrange. reflexivity.
     + intros i' Hi'. rewrite nth_error_map. rewrite nth_error_zrange_is_Some by lia.
       simpl. replace (_ + _)%Z with i' by lia. split.
@@ -3219,8 +3279,8 @@ Proof.
       -- auto.
   - pose proof E4 as E4'. pose proof E6 as E6'.
     apply name_gets_bigger in E4', E6'.
-    eapply sound_sizeof_tensor_has_size in E1; eauto; [].
-    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    eapply sound_sizeof_result_has_shape in E1; eauto; [].
+    eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E. invert E1.
     constructor;
       match goal with
@@ -3231,7 +3291,7 @@ Proof.
       apply Hctx2 in H''. lia.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.
-    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E.
     constructor;
       try match goal with
@@ -3241,7 +3301,7 @@ Proof.
     + eapply Forall_impl; [|eassumption]. invert 1; eauto.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.
-    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E.
     replace k with (Z.to_nat (Z.of_nat k)) by lia.
     constructor;
@@ -3253,7 +3313,7 @@ Proof.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.
     pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto; [].
+    eapply sound_sizeof_result_has_shape in E'; eauto; [].
     invert E'.
     cbv [sizeof].
     erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite E.
@@ -3267,7 +3327,7 @@ Proof.
       intros x ? ?. destruct x; congruence || auto.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.
-    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E.
     replace k with (Z.to_nat (Z.of_nat k)) by lia.
     constructor;
@@ -3278,7 +3338,7 @@ Proof.
     + eauto.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.
-    eapply sound_sizeof_tensor_has_size in E; eauto; [].
+    eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E.
     replace k with (Z.to_nat (Z.of_nat k)) by lia.
     constructor;
@@ -3290,7 +3350,7 @@ Proof.
   - pose proof E1 as E1'.
     apply name_gets_bigger in E1'.
     pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto; [].
+    eapply sound_sizeof_result_has_shape in E'; eauto; [].
     invert E'.
     cbv [sizeof].
     erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite E.
@@ -3307,7 +3367,7 @@ Proof.
   - pose proof E1 as E1'.
     apply name_gets_bigger in E1'.
     pose proof E as E'.
-    eapply sound_sizeof_tensor_has_size in E'; eauto; [].
+    eapply sound_sizeof_result_has_shape in E'; eauto; [].
     invert E'.
     cbv [sizeof].
     erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite E.
@@ -3585,7 +3645,7 @@ Proof.
   intros. eapply res_spec_of_compat_spec_of'; eassumption.
 Qed.
 
-Lemma spec_of_correct ts n e size name fd :
+Lemma spec_of_correct' ts n e size name fd :
   Wf_fvar_ATLExpr e ->
   fvar_sound_sizeof_shallow size (e _) ->
   fvar_idxs_in_bounds size (e _) ->
@@ -3597,3 +3657,4 @@ Proof.
   - eapply res_spec_of_correct; eauto.
   - eapply result_of_fvar_pATLexpr_correct; eauto.
 Qed.
+
