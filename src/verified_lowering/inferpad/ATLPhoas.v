@@ -2788,7 +2788,12 @@ Lemma blah :
   sizeof_Z (dummy_shal tZ) = sizeof_Z (dummy_result tZ).
 Proof. reflexivity. Qed.
 Hint Immediate blah : core.
-  
+
+Lemma blah' :
+  sizeof_Z (dummy_result tZ) = sizeof_Z (dummy_shal tZ).
+Proof. reflexivity. Qed.
+Hint Immediate blah' : core.
+
 Lemma result_of_pATLexpr_correct ctx n e_shal e_res sh :
   wf_ATLexpr interp_type_tagged interp_type_result ctx n e_shal e_res ->
   Forall res_tensor_corresp ctx ->
@@ -3043,21 +3048,40 @@ Proof.
     all: exact dummy_result || exact 0%Z || exact (dummy_result _).
 Qed.
 
-Lemma sizes_consistent_valuation_of' ctx v :
-  NoDup (map untagged_fst_ctx_elt ctx) ->
-  valuation_of' ctx $<= v ->
-  Forall (sizes_consistent (fun x => option_coalesce (v $? nat_to_string (untag_nat x))) sizeof_Z) ctx.
-Proof.
-  intros H Hinc. apply Forall_forall. intros x Hx.
-  destruct x. destruct ctx_elt_t1; simpl; auto.
-  erewrite includes_lookup; [reflexivity| |eassumption].
-  apply valuation_of'_correct; assumption.
-Qed.
-Hint Resolve sizes_consistent_valuation_of' : core.
+Definition tags_consistent (x : ctx_elt2 (fun _ => tagged_nat) interp_type_result) :=
+  match x with
+  | {| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} =>
+      match x1, x2 with
+      | itervarnat _, itervarZ _ => True
+      | argvarnat _, argvarZ _ => True
+      | _, _ => False
+      end
+  | _ => True
+  end.
+Hint Unfold tags_consistent : core.
 
-Lemma not_In_valuation_of'_None x ctx :
+Lemma sizes_consistent_valuation_of ctx v :
+  NoDup (map untagged_fst_ctx_elt ctx) ->
+  Forall tags_consistent ctx ->
+  valuation_of ctx $<= v ->
+  Forall (sizes_consistent (fun x => match x with
+                                  | itervarnat _ => None
+                                  | argvarnat x0 => v $? nat_to_string x0
+                                  end) sizeof_Z) ctx.
+Proof.
+  intros H Htag Hinc. apply Forall_forall. intros x Hx.
+  destruct x. destruct ctx_elt_t1; simpl; auto.
+  rewrite Forall_forall in Htag. specialize (Htag _ Hx). simpl in Htag.
+  destruct ctx_elt_p3; destruct ctx_elt_p4; try contradiction.
+  - simpl. eapply includes_lookup; [|eassumption].
+    eapply valuation_of_correct in Hx; eauto.
+  - reflexivity.
+Qed.
+Hint Resolve sizes_consistent_valuation_of : core.
+
+Lemma not_In_valuation_of_None x ctx :
   ~ In x (map untagged_fst_ctx_elt ctx) ->
-  valuation_of' ctx $? (nat_to_string x) = None.
+  valuation_of ctx $? (nat_to_string x) = None.
 Proof.
   intros. induction ctx.
   - simpl. apply lookup_empty.
@@ -3071,14 +3095,18 @@ Hint Resolve dummy_result : core.
 Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   wf_ATLexpr (fun _ => tagged_nat) interp_type_result ctx n e_nat e_shal ->
   NoDup (map untagged_fst_ctx_elt ctx) ->
+  Forall tags_consistent ctx ->
   (forall name'', In name'' (map untagged_fst_ctx_elt ctx) -> name'' < name) ->
   stringvar_ATLexpr name e_nat = Some (name', e_string) ->
-  sound_sizeof (fun _ => itervarnat 0) (fun x => option_coalesce (valuation_of' ctx $? nat_to_string (untag_nat x))) e_nat = Some sz ->
+  sound_sizeof (fun _ => itervarnat 0) (fun x => match x with
+                                           | itervarnat _ => None
+                                           | argvarnat x0 => valuation_of ctx $? nat_to_string x0
+                                           end) e_nat = Some sz ->
   idxs_in_bounds e_shal ->
   eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr e_shal).
 Proof.
   intros H. revert name name' e_string sz.
-  induction H; intros name name' e_string sz Hctx1 Hctx2 H' Hsz Hbds;
+  induction H; intros name name' e_string sz Hctx1 Htags Hctx2 H' Hsz Hbds;
     repeat match goal with
       | H: context [match stringvar_ATLexpr ?name ?e with _ => _ end] |- _ =>
           let E := fresh "E" in
@@ -3109,36 +3137,30 @@ Proof.
       split.
       { apply no_question_marks. }
       epose proof (H2 (itervarnat _) (itervarZ _)) as H2.
-      eapply H2; try eassumption; try eauto.
+      eapply H2; try eassumption; eauto.
       { constructor; auto. intros H'. apply Hctx2 in H'.
         cbv [untagged_fst_ctx_elt] in H'. simpl in H'. lia. }
       { cbv [untagged_fst_ctx_elt]. simpl. intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
       erewrite sound_sizeof_wf. 2: eauto.
       3: { simpl. constructor; eauto.
-           2: { eapply sizes_consistent_valuation_of'; eauto.
-                eapply includes_add_new. apply not_In_valuation_of'_None. intros H'.
-                apply Hctx2 in H'. lia. }
-           simpl. instantiate (1 := itervarZ _). simpl.
-           rewrite lookup_add_eq by reflexivity. reflexivity. }
-      { 
-      { erewrite <- sound_sizeof_wf. 2: eauto. 2: apply blah. 2: eauto.
-        3: { simpl. constructor; eauto. simpl.
-             
-           2: { eapply sizes_consistent_valuation_of'; eauto.
-                eapply includes_add_new. apply not_In_valuation_of'_None. intros H'.
-                apply Hctx2 in H'. lia. }
-           simpl. instantiate (1 := itervarZ _). simpl.
-           rewrite lookup_add_eq by reflexivity. reflexivity. }
-      
+           eapply sizes_consistent_valuation_of; eauto.
+           eapply includes_add_new. apply not_In_valuation_of_None. intros H'.
+           apply Hctx2 in H'. lia. }
+      { erewrite <- sound_sizeof_wf. 2: eauto. 1: eassumption. 1: apply blah. auto. }
+      apply blah.      
   - eapply mk_eval_sum.
     + eapply sound_sizeof_size_of. 6: eassumption. all: eauto.
-      -- apply dummy_result.
+      3: { constructor; eauto. simpl. auto. }
+      all: simpl; eauto.
       -- prove_sound_sizeof.
+      -- intros x ? ?. destruct x; try congruence. assumption.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; eauto.
-    + cbv [sizeof]. simpl. erewrite <- sound_sizeof_wf with (dummy1 := fun _ => 0).
-      2,3: solve[eauto]. rewrite Hsz. apply add_list_result_sum_with_sz.
-      intros. eapply sound_sizeof_tensor_has_size; eauto.
+    + cbv [sizeof]. simpl.
+      erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite Hsz.
+      all: eauto.
+      apply add_list_result_sum_with_sz.
+      intros. eapply sound_sizeof_tensor_has_size; eauto; simpl; auto.
     + rewrite length_map. rewrite length_zrange. reflexivity.
     + intros i' Hi'. rewrite nth_error_map. rewrite nth_error_zrange_is_Some by lia.
       simpl. replace (_ + _)%Z with i' by lia. split.
@@ -3147,28 +3169,35 @@ Proof.
         apply nat_to_string_injective in H1'. subst. apply Hctx2 in H2'. lia. }
       split.
       { apply no_question_marks. }
-      eapply H2; try eassumption; try eauto.
-      { constructor; auto. intros H'. apply Hctx2 in H'. lia. }
-      { intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
+      epose proof (H2 (itervarnat _) (itervarZ _)) as H2.
+      eapply H2; try eassumption; eauto.
+      { constructor; auto. intros H'. apply Hctx2 in H'.
+        cbv [untagged_fst_ctx_elt] in H'. simpl in H'. lia. }
+      { cbv [untagged_fst_ctx_elt]. simpl. intros name'' [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia. }
       erewrite sound_sizeof_wf. 2: eauto.
-      2: { constructor; auto. eapply sizes_consistent_valuation_of; eauto.
+      3: { simpl. constructor; eauto.
+           eapply sizes_consistent_valuation_of; eauto.
            eapply includes_add_new. apply not_In_valuation_of_None. intros H'.
            apply Hctx2 in H'. lia. }
-      prove_sound_sizeof.
+      { erewrite <- sound_sizeof_wf. 2: eauto. 1: eassumption. 1: apply blah. auto. }
+      apply blah.
   - destruct (interp_pBexpr _) eqn:Eb.
     + apply EvalGuardTrue; eauto.
       rewrite <- Eb. apply stringvar_B_correct; auto.
     + apply EvalGuardFalse; eauto.
       -- rewrite <- Eb. apply stringvar_B_correct; auto.
-      -- cbv [sizeof]. simpl. erewrite <- sound_sizeof_wf.
-         2,3: solve[eauto]. rewrite Hsz. eapply sound_sizeof_size_of; eauto.
-         apply dummy_result.
+      -- cbv [sizeof]. simpl.
+         erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite Hsz.
+         all: eauto.
+         eapply sound_sizeof_size_of; eauto; simpl; auto.
+         intros x ? ?. destruct x; congruence || auto.
   - pose proof E0 as E0'. pose proof E2 as E2'.
     apply name_gets_bigger in E0', E2'.
     pose proof (vars_of_stringvar_ATLexpr _ _ _ _ _ E0) as E0''.
     pose proof (vars_of_stringvar_ATLexpr _ _ _ _ _ E2) as E2''.
     eapply EvalLbind.
-    + eapply sound_sizeof_size_of. 6: eassumption. all: eauto. apply dummy_result.
+    + eapply sound_sizeof_size_of. 6: eassumption. all: eauto; simpl; auto.
+      intros x ? ?. destruct x; congruence || auto.
     + apply None_dom_lookup. intros H'. apply dom_ec_of in H'.
       apply in_map_iff in H'. destruct H' as (x&H1'&H2').
       apply nat_to_string_injective in H1'. subst.
@@ -3178,11 +3207,14 @@ Proof.
       -- apply E2'' in H'. invs''. lia.
     + apply sets_equal. split; try contradiction. intros [H1' H2'].
       apply E0'' in H1'. apply E2'' in H2'. invs''. lia.
-    + eapply IHwf_ATLexpr. 3: eassumption. all: eauto.
+    + eapply IHwf_ATLexpr. 4: eassumption. all: eauto.
       intros ? H'. apply Hctx2 in H'. lia.
-    + eapply H1. 3: eassumption.
-      -- constructor; auto. intros H'. apply Hctx2 in H'. lia.
-      -- intros ? [Hn|Hn]; subst; [lia|]. apply Hctx2 in Hn. lia.
+    + epose proof (H1 (itervarnat _) _) as H1.
+      eapply H1. 4: eassumption.
+      -- constructor; auto. intros H'. apply Hctx2 in H'. cbv [untagged_fst_ctx_elt] in H'. simpl in H'. lia.
+      -- auto.
+      -- cbv [untagged_fst_ctx_elt]. simpl. intros ? [Hn|Hn]; subst; [lia|].
+         apply Hctx2 in Hn. lia.
       -- prove_sound_sizeof.
       -- auto.
   - pose proof E4 as E4'. pose proof E6 as E6'.
@@ -3195,7 +3227,7 @@ Proof.
       | H: V _ = _ |- _ => rewrite H
       end.
     + eauto.
-    + eapply IHwf_ATLexpr2. 3: eassumption. all: eauto. intros ? H''. Search ctx.
+    + eapply IHwf_ATLexpr2. 4: eassumption. all: eauto. intros ? H''. Search ctx.
       apply Hctx2 in H''. lia.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.
@@ -3223,13 +3255,16 @@ Proof.
     pose proof E as E'.
     eapply sound_sizeof_tensor_has_size in E'; eauto; [].
     invert E'.
-    cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto. rewrite E.
+    cbv [sizeof].
+    erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite E.
+    all: eauto.
     constructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H
         end.
     + eauto.
-    + eapply sound_sizeof_size_of; eauto. apply dummy_result.
+    + eapply sound_sizeof_size_of; eauto; simpl; auto.
+      intros x ? ?. destruct x; congruence || auto.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.
     eapply sound_sizeof_tensor_has_size in E; eauto; [].
@@ -3257,28 +3292,34 @@ Proof.
     pose proof E as E'.
     eapply sound_sizeof_tensor_has_size in E'; eauto; [].
     invert E'.
-    cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto. rewrite E.
+    cbv [sizeof].
+    erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite E.
+    all: eauto.
     replace k with (Z.to_nat (Z.of_nat k)) by lia.
     econstructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H
         end.
     + simpl. f_equal. lia.
-    + eapply sound_sizeof_size_of; eauto. exact dummy_result.
+    + eapply sound_sizeof_size_of; eauto; simpl; auto.
+      intros x ? ?. destruct x; congruence || auto.
     + eauto.
   - pose proof E1 as E1'.
     apply name_gets_bigger in E1'.
     pose proof E as E'.
     eapply sound_sizeof_tensor_has_size in E'; eauto; [].
     invert E'.
-    cbv [sizeof]. erewrite <- sound_sizeof_wf by eauto. rewrite E.
+    cbv [sizeof].
+    erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarnat 0). 1: rewrite E.
+    all: eauto.
     replace k with (Z.to_nat (Z.of_nat k)) by lia.
     econstructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H
         end.
     + simpl. f_equal. lia.
-    + eapply sound_sizeof_size_of; eauto. exact dummy_result.
+    + eapply sound_sizeof_size_of; eauto; simpl; auto.
+      intros x ? ?. destruct x; congruence || auto.
     + eauto.
   - congruence.
   - pose proof stringvar_S_correct as H'.
