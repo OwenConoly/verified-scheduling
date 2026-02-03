@@ -2125,7 +2125,11 @@ Ltac nts_inj :=
 
 Ltac invs'' := invs'; nts_inj; subst.
 
-(*also checks that we don't divide by zero*)
+(*checks:
+  - indexes are in bounds
+  - we don't divide by zero
+  what these constraints have in common is that (unlike the no-zeroary-sums constraint) it's ok to violate them underneath false guards.
+ *)
 Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
   match e with
   | Gen lo hi body | Sum lo hi body =>
@@ -2164,7 +2168,7 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
   | SIZR _ => True
   end.
 
-(*because shallow ATL does not have reasonable semantics for zero-ary sums*)
+(*because shallow ATL does not have reasonable semantics for zero-ary sums.*)
 Fixpoint sum_bounds_good {n} (e : pATLexpr interp_type_tagged n) :=
   match e with
   | Gen lo hi body =>
@@ -3644,6 +3648,12 @@ Lemma res_spec_of_compat_spec_of ts n name size fd e_res e_shal :
 Proof.
   intros. eapply res_spec_of_compat_spec_of'; eassumption.
 Qed.
+
+(* Check pATLexpr. Print sound_sizeof. *)
+(* Fixpoint compute_size_and_check_idxs {n} (e : pATLexpr (fun _ => tagged_nat) n) : option (list nat * Prop) := *)
+(*   match e with *)
+(*   | Gen lo hi body => *)
+(*       match compute_size_and_check_idxs (body with *)
 
 Lemma spec_of_correct' ts n e size name fd :
   Wf_fvar_ATLExpr e ->
