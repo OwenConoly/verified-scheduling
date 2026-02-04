@@ -10,6 +10,7 @@ From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import Reals.Rpower.
+From Stdlib Require Import QArith.
 
 Import ListNotations.
 
@@ -22,6 +23,7 @@ From Lower Require Import Zexpr Bexpr Array Range Sexpr ListMisc
 Notation S := Datatypes.S.
 
 Open Scope list_scope.
+Open Scope nat_scope.
 
 (*where did this come from?  did i put it here?*)
 Set Default Proof Mode "Classic".
@@ -910,7 +912,7 @@ Fixpoint stringvar_S {n} (e : pATLexpr (fun _ => tagged_nat) n) : option Sexpr :
       | Some x', Some y' => Some (stringvar_Sbop o x' y')
       | _, _ => None
       end
-  | SIZR x => option_map Sexpr.Lit (option_map IZR (stringvar_ZLit x))
+  | SIZR x => option_map Sexpr.Lit (option_map inject_Z (stringvar_ZLit x))
   | Get x idxs =>
       match x with
       | Var y => Some (Sexpr.Get (nat_to_string y) (map stringvar_Z idxs))
@@ -2393,7 +2395,9 @@ Proof.
   - split; [reflexivity|].
     cbv [option_map] in *.
     repeat (destruct_one_match_hyp; try congruence || contradiction; []; invs').
-    erewrite stringvar_ZLit_correct by eassumption. constructor.
+    erewrite stringvar_ZLit_correct by eassumption.
+    replace (IZR z) with (Q2R (inject_Z z)). 1: constructor.
+    cbv [Q2R]. simpl. rewrite Rinv_1. ring.
 Qed.
 
 Definition R_of_scalar s :=
