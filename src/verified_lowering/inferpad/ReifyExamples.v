@@ -75,7 +75,43 @@ Proof.
   - simpl. intros. split; lia.
   - simpl. subst string_matmul. reflexivity.
 Qed.
+
 Print string_matmul.
+(*
+  string_matmul =
+Gen (nat_to_string 5) (| 0 |)%z (! nat_to_string 0 !)%z
+  (Gen (nat_to_string 6) (| 0 |)%z (! nat_to_string 2 !)%z
+     (Sum (nat_to_string 7) (| 0 |)%z (! nat_to_string 1 !)%z
+        (Scalar
+           (Mul
+              (Get (nat_to_string 3) [(! nat_to_string 5 !)%z; (! nat_to_string 7 !)%z])
+              (Get (nat_to_string 4) [(! nat_to_string 7 !)%z; (! nat_to_string 6 !)%z])))))
+     : ATLexpr
+*)
+Goal True.
+  pose proof matmul_correct as H. cbv [spec_of] in H. simpl in H.
+  Check H.
+  (*
+    H
+     : forall x : Z,
+       (1 <= x < 10)%Z ->
+       forall x0 : Z,
+       (1 <= x0 < 10)%Z ->
+       forall x1 : Z,
+       (1 <= x1 < 10)%Z ->
+       forall x2 : Result.result,
+       result_has_shape' [Z.to_nat x; Z.to_nat x0] x2 ->
+       forall x3 : Result.result,
+       result_has_shape' [Z.to_nat x0; Z.to_nat x1] x3 ->
+       exists r : Result.result,
+         eval_expr
+           ($0 $+ (nat_to_string 0, x) $+ (nat_to_string 1, x0) $+ (
+            nat_to_string 2, x1))
+           ($0 $+ (nat_to_string 3, x2) $+ (nat_to_string 4, x3)) string_matmul r /\
+         tensor_of_result r =
+         matmul x x0 x1 (tensor_of_result x2) (tensor_of_result x3)
+   *)
+Abort.
 
 Derive (reified_add : forall var, _ -> _ -> _ -> _ -> var (tensor_n 4) -> var (tensor_n 4) -> pATLexpr var 4) in
   (forall A B C D m1 m2,
