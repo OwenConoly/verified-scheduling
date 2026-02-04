@@ -25,14 +25,6 @@ Open Scope string_scope.
 
 Set Default Proof Mode "Classic".
 
-Record arb_dim_tensor := { dim: nat; val: dim_n dim }.
-
-Fixpoint rt var ts n :=
-  match ts with
-  | nil => pATLexpr var n
-  | t :: ts' => pExpr_type var t -> rt var ts' n
-  end.
-
 Definition Var' {t var} (x : var t) : pExpr_type var t :=
   match t return var t -> pExpr_type var t with
   | tZ => ATLPhoas.ZVar
@@ -40,49 +32,11 @@ Definition Var' {t var} (x : var t) : pExpr_type var t :=
   | tensor_n n => Var
   end x.
 
-Fixpoint ec_of_vars (names_vals : list (string * Result.result)) :=
-  match names_vals with
-  | [] => $0
-  | (n, v) :: names_vals' => ec_of_vars names_vals' $+ (n, v)
-  end.
-
 Fixpoint varify var ts T (f : fun_type (pExpr_type var) ts T) : fun_type var ts T :=
   match ts return fun_type (pExpr_type var) ts T -> fun_type var ts T with
   | [] => fun f => f
   | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
   end f.
-
-Derive (reified_matmul : forall var, fun_type var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] (pATLexpr var 2)) in
-  (interp_fvar_pATLexpr _ _ (reified_matmul interp_type_tagged) = matmul)
-    as reified_matmul_correct.
-Proof.
-  cbv [matmul].
-  symmetry. Reify_lhs rm.
-  Check (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (rm var)).
-  subst reified_matmul.
-  match goal with
-  | rm := ?x |- _ => instantiate (1 := (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (x var)))
-  end.
-  Time simpl. Time reflexivity.
-  Time Qed.
-
-Fixpoint stringvar_fun {ts n} (names : list nat) (big_name : nat) (f : fun_type (fun _ => tagged_nat) ts (pATLexpr (fun _ => tagged_nat) n)) : option ATLexpr :=
-  match ts return fun_type (fun _ => tagged_nat) ts (pATLexpr (fun _ => tagged_nat) n) -> _ with
-  | [] => fun f =>
-           match stringvar_ATLexpr big_name f with
-           | Some (_, e) => Some e
-           | None => None
-           end
-  | t :: ts' => fun f =>
-                match names with
-                | [] => None
-                | name :: names' =>
-                    stringvar_fun names' big_name (f (argvarnat name))
-                end
-  end f.
-
-Derive string_matmul in (stringvar_fun (seq 0 5) 6 (reified_matmul _) = Some string_matmul) as string_matmul_correct.
-Proof. simpl. subst string_matmul. reflexivity. Qed.
 
 Definition matmul_size :=
   with_Z_var 1 10
@@ -98,7 +52,7 @@ Derive string_matmul in
     as matmul_correct.
 Proof.
   eassert (matmul = _) as ->.
-  2: eapply spec_of_correct'.
+  2: eapply spec_of_correct.
   { cbv [matmul]. Reify_lhs rmatmul.
     match goal with
     | rm := ?x |- _ => instantiate (1 := (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (x var)))
@@ -111,118 +65,18 @@ Proof.
     replace (_ =? _)%nat with false.
     2: { symmetry. apply Nat.eqb_neq. lia. }
     constructor.
-  - simpl. intros. admit.
+  - simpl. intros.
+    repeat match goal with
+           | |- _ => progress intros
+           | |- Forall2 _ _ _ => constructor
+           | |- _ /\ _ => split
+           | |- _ => lia
+           end.
   - simpl. intros. split; lia.
   - simpl. subst string_matmul. reflexivity.
-Admitted.
-    
-Lemma matmul_correct :
-  .
-Proof.
-  
-  simpl. cbv [spec_of]. simpl.
-Abort.
+Qed.
+Print string_matmul.
 
-
-  Check rt.
-  pattern @lam in rm.
-  change (fun x => f x) with (lam _ _ _ _ ).
-  cbv [interp_fvar_pATLexpr]. simpl.
-  simpl.
-  (is_reification (n := 2)
-     reified_matmul
-     (fun '(A, B, C, m1, m2) => ([("m1", {| dim := 2; val:= m1 |}); ("m2", {| dim := 2; val := m2 |})], matmul A B C m1 m2)))
-    as reified_matmul_correct.
-Proof.
-  cbv [is_reification]. intros x. repeat (destruct x as [x ?]). eexists.
-  intros. eassert (ec_of_vars _ = _) as ->; cycle 1.
-  { 
-  Check stringvar_ATLexpr_eval_shal.
-Check string
-  eapply reify_is_reification with (vars := fun '(_, _, _, _, _) => _).
-  2: { intros x. repeat (destruct x as [x ?]). simpl. reflexivity. }
-  2: { intros x. repeat (destruct x as [x ?]). simpl.
-       rename z into z1. cbv [matmul]. Print Reify_lhs.
-       lazymatch goal with
-       | |- ?x = _ => set (y := x)
-       end.
-       make_types_reifiable_in y. subst y.
-       Print Ltac Reify.
-       match goal with
-       | |- ?x = _ =>
-           set (y := x); pattern_shallows y
-       end.
-         (let rx := lazymatch goal with
-              | y:=?y':_ |- _ => get_fun y'
-              end in
-    set (z := rx);
-     (let w := constr:((fun var => apply_to_all var (z (pExpr_type var)))) in
-      let w := eval cbv[apply_to_all z] in w in
-      set (name := w); subst y; subst z; simpl))
-       match goal with
-       | |- ?x = _ => Reify x name
-       end.
-       Print Reify_lhs.
-  end
-       reified_matmul'.
-  f_equal. idtac. simpl.
-  match goal with
-  | |- is_reification _ ?x => eassert (x = fun '(_, _, _, _, _) => _) as ->; cycle 1
-  end.
-  1: eapply reify_is_reification.
-  
-  idtac.
-  
-Abort.
-
-Goal matmul = matmul.
-  cbv [matmul].
-  Reify_lhs reified_matmul.
-  
-  
-    
-  Lemma arrows_wf ts
-  
-Abort.
-
-Definition pATLExpr n := forall var, pATLexpr var n.
-
-Ltac app_args e :=
-  lazymatch e with
-  | ?f ?x => let xs := app_args f in constr:((x, xs))
-  | _ => constr:(tt)
-  end.
-
-Ltac remove_last l :=
-  lazymatch l with
-  | (?x, (?y, ?zs)) => constr:((x, ltac:(let r := remove_last (y, zs) in exact r)))
-  | (?x, tt) => tt
-  end.
-
-Ltac tl l :=
-  lazymatch l with
-  | (_, ?xs) => xs
-  end.
-
-Ltac for_each tac l :=
-  lazymatch l with
-  | (?x, ?xs) => tac x; for_each tac xs
-  | tt => idtac
-  end.
-
-Ltac pattern_in x arg :=
-  pattern arg in x;
-  match goal with
-  | x := ?x' |- _ =>
-           lazymatch x' with
-           | ?f _ =>
-               subst x; set (x := f)
-           end
-  end.
-
-Ltac pattern_all_in x args :=
-  let pix := pattern_in x in
-  for_each pix args.
 Derive (reified_add : forall var, _ -> _ -> _ -> _ -> var (tensor_n 4) -> var (tensor_n 4) -> pATLexpr var 4) in
   (forall A B C D m1 m2,
       interp_pATLexpr (reified_add interp_type A B C D m1 m2) =
