@@ -98,7 +98,7 @@ Derive string_matmul in
     as matmul_correct.
 Proof.
   eassert (matmul = _) as ->.
-  2: eapply spec_of_correct.
+  2: eapply spec_of_correct'.
   { cbv [matmul]. Reify_lhs rmatmul.
     match goal with
     | rm := ?x |- _ => instantiate (1 := (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (x var)))
@@ -112,7 +112,7 @@ Proof.
     2: { symmetry. apply Nat.eqb_neq. lia. }
     constructor.
   - simpl. intros. admit.
-  - Print fvar_sum_bounds_good. simpl. intros. split; try lia. admit.
+  - simpl. intros. split; lia.
   - simpl. subst string_matmul. reflexivity.
 Admitted.
     

@@ -2140,7 +2140,7 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
       interp_pBexpr p = true ->
       idxs_in_bounds body
   | Lbind e1 e2 =>
-      idxs_in_bounds e1 /\ (forall x, idxs_in_bounds (e2 x))
+      idxs_in_bounds e1 /\ idxs_in_bounds (e2 (result_of_pATLexpr e1))
   | Concat x y =>
       idxs_in_bounds x /\ idxs_in_bounds y
   | Flatten e | Split _ e | Transpose e | Truncr _ e | Truncl _ e | Padr _ e
@@ -2167,6 +2167,122 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
       /\ idxs_in_bounds x /\ idxs_in_bounds y
   | SIZR _ => True
   end.
+
+Definition interp_type_result' t :=
+  match t with
+  | tZ => tagged_Z
+  | tB => bool
+  | tensor_n _ => list nat
+  end.
+
+Definition dummy_result' t : interp_type_result' t :=
+  match t with
+  | tZ => itervarZ 0%Z
+  | tB => false
+  | tensor_n _ => []
+  end.
+
+Fixpoint idxs_in_bounds' {n} (e : pATLexpr interp_type_result' n) :=
+  match e with
+  | Gen lo hi body | Sum lo hi body =>
+      forall i,
+        (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
+        idxs_in_bounds' (body (itervarZ i))
+  | Guard p body =>
+      interp_pBexpr p = true ->
+      idxs_in_bounds' body
+  | Lbind e1 e2 =>
+      match sound_sizeof dummy_result' sizeof_Z e1 with
+      | Some sz => idxs_in_bounds' e1 /\ idxs_in_bounds' (e2 sz)
+      | None => False
+      end
+  | Concat x y =>
+      idxs_in_bounds' x /\ idxs_in_bounds' y
+  | Flatten e | Split _ e | Transpose e | Truncr _ e | Truncl _ e | Padr _ e
+  | Padl _ e =>
+      idxs_in_bounds' e
+  | Var x => True
+  | Get v idxs =>
+      match v with
+      | Var sh =>
+          Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs) sh
+      | _ => False
+      end
+  | SBop o x y =>
+      match o with
+      | Div => False
+      (*TODO: this needs to be a sound check that y is nonzero.
+        The current check is obviously sound but could be replaced with something smarter*)
+      | _ => True
+      end
+      /\ idxs_in_bounds' x /\ idxs_in_bounds' y
+  | SIZR _ => True
+  end.
+
+(*TODO my names for things are getting worse and worse*)
+Definition corresp' (x : ctx_elt2 interp_type_result' interp_type_result) :=
+  match x with
+  | {| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => x1 = x2
+  | {| ctx_elt_t := tB; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} => x1 = x2
+  | {| ctx_elt_t := tensor_n _; ctx_elt_p1 := x1; ctx_elt_p2 := x2|} =>
+      result_has_shape' x1 x2
+  end.
+
+(*stupidly non-general*)
+Lemma Zexprs_corresp'_same ctx e1 e2 :
+  Forall corresp' ctx ->
+  wf_Zexpr _ _ ctx e1 e2 ->
+  interp_pZexpr e1 = interp_pZexpr e2.
+Proof.
+  intros Hctx.
+  induction 1; simpl; f_equal; auto.
+  { rewrite Forall_forall in Hctx. apply Hctx in H. simpl in H. auto. }
+Qed.
+
+Lemma Bexprs_corresp'_same ctx e1 e2 :
+  Forall corresp' ctx ->
+  wf_Bexpr _ _ ctx e1 e2 ->
+  interp_pBexpr e1 = interp_pBexpr e2.
+Proof.
+  induction 2; simpl; f_equal; eauto using Zexprs_corresp'_same.
+Qed.
+
+Lemma corresp'_sizes_consistent x :
+  corresp' x ->
+  sizes_consistent sizeof_Z sizeof_Z x.
+Proof. destruct x. destruct ctx_elt_t1; simpl; intros; subst; auto. Qed.
+
+Hint Unfold corresp' : core.
+Lemma idxs_in_bounds'_idxs_in_bounds ctx n e e' :
+  wf_ATLexpr interp_type_result' interp_type_result ctx n e' e ->
+  Forall corresp' ctx ->
+  idxs_in_bounds' e' ->
+  idxs_in_bounds e.
+Proof.
+  intros H Hcorresp' He'. induction H; simpl in He'; simpl;
+    repeat (erewrite Zexprs_corresp'_same in * by eassumption);
+    repeat (erewrite Bexprs_corresp'_same in * by eassumption);
+    eauto.
+  - intros. eapply H2; eauto. eapply He'.
+    erewrite Zexprs_corresp'_same with (e1 := hi1) by eassumption. eauto.
+  - intros. eapply H2; eauto. eapply He'.
+    erewrite Zexprs_corresp'_same with (e1 := hi1) by eassumption. eauto.
+  - destruct_one_match_hyp; try contradiction. invs'. split; auto.
+    intros. eapply H1; eauto. constructor; auto. simpl.
+    eapply sound_sizeof_result_has_shape. 1: eassumption. 3: eassumption.
+    1: reflexivity. eauto using Forall_impl, corresp'_sizes_consistent.
+  - invs'. eauto.
+  - destruct_one_match_hyp; try contradiction. simpl in *. split; eauto.
+    apply inv_wf_ATLexpr in H. invs'. simpl. pose proof Hcorresp' as H'.
+    rewrite Forall_forall in H'.
+    specialize (H' _ ltac:(eassumption)). simpl in H'. eexists.
+    split; [eassumption|].
+    assert (map interp_pZexpr idxs1 = map interp_pZexpr idxs2) as <-.
+    { clear -H0 Hcorresp'. induction H0; simpl; f_equal; eauto.
+      eauto using Zexprs_corresp'_same. }
+    assumption.
+  - invs'. destruct_one_match_hyp; try contradiction; auto.
+Qed.
 
 (*because shallow ATL does not have reasonable semantics for zero-ary sums.*)
 Fixpoint sum_bounds_good {n} (e : pATLexpr interp_type_tagged n) :=
@@ -3453,6 +3569,35 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
   | _, _ => fun _ => False
   end e.
 
+Fixpoint fvar_idxs_in_bounds' {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_result' ts n) : Prop :=
+  match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
+  | [], size_nil => fun e => idxs_in_bounds' e
+  | tensor_n n :: ts', with_T_var sh sz => fun e =>
+      n = length sh /\
+        fvar_idxs_in_bounds' sz (e sh)
+  | tZ :: ts', with_Z_var min max sz => fun e => forall r,
+      (min <= r < max)%Z ->
+      fvar_idxs_in_bounds' (sz r) (e (argvarZ r))           
+  (* | tB :: ts', with_B_var sz => *)
+  (*     (* fun e => forall r, fvar_idxs_in_bounds sz (e r)*) *)
+  (*     fun _ => False *)
+  | _, _ => fun _ => False
+  end e.
+
+Lemma fvar_idxs_in_bounds'_fvar_idxs_in_bounds ctx ts sizes n e e' :
+  wf_fvar_ATLexpr _ _ ctx ts n e' e ->
+  Forall corresp' ctx ->
+  fvar_idxs_in_bounds' sizes e' ->
+  fvar_idxs_in_bounds sizes e.
+Proof.
+  intros H Hctx. revert sizes. induction H; intros sizes Hsizes; simpl in *.
+  - destruct sizes; try contradiction.
+    eapply idxs_in_bounds'_idxs_in_bounds; eassumption.
+  - destruct t; try contradiction.
+    + destruct sizes; try contradiction. eauto.
+    + destruct sizes; try contradiction. invs'. eauto.
+Qed.    
+
 Fixpoint fvar_sound_sizeof_shallow {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil => fun e =>
@@ -3471,11 +3616,15 @@ Fixpoint fvar_sound_sizeof_shallow {ts n} (sizes : size_spec) (e : fvar_pATLexpr
   | _, _ => fun _ => False
   end e.
 
-Fixpoint fvar_sum_bounds_good {ts n} (e : fvar_pATLexpr interp_type_tagged ts n) : Prop :=
-  match ts return fvar_pATLexpr _ ts _ -> _ with
-  | [] => fun e => sum_bounds_good e
-  | tZ :: ts' => fun e => forall r, fvar_sum_bounds_good (e (argvarZ r))
-  | t :: ts' => fun e => forall r, fvar_sum_bounds_good (e r)
+Fixpoint fvar_sum_bounds_good {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_tagged ts n) : Prop :=
+  match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
+  | [], size_nil => fun e => sum_bounds_good e
+  | tensor_n _ :: ts', with_T_var _ sz => fun e => forall r, fvar_sum_bounds_good sz (e r)
+  | tZ :: ts', with_Z_var min max sz =>
+      fun e => forall r,
+          (min <= r < max)%Z ->
+          fvar_sum_bounds_good (sz r) (e (argvarZ r))
+  | _, _ => fun _ => False
   end e.
 
 Fixpoint res_spec_of' ts n name size (fd : ATLexpr) (fs : fvar_pATLexpr interp_type_result ts n) (v : fmap string Z) (ec : fmap string Result.result) :=
@@ -3591,7 +3740,7 @@ Lemma result_of_fvar_pATLexpr_correct' ctx ts n e_shal e_res size :
   fvar_sound_sizeof_shallow size e_res ->
   Forall res_tensor_corresp ctx ->
   fvar_idxs_in_bounds size e_res ->
-  fvar_sum_bounds_good e_shal ->
+  fvar_sum_bounds_good size e_shal ->
   compat ts n size e_shal e_res.
 Proof.
   intros Hwf. revert size.
@@ -3609,7 +3758,7 @@ Lemma result_of_fvar_pATLexpr_correct ts n e size :
   Wf_fvar_ATLExpr e ->
   fvar_sound_sizeof_shallow size (e _) ->
   fvar_idxs_in_bounds size (e _) ->
-  fvar_sum_bounds_good (e _) ->
+  fvar_sum_bounds_good size (e _) ->
   compat ts n size (e _) (e _).
 Proof.
   intros. eapply result_of_fvar_pATLexpr_correct'; eauto.
@@ -3649,17 +3798,11 @@ Proof.
   intros. eapply res_spec_of_compat_spec_of'; eassumption.
 Qed.
 
-(* Check pATLexpr. Print sound_sizeof. *)
-(* Fixpoint compute_size_and_check_idxs {n} (e : pATLexpr (fun _ => tagged_nat) n) : option (list nat * Prop) := *)
-(*   match e with *)
-(*   | Gen lo hi body => *)
-(*       match compute_size_and_check_idxs (body with *)
-
 Lemma spec_of_correct' ts n e size name fd :
   Wf_fvar_ATLExpr e ->
   fvar_sound_sizeof_shallow size (e _) ->
   fvar_idxs_in_bounds size (e _) ->
-  fvar_sum_bounds_good (e _) ->
+  fvar_sum_bounds_good size (e _) ->
   stringvar_fvar_ATLexpr name (e _) = Some fd ->
   spec_of ts n name size fd (interp_fvar_pATLexpr ts n (e _)).
 Proof.
@@ -3668,3 +3811,14 @@ Proof.
   - eapply result_of_fvar_pATLexpr_correct; eauto.
 Qed.
 
+Lemma spec_of_correct ts n e size name fd :
+  Wf_fvar_ATLExpr e ->
+  fvar_sound_sizeof_shallow size (e _) ->
+  fvar_idxs_in_bounds' size (e _) ->
+  fvar_sum_bounds_good size (e _) ->
+  stringvar_fvar_ATLexpr name (e _) = Some fd ->
+  spec_of ts n name size fd (interp_fvar_pATLexpr ts n (e _)).
+Proof.
+  intros. eapply spec_of_correct'; try eassumption.
+  eapply fvar_idxs_in_bounds'_fvar_idxs_in_bounds; eauto.
+Qed.
