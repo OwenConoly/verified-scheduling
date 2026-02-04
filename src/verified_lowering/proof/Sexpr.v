@@ -7,6 +7,7 @@ From Stdlib Require Import ZArith.Znat.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import Reals.Rpower.
+From Stdlib Require Import QArith.
 
 From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Reals.Reals. Import Rdefinitions. Import RIneq.
@@ -27,7 +28,7 @@ Inductive Sexpr :=
 | Add (x y : Sexpr)
 | Div (x y : Sexpr)
 | Sub (x y : Sexpr)
-| Lit (r : R).
+| Lit (r : Q).
 
 Inductive Sstmt :=
 | SVar (v : string)
@@ -36,7 +37,7 @@ Inductive Sstmt :=
 | SAdd (x y : Sstmt)
 | SDiv (x y : Sstmt)
 | SSub (x y : Sstmt)
-| SLit (r : R).
+| SLit (r : Q).
 
 Fixpoint lowerS (s : Sexpr) (sh : context) : Sstmt :=
   match s with
@@ -103,8 +104,8 @@ Inductive eval_Sexpr :
     eval_Sexpr v ec s2 r2 ->       
     eval_Sexpr v ec (Sub s1 s2) (bin_scalar_result Rminus r1 r2)
 |EvalLit : forall v ec r,
-    eval_Sexpr v ec (Lit r) (SS r).
-About flatten_shape_index.
+    eval_Sexpr v ec (Lit r) (SS (Q2R r)).
+
 Inductive eval_Sstmt :
   valuation -> stack -> heap -> Sstmt -> R -> Prop :=
 | EvalSVar : forall v st h x r,
@@ -137,4 +138,4 @@ Inductive eval_Sstmt :
     (r1 - r2 = r)%R ->
     eval_Sstmt v st h (SSub s1 s2) r
 | EvalSLit: forall v st h r,
-    eval_Sstmt v st h (SLit r) r.
+    eval_Sstmt v st h (SLit r) (Q2R r).
