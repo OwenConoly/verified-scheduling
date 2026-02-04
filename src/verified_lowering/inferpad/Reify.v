@@ -11,6 +11,7 @@ From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import Reals.Rpower.
+From Stdlib Require Import QArith.
 
 Import ListNotations.
 
@@ -95,8 +96,8 @@ Goal forall (i j : Z) (s : string) (v : list (list R)), True.
 
 Ltac reify_R s :=
   lazymatch s with
-  | 1%R => constr:(Lit 1%R)
-  | 0%R => constr:(Lit 0%R)
+  | 1%R => constr:(Lit 1%Q)
+  | 0%R => constr:(Lit 1%Q)
   | (?a * ?b)%R =>
       let la := reify_R a in
       let lb := reify_R b in
