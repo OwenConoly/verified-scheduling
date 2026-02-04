@@ -37,10 +37,10 @@ Ltac Llibfunc name context :=
                 | String _ ?s' => s'
                 | EmptyString => EmptyString
                 end in
-  let ast := R in
+    let ast := R in
     let _ := match goal with |- _ => intros end in
     let ast := constr:(lower ast
-                         (fun i : list (Zexpr * Z) => i) "output"
+                         (fun i : list (Zexpr * Zexpr) => i) "output"
                          Assign context) in
     let _ := match goal with |- _ => assert (Hast : ast = ast) by eauto end in
     let Hast := match goal with
@@ -48,7 +48,7 @@ Ltac Llibfunc name context :=
                 end in
     let _ := match goal with
                |- _ =>
-                 repeat (cbn -[Nat.add Nat.mul Nat.div Nat.sub] in Hast;
+                 repeat (simpl in Hast;
                          first [ rewrite lookup_add_eq in Hast by auto |
                                  rewrite lookup_add_ne in Hast by
                                    (unfold not; intros Hneq; inversion Hneq)
@@ -58,19 +58,17 @@ Ltac Llibfunc name context :=
                H : ?ast = ?ast |- _ => ast
              end in
   let ast := eval unfold flat_sizeof in ast in
-  let ast := eval cbn[sizeof] in ast in
-  let ast := eval unfold eval_Zexpr_Z_total in ast in
-  let ast := eval cbn[eval_Zexpr_Z] in ast in
+  let ast := eval simpl in ast in
   let prog := match goal with |- ?prog = _ => prog end in
   let progty := type of prog in
   let tystr := type_to_str progty in
   let funcname := name in
-  let progstr := stringify_stmt ast in  
+  let progstr := stringify_stmt ast in
   let progstr := eval simpl in progstr in
     let header := constr:([funcname++".h";
                            "#include <stdlib.h>";
                            "";
-                           "void "++funcname++"("++args++","++scalar++"*output);"]) in 
+                           "void "++funcname++"("++args++","++scalar++"*output);"]) in
     
     let func := constr:((funcname++".c")::
                           "#include <stdlib.h>"::
@@ -82,7 +80,7 @@ Ltac Llibfunc name context :=
 
     let ret' := constr:(app ("!!!"::header) ("!!!"::func)) in
     let ret := eval simpl in ret' in
-      ret. 
+      ret.
 
 Goal forall A B C (m1 m2 : list (list R)),
      (0 < A)%Z ->
@@ -95,8 +93,8 @@ Proof.
   intros.
   let s := Llibfunc
              constr:("matmul")
-             constr:(($0 $+ ("m1", [Z.to_nat A; Z.to_nat B])
-                        $+ ("m2", [Z.to_nat A; Z.to_nat B])))
+             constr:(($0 $+ ("m1", [ZLit A;ZLit B])
+                        $+ ("m2", [ZLit A;ZLit B])))
   in idtac_list s.
 Abort.
 
@@ -112,8 +110,8 @@ Proof.
  intros.
  let s := Llibfunc
             constr:("matmul_tiled")
-                     constr:(($0 $+ ("m1", [Z.to_nat A; Z.to_nat B])
-                                $+ ("m2", [Z.to_nat A; Z.to_nat B])))
+                     constr:(($0 $+ ("m1", [ZLit A;ZLit B])
+                                $+ ("m2", [ZLit A;ZLit B])))
  in idtac_list s.
 Abort.
 
@@ -129,8 +127,8 @@ Proof.
  intros.
  let s := Llibfunc
             constr:("matmul_tiled_split")
-                     constr:(($0 $+ ("m1", [Z.to_nat A; Z.to_nat B])
-                                $+ ("m2", [Z.to_nat B; Z.to_nat C])))
+                     constr:(($0 $+ ("m1", [ZLit A;ZLit B])
+                                $+ ("m2", [ZLit B;ZLit C])))
  in idtac_list s.
 Abort.
 
@@ -149,9 +147,9 @@ Proof.
              constr:("tensoradd")
              constr:(($0
                         $+ ("m1",
-                          [A; B; C; A])
+                          [ZLit (Z.of_nat A);ZLit (Z.of_nat B);ZLit (Z.of_nat C);ZLit (Z.of_nat A)])
                         $+ ("m2",
-                          [A; B; C; A])))
+                          [ZLit (Z.of_nat A);ZLit (Z.of_nat B);ZLit (Z.of_nat C);ZLit (Z.of_nat A)])))
   in idtac_list s.
 Abort.  
 
@@ -170,9 +168,9 @@ Proof.
              constr:("tensoradd_split")
              constr:(($0
                         $+ ("m1",
-                          [A; B; C; A])
+                          [ZLit (Z.of_nat A);ZLit (Z.of_nat B);ZLit (Z.of_nat C);ZLit (Z.of_nat A)])
                         $+ ("m2",
-                          [A; B; C; A])))
+                          [ZLit (Z.of_nat A);ZLit (Z.of_nat B);ZLit (Z.of_nat C);ZLit (Z.of_nat A)])))
   in idtac_list s.
 Abort.  
 
@@ -181,7 +179,7 @@ Goal forall (c : (list R)) n m,
 Proof.
   intros.  
   let s := Llibfunc constr:("conv4")
-                             constr:(($0 $+ ("c",[Z.to_nat n])))
+                             constr:(($0 $+ ("c",[ZLit n])))
   in idtac_list s.
 Abort.
 
@@ -190,7 +188,7 @@ Goal forall (c : (list R)) n m,
 Proof.
   intros.  
   let s := Llibfunc constr:("conv4")
-                             constr:(($0 $+ ("c",[Z.to_nat n])))
+                             constr:(($0 $+ ("c",[ZLit n])))
   in idtac_list s.
 Abort.
 
@@ -202,7 +200,7 @@ Goal forall (c : (list R)) (n m : Z),
 Proof.
   intros.
   let s := Llibfunc constr:("conv1")
-                             constr:(($0 $+ ("c",[Z.to_nat n])))
+                             constr:(($0 $+ ("c",[ZLit n])))
   in idtac_list s.
 Abort.
            
@@ -227,7 +225,7 @@ Goal forall n m (l : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("concattest1")
-                             constr:($0 $+ ("l",[Z.to_nat n; Z.to_nat m]))
+                             constr:($0 $+ ("l",[ZLit n; ZLit m]))
   in idtac_list s.
 Abort.
 
@@ -246,7 +244,8 @@ Goal forall n m (l : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("concattest0")
-                             constr:($0 $+ ("l",[n; m]))
+                             constr:($0 $+ ("l",[ZLit (Z.of_nat n);
+                                                 ZLit (Z.of_nat m)]))
   in idtac_list s.
 Abort.
 
@@ -272,7 +271,8 @@ Goal forall n m (v : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("concattest2")
-                             constr:($0 $+ ("v",[n; m]))
+                             constr:($0 $+ ("v",[ZLit (Z.of_nat n);
+                                                 ZLit (Z.of_nat m)]))
   in idtac_list s.
 Abort.
 
@@ -289,7 +289,8 @@ Goal forall n m (l : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("concattest3")
-                               constr:($0 $+ ("l",[n; m]))
+                               constr:($0 $+ ("l",[ZLit (Z.of_nat n);
+                                                 ZLit (Z.of_nat m)]))
   in idtac_list s.
 Abort.
 
@@ -311,7 +312,7 @@ Goal forall n m (l : (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("concattest4")
-  constr:($0 $+ ("l",[n; m])) in idtac_list s.
+  constr:($0 $+ ("l",[ZLit (Z.of_nat n); ZLit (Z.of_nat m)])) in idtac_list s.
 Abort.
 
  Goal forall N M (v : list (list R)),
@@ -322,7 +323,8 @@ Abort.
  Proof.
  intros.
    let s := Llibfunc constr:("blurim")
-                     constr:($0 $+ ("v",[N; M])) in idtac_list s.
+                     constr:($0 $+ ("v",[ZLit (Z.of_nat N);
+                                         ZLit (Z.of_nat M)])) in idtac_list s.
 Abort.
  
 Goal forall N M (v : list (list R)),
@@ -333,7 +335,8 @@ Goal forall N M (v : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("blurtwo")
-                             constr:($0 $+ ("v",[N; M])) in
+                             constr:($0 $+ ("v",[ZLit (Z.of_nat N);
+                                                 ZLit (Z.of_nat M)])) in
   idtac_list s.
 Abort.
 (*
@@ -376,7 +379,7 @@ Goal forall n m (l : list (list R)),
 Proof.
   autounfold with examples. intros.
   let s := Llibfunc constr:("blurtiles")
-  constr:($0 $+ ("l",[n; m])) in idtac_list s.
+  constr:($0 $+ ("l",[ZLit (Z.of_nat n); ZLit (Z.of_nat m)])) in idtac_list s.
 Abort.
 
 Goal forall n m (l : list (list R)),
@@ -388,31 +391,31 @@ Goal forall n m (l : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("fusion_nb")
-    constr:($0 $+ ("l",[n; m])) in idtac_list s.
+    constr:($0 $+ ("l",[ZLit (Z.of_nat n); ZLit (Z.of_nat m)])) in idtac_list s.
 Abort.
 
 Goal forall W RR (x w : list R),    
-    consistent w (RR, tt) ->
-    consistent x (RR, tt) ->
+    consistent w (Z.to_nat RR, tt) ->
+    consistent x (Z.to_nat RR, tt) ->
     (0 < W)%Z ->
     (Z.of_nat (length x) < W)%Z ->
     gather W x w = @nil _.
 Proof.
   intros.
   let s := Llibfunc constr:("gather")
-  constr:($0 $+ ("x",[RR]) $+ ("w",[RR])) in idtac_list s.
+  constr:($0 $+ ("x",[ZLit RR]) $+ ("w",[ ZLit RR])) in idtac_list s.
 Abort.      
 
 Goal forall W RR (x w : list R),    
-    consistent w (RR, tt) ->
-    consistent x (RR, tt) ->
+    consistent w (Z.to_nat RR, tt) ->
+    consistent x (Z.to_nat RR, tt) ->
     (0 < W)%Z ->
     (Z.of_nat (length x) < W)%Z ->
     scatter W x w = @nil _.
 Proof.
   intros.
   let s := Llibfunc constr:("scatter")
-  constr:($0 $+ ("x",[RR]) $+ ("w",[RR])) in idtac_list s.
+  constr:($0 $+ ("x",[ZLit RR]) $+ ("w",[ ZLit RR])) in idtac_list s.
 Abort.
 
 Goal forall A B K W RR (w : list (list R)) (x : list R),
@@ -425,8 +428,9 @@ Goal forall A B K W RR (w : list (list R)) (x : list R),
 Proof.
   intros.
   let s := Llibfunc constr:("im2collifted")
-                             constr:($0 $+ ("x",[Z.to_nat K]) $+
-                                       ("w",[A; B]))
+                             constr:($0 $+ ("x",[ZLit K]) $+
+                                       ("w",[ ZLit (Z.of_nat A);
+                                              ZLit (Z.of_nat B)]))
   in idtac_list s.                             
 Abort.      
 
@@ -440,9 +444,11 @@ Goal forall A B K W RR (w : list (list R)) (x : list R),
 Proof.
   intros.
   let s := Llibfunc constr:("im2col")
-                             constr:($0 $+ ("x",[Z.to_nat K]) $+
-                                       ("w",[A; B]))
-  in idtac_list s.                  
+                             constr:($0 $+ ("x",[ZLit K]) $+
+                                       ("w",[ ZLit (Z.of_nat A);
+                                              ZLit (Z.of_nat B)]))
+  in idtac_list s.                             
+                             
 Abort.
 
 Goal forall n m (v : list (list R)),
@@ -453,7 +459,8 @@ Goal forall n m (v : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("blurpart")
-                             constr:($0 $+ ("v",[n; m]))
+                             constr:($0 $+ ("v",[ZLit (Z.of_nat n);
+                                                 ZLit (Z.of_nat m)]))
   in idtac_list s.
 Abort.
 
@@ -465,7 +472,8 @@ Goal forall n m (v : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("blurisolate")
-                             constr:($0 $+ ("v",[n; m]))
+                             constr:($0 $+ ("v",[ZLit (Z.of_nat n);
+                                                 ZLit (Z.of_nat m)]))
   in idtac_list s.  
 Abort.
 
@@ -477,6 +485,7 @@ Goal forall N M (v : list (list R)),
 Proof.
   intros.
   let s := Llibfunc constr:("blurtwopart")
-                             constr:($0 $+ ("v",[N; M]))
+                             constr:($0 $+ ("v",[ZLit (Z.of_nat N);
+                                                 ZLit (Z.of_nat M)]))
   in idtac_list s.                             
 Abort.
