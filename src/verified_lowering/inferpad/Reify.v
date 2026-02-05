@@ -241,8 +241,12 @@ Ltac get_fun x :=
   | _ => x
   end.
 
-(*assumes that the reification target appears in the goal*)
 Ltac make_types_reifiable_in x :=
+  lazy[dim_n];
+  (*Line above prevents line below from caulsing following error.
+    Error: Replacement would lead to an ill-typed term: In pattern-matching on term 
+    "n" the branch for constructor "O" has type "Type" which should be
+    "Set".*)
   change R with (interp_type (tensor_n O)) in x;
   repeat change (list (interp_type (tensor_n ?n))) with (interp_type (tensor_n (S n))) in x;
   change RTensorElem with (dim_n_TensorElem O) in x;
@@ -275,19 +279,19 @@ Ltac make_types_reifiable_in x :=
   change (@bin (interp_type (tensor_n O)) _) with Rplus in x.
 
 Ltac Reify0 x name :=
-  set (y := x);
+  pose (y := x);
   pattern_shallows y;
   let rx :=
     lazymatch goal with
     | y := ?y' |- _ => get_fun y'
     end in
-  set (z := rx);
+  pose (z := rx);
   let w := constr:(fun var => apply_to_all var (z (pExpr_type var))) in
-  let w := eval cbv [apply_to_all z] in w in set (name := w);
+  let w := eval cbv [apply_to_all z] in w in pose (name := w);
                                         subst y; subst z; simpl.
 
 Ltac Reify x name :=
-  set (h := x);
+  pose (h := x);
   make_types_reifiable_in h;
   let h0 := (eval cbv [h] in h) in
   subst h;
