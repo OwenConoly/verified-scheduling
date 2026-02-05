@@ -42,8 +42,9 @@ Derive string_add in
   (spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 O add_size string_add add)
     as string_add_correct.
 Proof.
-  cbv [add]. Set Ltac Profiling. Time prove_spec_of. Show Ltac Profile. Unset Ltac Profiling.
-  (* Finished transaction in 5.613 secs (5.599u,0.005s) (successful) *)
+  cbv [add].
+  cbv [add]. Set Ltac Profiling. Time prove_spec_of. Show Ltac Profile.
+  (*Finished transaction in 0.397 secs (0.394u,0.001s) (successful)*)
 Time Qed.
 (* Finished transaction in 2.754 secs (2.747u,0.002s) (successful) *)
   
@@ -58,7 +59,7 @@ Definition matmul_size :=
 Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
     as string_matmul_correct.
-Proof. cbv [matmul]. Set Ltac Profiling. Reset Ltac Profile. Time prove_spec_of. Show Ltac Profile. Unset Ltac Profiling. Time Qed.
+Proof. cbv [matmul]. Set Ltac Profiling. Reset Ltac Profile. Time prove_spec_of. Show Ltac Profile. Time Qed.
 
 Definition matmul_size1 :=
   with_T_var [64; 64] (with_T_var [64; 64] size_nil).

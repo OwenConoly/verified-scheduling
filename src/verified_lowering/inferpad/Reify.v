@@ -314,10 +314,9 @@ Ltac prove_spec_of0 :=
   | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
       let e' := fresh "e'" in
       Reify shallow_expr e';
-      refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var))  _ _ _ _ _ _ _ _ _);
-      [lazy [interp_pATLexpr interp_Sbop gget_R map interp_pZexpr]; reflexivity|..];
-      cycle -1;
-      [subst string_expr; simpl; reflexivity|..]
+      refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _);
+      [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map interp_pZexpr Var' e']; reflexivity | .. ];
+      cycle -1; [ subst string_expr; simpl; reflexivity | .. ]
   end.
 
 Ltac checks_are_true :=
