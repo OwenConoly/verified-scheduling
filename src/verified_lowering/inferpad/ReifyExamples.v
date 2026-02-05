@@ -20,11 +20,33 @@ From Codegen Require Import IdentParsing NatToString IntToString CodeGen Normali
 From Examples Require Import GatherScatter Convolution Im2col Blur TensorAdd Matmul.
 From Inferpad Require Import Reify ATLPhoas.
 From Lower Require Import Zexpr ATLDeep Bexpr Sexpr ATLDeep.
-From ATL Require Import FrapWithoutSets.
 
 Open Scope string_scope.
 Open Scope nat_scope.
 
+Definition add_size :=
+  with_Z_var 1 10
+    (fun A =>
+       with_Z_var 1 10
+         (fun B =>
+            with_Z_var 1 10
+              (fun C =>
+                 with_Z_var 1 10
+                   (fun D =>
+                      (* A; C; B; D ... ???*)
+                      with_T_var [Z.to_nat A; Z.to_nat C; Z.to_nat B; Z.to_nat D]
+                        (with_T_var [Z.to_nat A; Z.to_nat C; Z.to_nat B; Z.to_nat D]
+                                   size_nil))))).
+
+Derive string_add in
+  (spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 O add_size string_add add)
+    as string_add_correct.
+Proof.
+  cbv [add]. Set Ltac Profiling. Time prove_spec_of. Show Ltac Profile. Unset Ltac Profiling.
+  (* Finished transaction in 5.613 secs (5.599u,0.005s) (successful) *)
+Time Qed.
+(* Finished transaction in 2.754 secs (2.747u,0.002s) (successful) *)
+  
 Definition matmul_size :=
   with_Z_var 1 10
     (fun A => with_Z_var 1 10
@@ -35,64 +57,16 @@ Definition matmul_size :=
 
 Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
-    as matmul_correct.
-Proof. cbv [matmul]. prove_spec_of. Time Qed.
+    as string_matmul_correct.
+Proof. cbv [matmul]. Set Ltac Profiling. Reset Ltac Profile. Time prove_spec_of. Show Ltac Profile. Unset Ltac Profiling. Time Qed.
 
-Derive (reified_add : forall var, _ -> _ -> _ -> _ -> var (tensor_n 4) -> var (tensor_n 4) -> pATLexpr var 4) in
-  (forall A B C D m1 m2,
-      interp_pATLexpr (reified_add interp_type A B C D m1 m2) =
-        add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2)
-    as reified_add_correct.
-Proof.
-  intros.
-  cbv [add].
-  match goal with
-  | |- interp_pATLexpr ?R = ?S =>
-      set (x := S);
-      let y := app_args R in
-      let y := remove_last y in
-      pattern_all_in x y;
-      subst x
-  end.
-  match goal with
-  | |- _ = ?x' =>
-      let f := get_fun x' in
-      set (x := f);
-      make_types_reifiable_in x;
-      let x := eval cbv[x] in x in
-        Reify x foo
-  end.
-  subst reified_add. Unshelve.
-  2: { set (foo := fun (var : type -> Type) (n n0 n1 n2 : nat) (i i0 : pExpr_type var (tensor_n 4)) =>
-    Reify.Gen ZZ0 (ZZ_of_nat n)
-      (fun x : var tZ =>
-       Reify.Gen ZZ0 (ZZ_of_nat n1)
-         (fun x0 : var tZ =>
-          Reify.Gen ZZ0 (ZZ_of_nat n0)
-            (fun x1 : var tZ =>
-             Reify.Gen ZZ0 (ZZ_of_nat n2)
-               (fun x2 : var tZ =>
-                SBop Reify.Mul
-                  (Reify.Get i
-                     [Reify.ZVar x; Reify.ZVar x0; Reify.ZVar x1; Reify.ZVar x2])
-                  (Reify.Get i0
-                     [Reify.ZVar x; Reify.ZVar x0; Reify.ZVar x1; Reify.ZVar x2])))))).
-       exact (fun var A B C D m1 m2 => foo var A B C D (Reify.Var m1) (Reify.Var m2)). }
-  (* simpl. subst x. simpl. reflexivity. Time Qed. *)
-  (* Finished transaction in 5.264 secs (5.262u,0.s) (successful) *)
-  reflexivity.
-  Time Qed.
-(*Finished transaction in 0.004 secs (0.004u,0.s) (successful)*)
+Definition matmul_size1 :=
+  with_T_var [64; 64] (with_T_var [64; 64] size_nil).
 
-  
-Goal forall (A B C D : nat),
-    (fun m1 m2 => add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2) =
-      (fun m1 m2 => add_split A B C D m1 m2).
-Proof.
-  intros. cbv [add].
-  Reify_lhs reified_add.
-Abort.  
-
+Derive string_matmul_tiled in
+  (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size1 string_matmul_tiled (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4))
+    as string_matmul_tiled_correct.
+Proof. cbv [matmul_tiled]. Set Ltac Profiling. Time prove_spec_of0.
 Goal
     (fun A B C m1 m2 => matmul A B C m1 m2) = (fun A B C m1 m2 => matmul_tiled (Z.to_nat A) (Z.to_nat B) (Z.to_nat C) m1 m2 4%Z).
 Proof.
