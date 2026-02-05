@@ -41,13 +41,8 @@ Definition add_size :=
 Derive string_add in
   (spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 O add_size string_add add)
     as string_add_correct.
-Proof.
-  cbv [add].
-  cbv [add]. Set Ltac Profiling. Time prove_spec_of. Show Ltac Profile.
-  (*Finished transaction in 0.397 secs (0.394u,0.001s) (successful)*)
-Time Qed.
-(* Finished transaction in 2.754 secs (2.747u,0.002s) (successful) *)
-  
+Proof. cbv [add]. Set Ltac Profiling. Time prove_spec_of. Show Ltac Profile. Time Qed.
+
 Definition matmul_size :=
   with_Z_var 1 10
     (fun A => with_Z_var 1 10
@@ -59,56 +54,16 @@ Definition matmul_size :=
 Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
     as string_matmul_correct.
-Proof. cbv [matmul]. Set Ltac Profiling. Reset Ltac Profile. Time prove_spec_of. Show Ltac Profile. Time Qed.
+Proof. cbv [matmul]. prove_spec_of. Qed.
   
 Definition matmul_size1 :=
   with_T_var [64; 64] (with_T_var [64; 64] size_nil).
-Axiom f : False.
-Derive string_matmul_tiled in
-  (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size1 string_matmul_tiled (fun m1 m2 : interp_type (tensor_n 2) =>
-     truncr (64 //n 4 * 4 - 64)
-       (Common.flatten
-          (GEN [ i < 64 // 4 ]
-           GEN [ i0 < 4 ]
-           truncr (64 //n 4 * 4 - 64)
-             (Common.flatten
-                (GEN [ i1 < 64 // 4 ]
-                 GEN [ i2 < 4 ]
-                 (|[ (i1 * 4 + i2 <? 64) && (i * 4 + i0 <? 64) ]|
-                   SUM [ k < 64 ]
-                   (m1 _[ i * 4 + i0; k] * m2 _[ k; i1 * 4 + i2])%R)))))))
-    as string_matmul_tiled_correct.
-Proof. lazy [dim_n]. prove_spec_of. Qed. lazy [dim_n].
-       Print Ltac Reify.
-       match goal with
-       | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
-           pose (x := shallow_expr)
-       end.
-       Print Ltac Reify.
-       make_types_reifiable_in x.
-       Print Ltac Reify.
-       Print Reify0.
-       pattern_shallows x.
-       Print Reify0.
-       let rx := lazymatch goal with
-              | y:=?y':_ |- _ => get_fun y'
-              end in
-       pose (z := rx).
 
-       Print Reify0.
-       let w := constr:((fun var => apply_to_all var (z (pExpr_type var)))) in
-       let w := eval cbv[apply_to_all z] in w in
-         
-         set (name := w). destruct f. Unshelve. exact (Scalar (Lit 0)). Qed.
-       set (name := w
-        let e' := fresh "e'" in
-        Reify shallow_expr e'; (*refine
-         (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _);
-         [ (* lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map *)
-           (*     interp_pZexpr Var' e' interp_Zbop interp_pBexpr interp_Bbop untag_Z]; *)
-            idtac
-         | .. ];*) (*cycle -1; [ subst string_expr; simpl; idtac | .. ]*) idtac
-  end. all: destruct f. Unshelve. exact (Scalar (Lit 0)). Qed. Show Proof. 1: reflexivity. all: prove_sideconditions. Show Proof. Time Qed.
+Derive string_matmul_tiled in
+  (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size1 string_matmul_tiled (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4))
+    as string_matmul_tiled_correct.
+Proof. cbv [matmul_tiled]. prove_spec_of. Qed.
+
 Goal
     (fun A B C m1 m2 => matmul A B C m1 m2) = (fun A B C m1 m2 => matmul_tiled (Z.to_nat A) (Z.to_nat B) (Z.to_nat C) m1 m2 4%Z).
 Proof.

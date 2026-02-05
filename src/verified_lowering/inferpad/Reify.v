@@ -292,6 +292,7 @@ Ltac Reify0 x name :=
 
 Ltac Reify x name :=
   pose (h := x);
+  lazy [Z.to_nat Z.of_nat PosDef.Pos.to_nat PosDef.Pos.iter_op Nat.add PosDef.Pos.of_succ_nat PosDef.Pos.succ] in h;
   make_types_reifiable_in h;
   let h0 := (eval cbv [h] in h) in
   subst h;
