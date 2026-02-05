@@ -3813,14 +3813,15 @@ Proof.
   - eapply result_of_fvar_pATLexpr_correct; eauto.
 Qed.
 
-Lemma spec_of_correct ts n e size name fd :
+Lemma spec_of_correct ts n e0 (e : fvar_pATLExpr _ _) size name fd :
+  e0 = interp_fvar_pATLexpr ts n (e _) ->
   Wf_fvar_ATLExpr e ->
   fvar_sound_sizeof size (e _) ->
   fvar_idxs_in_bounds' size (e _) ->
   fvar_sum_bounds_good size (e _) ->
   stringvar_fvar_ATLexpr name (e _) = Some fd ->
-  spec_of ts n name size fd (interp_fvar_pATLexpr ts n (e _)).
+  spec_of ts n name size fd e0.
 Proof.
-  intros. eapply spec_of_correct'; try eassumption.
+  intros. subst. eapply spec_of_correct'; try eassumption.
   eapply fvar_idxs_in_bounds'_fvar_idxs_in_bounds; eauto.
 Qed.

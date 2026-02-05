@@ -271,7 +271,7 @@ Ltac make_types_reifiable_in x :=
   repeat change (@let_binding (interp_type (tensor_n ?n)) (interp_type (tensor_n ?m))) with (let_nm n m) in x;
   change (@bin (interp_type (tensor_n O)) _) with Rplus in x.
 
-Ltac Reify x name :=
+Ltac Reify0 x name :=
   set (y := x);
   pattern_shallows y;
   let rx :=
@@ -283,13 +283,14 @@ Ltac Reify x name :=
   let w := eval cbv [apply_to_all z] in w in set (name := w);
                                         subst y; subst z; simpl.
 
+Ltac Reify x name :=
+  set (h := x);
+  make_types_reifiable_in h;
+  let h0 := (eval cbv [h] in h) in
+  subst h;
+  Reify0 h0 name.
+
 Ltac Reify_lhs name :=
-  lazymatch goal with
-  | |- ?x = _ =>
-      set (y := x);
-      make_types_reifiable_in y;
-      subst y
-  end;
   lazymatch goal with
   | |- ?x = _ =>
       Reify x name

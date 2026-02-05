@@ -52,23 +52,16 @@ Check spec_of_correct.
 Ltac prove_spec_of0 :=
   match goal with
   | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
-      (*idk idiomatic way to make evar*)
       let e' := fresh "e'" in
-      epose (e' := _);
-      eassert (shallow_expr = _) as ->; [|eapply spec_of_correct with (e := fun var => varify var ts _ (e' var))];
-      [let phoas_expr := fresh "phoas_expr" in
-       Reify_lhs phoas_expr;
-       (*idk idiomatic way to instantiate evar*)
-       let H := fresh "H" in
-       assert (H: e' = phoas_expr) by (subst e'; subst phoas_expr; reflexivity);
-       clear H phoas_expr;
-       subst e'
-       |..];
-      (*TODO: what gives good performance below ?*)
-      [lazy [interp_pATLexpr interp_Sbop gget_R map interp_pZexpr]; reflexivity|..];
-      cycle -1;
-      [subst string_expr; simpl; reflexivity|..]
+      Reify shallow_expr e';
+      refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var))  _ _ _ _ _ _ _ _ _)
   end.
+      (* eapply spec_of_correct with (e := fun var => varify var ts _ (e' var)); *)
+  (*     (*TODO: what gives good performance below ?*) *)
+  (*     [lazy [interp_pATLexpr interp_Sbop gget_R map interp_pZexpr]; reflexivity|..]; *)
+  (*     cycle -1; *)
+  (*     [subst string_expr; simpl; reflexivity|..] *)
+  (* end. *)
 
 Ltac checks_are_true :=
   repeat match goal with
@@ -104,8 +97,11 @@ Ltac prove_spec_of := prove_spec_of0; prove_sideconditions.
 Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
     as matmul_correct.
-Proof. cbv [matmul]. prove_spec_of. Time Qed.
-(*Finished transaction in 0.198 secs (0.197u,0.s) (successful)*)
+Proof. cbv [matmul].
+       prove_spec_of0. all: destruct f. Unshelve. exact (Scalar (Lit 0%Q)).
+       Show Proof.
+       Time Qed.
+(*Finished transaction in 0.17 secs (0.17u,0.s) (successful)*)
 
 Print string_matmul.
 (*
