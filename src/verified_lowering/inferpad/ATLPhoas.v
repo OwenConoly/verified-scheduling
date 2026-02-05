@@ -551,9 +551,7 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
           let n := Z.to_nat (hi' - lo') in
           (*for reasons described below (truncl case),
             we check that the tensor has nonzero length*)
-          if (n =? 0)%nat then None
-          else
-            Some (n :: sz)
+          if (0 <? n)%nat then Some (n :: sz) else None
       | _, _, _ => None
       end
   | Sum lo hi body =>
@@ -3602,7 +3600,7 @@ Proof.
     + destruct sizes; try contradiction. invs'. eauto.
 Qed.    
 
-Fixpoint fvar_sound_sizeof_shallow {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
+Fixpoint fvar_sound_sizeof {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil => fun e =>
                      match sound_sizeof dummy_result sizeof_Z e with
@@ -3612,11 +3610,11 @@ Fixpoint fvar_sound_sizeof_shallow {ts n} (sizes : size_spec) (e : fvar_pATLexpr
   | tensor_n n :: ts', with_T_var sh sz =>
       fun e =>
         forall r,
-          fvar_sound_sizeof_shallow sz (e r)
+          fvar_sound_sizeof sz (e r)
   | tZ :: ts', with_Z_var min max sz =>
       fun e => forall r,
           (min <= r < max)%Z ->
-          fvar_sound_sizeof_shallow (sz r) (e (argvarZ r))           
+          fvar_sound_sizeof (sz r) (e (argvarZ r))           
   | _, _ => fun _ => False
   end e.
 
@@ -3688,7 +3686,7 @@ Lemma res_spec_of'_correct ts n name size fd e_nat e_res ctx_res :
   NoDup (map untagged_fst_ctx_elt ctx_res) ->
   Forall tags_consistent ctx_res ->
   (forall name'' : nat, In name'' (map untagged_fst_ctx_elt ctx_res) -> name'' < name) ->
-  fvar_sound_sizeof_shallow size e_res ->
+  fvar_sound_sizeof size e_res ->
   fvar_idxs_in_bounds size e_res ->
   stringvar_fvar_ATLexpr name e_nat = Some fd ->
   res_spec_of' ts n name size fd e_res (valuation_of ctx_res) (ec_of ctx_res).
@@ -3741,7 +3739,7 @@ Fixpoint compat ts n size (e_shal : fvar_pATLexpr interp_type_tagged ts n) (e_re
 Hint Unfold res_tensor_corresp : core.
 Lemma result_of_fvar_pATLexpr_correct' ctx ts n e_shal e_res size :
   wf_fvar_ATLexpr interp_type_tagged interp_type_result ctx ts n e_shal e_res ->
-  fvar_sound_sizeof_shallow size e_res ->
+  fvar_sound_sizeof size e_res ->
   Forall res_tensor_corresp ctx ->
   fvar_idxs_in_bounds size e_res ->
   fvar_sum_bounds_good size e_shal ->
@@ -3760,7 +3758,7 @@ Qed.
 
 Lemma result_of_fvar_pATLexpr_correct ts n e size :
   Wf_fvar_ATLExpr e ->
-  fvar_sound_sizeof_shallow size (e _) ->
+  fvar_sound_sizeof size (e _) ->
   fvar_idxs_in_bounds size (e _) ->
   fvar_sum_bounds_good size (e _) ->
   compat ts n size (e _) (e _).
@@ -3770,7 +3768,7 @@ Qed.
 
 Lemma res_spec_of_correct ts n name size fd e :
   Wf_fvar_ATLExpr e ->
-  fvar_sound_sizeof_shallow size (e _) ->
+  fvar_sound_sizeof size (e _) ->
   fvar_idxs_in_bounds size (e _) ->
   stringvar_fvar_ATLexpr name (e _) = Some fd ->
   res_spec_of ts n name size fd (e _).
@@ -3804,7 +3802,7 @@ Qed.
 
 Lemma spec_of_correct' ts n e size name fd :
   Wf_fvar_ATLExpr e ->
-  fvar_sound_sizeof_shallow size (e _) ->
+  fvar_sound_sizeof size (e _) ->
   fvar_idxs_in_bounds size (e _) ->
   fvar_sum_bounds_good size (e _) ->
   stringvar_fvar_ATLexpr name (e _) = Some fd ->
@@ -3817,7 +3815,7 @@ Qed.
 
 Lemma spec_of_correct ts n e size name fd :
   Wf_fvar_ATLExpr e ->
-  fvar_sound_sizeof_shallow size (e _) ->
+  fvar_sound_sizeof size (e _) ->
   fvar_idxs_in_bounds' size (e _) ->
   fvar_sum_bounds_good size (e _) ->
   stringvar_fvar_ATLexpr name (e _) = Some fd ->

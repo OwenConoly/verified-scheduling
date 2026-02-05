@@ -11,6 +11,7 @@ From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import micromega.Zify.
 From Stdlib Require Import Lists.List.
+From Stdlib Require Import QArith.
 
 Import ListNotations.
 
@@ -22,8 +23,7 @@ From Lower Require Import Zexpr ATLDeep Bexpr Sexpr ATLDeep.
 From ATL Require Import FrapWithoutSets.
 
 Open Scope string_scope.
-
-Set Default Proof Mode "Classic".
+Open Scope nat_scope.
 
 Definition Var' {t var} (x : var t) : pExpr_type var t :=
   match t return var t -> pExpr_type var t with
@@ -46,35 +46,66 @@ Definition matmul_size :=
                                (with_T_var [Z.to_nat B; Z.to_nat C]
                                   size_nil)))).
 
-Opaque tensor_of_result.
+Check spec_of_correct. Print Reify_lhs.
+Check spec_of_correct.
+
+Ltac prove_spec_of0 :=
+  match goal with
+  | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
+      (*idk idiomatic way to make evar*)
+      let e' := fresh "e'" in
+      epose (e' := _);
+      eassert (shallow_expr = _) as ->; [|eapply spec_of_correct with (e := fun var => varify var ts _ (e' var))];
+      [let phoas_expr := fresh "phoas_expr" in
+       Reify_lhs phoas_expr;
+       (*idk idiomatic way to instantiate evar*)
+       let H := fresh "H" in
+       assert (H: e' = phoas_expr) by (subst e'; subst phoas_expr; reflexivity);
+       clear H phoas_expr;
+       subst e'
+       |..];
+      (*TODO: what gives good performance below ?*)
+      [lazy [interp_pATLexpr interp_Sbop gget_R map interp_pZexpr]; reflexivity|..];
+      cycle -1;
+      [subst string_expr; simpl; reflexivity|..]
+  end.
+
+Ltac checks_are_true :=
+  repeat match goal with
+    | |- context[(_ =? _)%nat] =>
+        replace (_ =? _)%nat with true by (symmetry; apply Nat.eqb_eq; lia)
+    | |- context[(_ <? _)%nat] =>
+        replace (_ <? _)%nat with true by (symmetry; apply Nat.ltb_lt; lia)
+    end.
+
+Ltac do_arith :=
+  repeat match goal with
+    | |- _ => progress intros
+    | |- Forall2 _ _ _ => constructor
+    | |- _ /\ _ => split
+    | |- _ => lia
+    end.
+
+Axiom f : False.
+Ltac prove_sideconditions :=
+  match goal with
+  | |- Wf_fvar_ATLExpr _ =>
+  simpl; apply WfByUnnatify; simpl; reflexivity
+  | |- fvar_sound_sizeof _ _ =>
+      simpl; intros; checks_are_true; try (exact I)
+  | |- fvar_idxs_in_bounds' _ _ =>
+      simpl; intros; do_arith
+  | |- fvar_sum_bounds_good _ _ =>
+  simpl; intros; do_arith
+  | |- _ => idtac
+  end.
+
+Ltac prove_spec_of := prove_spec_of0; prove_sideconditions.
 Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
     as matmul_correct.
-Proof.
-  eassert (matmul = _) as ->.
-  2: eapply spec_of_correct.
-  { cbv [matmul]. Reify_lhs rmatmul.
-    match goal with
-    | rm := ?x |- _ => instantiate (1 := (fun var => varify var [tZ; tZ; tZ; tensor_n 2; tensor_n 2] _ (x var)))
-    end.
-    simpl. reflexivity. }
-  - simpl. apply WfByUnnatify. simpl. reflexivity.
-  - simpl. intros.
-    replace (_ =? _)%nat with false.
-    2: { symmetry. apply Nat.eqb_neq. lia. }
-    replace (_ =? _)%nat with false.
-    2: { symmetry. apply Nat.eqb_neq. lia. }
-    constructor.
-  - simpl. intros.
-    repeat match goal with
-           | |- _ => progress intros
-           | |- Forall2 _ _ _ => constructor
-           | |- _ /\ _ => split
-           | |- _ => lia
-           end.
-  - simpl. intros. split; lia.
-  - simpl. subst string_matmul. reflexivity.
-Qed.
+Proof. cbv [matmul]. prove_spec_of. Time Qed.
+(*Finished transaction in 0.198 secs (0.197u,0.s) (successful)*)
 
 Print string_matmul.
 (*
