@@ -25,18 +25,18 @@ Open Scope string_scope.
 Open Scope nat_scope.
 
 Definition add_size :=
-  with_Z_var 1 10
+  with_Z_var
     (fun A =>
-       with_Z_var 1 10
+       with_Z_var
          (fun B =>
-            with_Z_var 1 10
+            with_Z_var
               (fun C =>
-                 with_Z_var 1 10
+                 with_Z_var
                    (fun D =>
                       (* A; C; B; D ... ???*)
                       with_T_var [Z.to_nat A; Z.to_nat C; Z.to_nat B; Z.to_nat D]
                         (with_T_var [Z.to_nat A; Z.to_nat C; Z.to_nat B; Z.to_nat D]
-                                   size_nil))))).
+                                   (size_nil (0 < A /\ 0 < B /\ 0 < C /\ 0 < D)%Z)))))).
 
 Derive string_add in
   (spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 O add_size string_add add)
@@ -44,12 +44,12 @@ Derive string_add in
 Proof. cbv [add]. Set Ltac Profiling. Time prove_spec_of. Show Ltac Profile. Time Qed.
 
 Definition matmul_size :=
-  with_Z_var 1 10
-    (fun A => with_Z_var 1 10
-             (fun B => with_Z_var 1 10
+  with_Z_var
+    (fun A => with_Z_var
+             (fun B => with_Z_var
                       (fun C => with_T_var [Z.to_nat A; Z.to_nat B]
                                (with_T_var [Z.to_nat B; Z.to_nat C]
-                                  size_nil)))).
+                                  (size_nil (0 < A /\ 0 < B /\ 0 < C)%Z))))).
 
 Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
@@ -57,38 +57,60 @@ Derive string_matmul in
 Proof. cbv [matmul]. prove_spec_of. Qed.
   
 Definition matmul_size1 :=
-  with_T_var [64; 64] (with_T_var [64; 64] size_nil).
+  with_T_var [64; 64] (with_T_var [64; 64] (size_nil True)).
 
 Derive string_matmul_tiled in
   (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size1 string_matmul_tiled (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4))
     as string_matmul_tiled_correct.
-Proof. cbv [matmul_tiled]. prove_spec_of. Qed.
+Proof. cbv [matmul_tiled]. prove_spec_of. all: fail. Abort.
 
-Goal
-    (fun A B C m1 m2 => matmul A B C m1 m2) = (fun A B C m1 m2 => matmul_tiled (Z.to_nat A) (Z.to_nat B) (Z.to_nat C) m1 m2 4%Z).
-Proof.
-  intros. cbv [matmul].
-  Reify_lhs reified_matmul.
-Abort.
+Definition matmul_size2 :=
+  with_T_var [50; 70] (with_T_var [70; 30] (size_nil True)).
 
-Goal (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4%Z) = (fun m1 m2 => matmul 64 64 64 m1 m2).
-Proof.
-  intros. cbv [matmul_tiled].
-  make_types_reifiable.
-  Reify_lhs reified_matmul_tiled.
-Abort.
+Derive string_matmul_tiled_split in
+  (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size2 string_matmul_tiled_split (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4))
+    as string_matmul_tiled_split_correct.
+Proof. cbv [matmul_tiled_split]. prove_spec_of. all: fail. Abort.
 
-Goal (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4%Z) = (fun m1 m2 => matmul 50 70 30 m1 m2).
-Proof.
-  cbv [matmul_tiled_split].
-  Reify_lhs reified_matmul_tiled_split.
-Abort.
+Derive string_matmul_tiled_split in
+  (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size2 string_matmul_tiled_split (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4))
+    as string_matmul_tiled_split_correct.
+Proof. cbv [matmul_tiled_split]. prove_spec_of. all: fail. Abort.
 
-Goal
-    (fun c n m => conv4 c n m) = (fun c n m => conv1 c n m).
-Proof.
-  cbv [conv4].
-  Reify_lhs reified_conv4.
+Definition conv_size :=
+  with_Z_var
+    (fun n =>
+       with_T_var [Z.to_nat n]
+         (with_Z_var
+            (fun m =>
+               size_nil (0 < n /\ -m + 1 < n)%Z))).       
+
+Derive string_conv4 in
+  (spec_of [tZ; tensor_n 1; tZ] 1 O conv_size string_conv4 (fun n c m => conv4 c n m))
+    as string_conv4_correct.
+Proof. cbv [conv4]. prove_spec_of. Qed.
+
+Derive string_conv1 in
+  (spec_of [tZ; tensor_n 1; tZ] 1 O conv_size string_conv1 (fun n c m => conv1 c n m))
+    as string_conv1_correct.
+Proof. cbv [conv1]. Print normalize. normalize_rec.
+       match goal with
+  | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
+        let e' := fresh "e'" in
+        Reify shallow_expr e'; refine
+         (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _);
+         [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map
+               interp_pZexpr Var' e'];
+            reflexivity
+         | .. ]; cycle -1
+       end.
+       Print normalize.
+       Print normalize_types.
+       simpl.
+       normalize_rec.
+       { lazy [varify e']. simpl.
+       Print prove_spec_of0. Qed.
+
 Abort.
 
 Goal (fun c n m => conv1 c n m) = (fun c n m => conv4 c n m).

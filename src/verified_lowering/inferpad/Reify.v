@@ -338,6 +338,7 @@ Ltac checks_are_true :=
 Ltac do_arith :=
   repeat match goal with
     | |- _ => progress intros
+    | H: (_ <? _)%Z = true |- _ => apply Z.ltb_lt in H
     | |- Forall2 _ _ _ => constructor
     | |- _ /\ _ => split
     | |- _ => lia
