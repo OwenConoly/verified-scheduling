@@ -48,7 +48,7 @@ Definition matmul_size :=
 
 Check spec_of_correct. Print Reify_lhs.
 Check spec_of_correct.
-Print Reify_lhs.
+
 Ltac prove_spec_of0 :=
   match goal with
   | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
@@ -104,28 +104,7 @@ Ltac prove_spec_of := prove_spec_of0; prove_sideconditions.
 Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
     as matmul_correct.
-Proof. cbv [matmul].
-       Ltac Reify' x :=
-  set (y := x); pattern_shallows y;
-   (let rx := lazymatch goal with
-              | y:=?y':_ |- _ => get_fun y'
-              end in
-    set (z := rx);
-     (let w := constr:((fun var => apply_to_all var (z (pExpr_type var)))) in
-      let w := eval cbv[apply_to_all z y z] in w in
-      let w := eval simpl in w in
-   w)).
-       Ltac Reify x k :=
-         set (h := x); make_types_reifiable_in h;
-         (let y := eval cbv[h] in h in
-            Reify' y).
-       match goal with
-       | |- spec_of _ _ _ _ _ ?x =>
-           let y := Reify x in
-           refine (spec_of_correct _ _ (fun var => varify var _ _ (y var)) _ _ _ _ _ _ _ _)
-       end.
-       (*Error: variable y should be bound to a term.*)
-       prove_spec_of. Time Qed.
+Proof. cbv [matmul]. prove_spec_of. Time Qed.
 (*Finished transaction in 0.198 secs (0.197u,0.s) (successful)*)
 
 Print string_matmul.
