@@ -25,19 +25,6 @@ From ATL Require Import FrapWithoutSets.
 Open Scope string_scope.
 Open Scope nat_scope.
 
-Definition Var' {t var} (x : var t) : pExpr_type var t :=
-  match t return var t -> pExpr_type var t with
-  | tZ => ATLPhoas.ZVar
-  | tB => fun _ => BBop BEq ZZ0 ZZ0
-  | tensor_n n => Var
-  end x.
-
-Fixpoint varify var ts T (f : fun_type (pExpr_type var) ts T) : fun_type var ts T :=
-  match ts return fun_type (pExpr_type var) ts T -> fun_type var ts T with
-  | [] => fun f => f
-  | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
-  end f.
-
 Definition matmul_size :=
   with_Z_var 1 10
     (fun A => with_Z_var 1 10
@@ -46,99 +33,10 @@ Definition matmul_size :=
                                (with_T_var [Z.to_nat B; Z.to_nat C]
                                   size_nil)))).
 
-Check spec_of_correct. Print Reify_lhs.
-Check spec_of_correct.
-
-Ltac prove_spec_of0 :=
-  match goal with
-  | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
-      let e' := fresh "e'" in
-      Reify shallow_expr e';
-      refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var))  _ _ _ _ _ _ _ _ _)
-  end.
-      (* eapply spec_of_correct with (e := fun var => varify var ts _ (e' var)); *)
-  (*     (*TODO: what gives good performance below ?*) *)
-  (*     [lazy [interp_pATLexpr interp_Sbop gget_R map interp_pZexpr]; reflexivity|..]; *)
-  (*     cycle -1; *)
-  (*     [subst string_expr; simpl; reflexivity|..] *)
-  (* end. *)
-
-Ltac checks_are_true :=
-  repeat match goal with
-    | |- context[(_ =? _)%nat] =>
-        replace (_ =? _)%nat with true by (symmetry; apply Nat.eqb_eq; lia)
-    | |- context[(_ <? _)%nat] =>
-        replace (_ <? _)%nat with true by (symmetry; apply Nat.ltb_lt; lia)
-    end.
-
-Ltac do_arith :=
-  repeat match goal with
-    | |- _ => progress intros
-    | |- Forall2 _ _ _ => constructor
-    | |- _ /\ _ => split
-    | |- _ => lia
-    end.
-
-Axiom f : False.
-Ltac prove_sideconditions :=
-  match goal with
-  | |- Wf_fvar_ATLExpr _ =>
-  simpl; apply WfByUnnatify; simpl; reflexivity
-  | |- fvar_sound_sizeof _ _ =>
-      simpl; intros; checks_are_true; try (exact I)
-  | |- fvar_idxs_in_bounds' _ _ =>
-      simpl; intros; do_arith
-  | |- fvar_sum_bounds_good _ _ =>
-  simpl; intros; do_arith
-  | |- _ => idtac
-  end.
-
-Ltac prove_spec_of := prove_spec_of0; prove_sideconditions.
 Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
     as matmul_correct.
-Proof. cbv [matmul].
-       prove_spec_of0. all: destruct f. Unshelve. exact (Scalar (Lit 0%Q)).
-       Show Proof.
-       Time Qed.
-(*Finished transaction in 0.17 secs (0.17u,0.s) (successful)*)
-
-Print string_matmul.
-(*
-  string_matmul =
-Gen (nat_to_string 5) (| 0 |)%z (! nat_to_string 0 !)%z
-  (Gen (nat_to_string 6) (| 0 |)%z (! nat_to_string 2 !)%z
-     (Sum (nat_to_string 7) (| 0 |)%z (! nat_to_string 1 !)%z
-        (Scalar
-           (Mul
-              (Get (nat_to_string 3) [(! nat_to_string 5 !)%z; (! nat_to_string 7 !)%z])
-              (Get (nat_to_string 4) [(! nat_to_string 7 !)%z; (! nat_to_string 6 !)%z])))))
-     : ATLexpr
-*)
-Goal True.
-  pose proof matmul_correct as H. cbv [spec_of] in H. simpl in H.
-  Check H.
-  (*
-    H
-     : forall x : Z,
-       (1 <= x < 10)%Z ->
-       forall x0 : Z,
-       (1 <= x0 < 10)%Z ->
-       forall x1 : Z,
-       (1 <= x1 < 10)%Z ->
-       forall x2 : Result.result,
-       result_has_shape' [Z.to_nat x; Z.to_nat x0] x2 ->
-       forall x3 : Result.result,
-       result_has_shape' [Z.to_nat x0; Z.to_nat x1] x3 ->
-       exists r : Result.result,
-         eval_expr
-           ($0 $+ (nat_to_string 0, x) $+ (nat_to_string 1, x0) $+ (
-            nat_to_string 2, x1))
-           ($0 $+ (nat_to_string 3, x2) $+ (nat_to_string 4, x3)) string_matmul r /\
-         tensor_of_result r =
-         matmul x x0 x1 (tensor_of_result x2) (tensor_of_result x3)
-   *)
-Abort.
+Proof. cbv [matmul]. prove_spec_of. Time Qed.
 
 Derive (reified_add : forall var, _ -> _ -> _ -> _ -> var (tensor_n 4) -> var (tensor_n 4) -> pATLexpr var 4) in
   (forall A B C D m1 m2,

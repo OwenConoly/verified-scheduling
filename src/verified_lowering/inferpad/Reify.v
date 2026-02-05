@@ -296,6 +296,61 @@ Ltac Reify_lhs name :=
       Reify x name
   end.
 
+Definition Var' {t var} (x : var t) : pExpr_type var t :=
+  match t return var t -> pExpr_type var t with
+  | tZ => ATLPhoas.ZVar
+  | tB => fun _ => BBop BEq ZZ0 ZZ0
+  | tensor_n n => Var
+  end x.
+
+Fixpoint varify var ts T (f : fun_type (pExpr_type var) ts T) : fun_type var ts T :=
+  match ts return fun_type (pExpr_type var) ts T -> fun_type var ts T with
+  | [] => fun f => f
+  | t :: ts' => fun f => fun x => varify var ts' T (f (Var' x))
+  end f.
+
+Ltac prove_spec_of0 :=
+  match goal with
+  | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
+      let e' := fresh "e'" in
+      Reify shallow_expr e';
+      refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var))  _ _ _ _ _ _ _ _ _);
+      [lazy [interp_pATLexpr interp_Sbop gget_R map interp_pZexpr]; reflexivity|..];
+      cycle -1;
+      [subst string_expr; simpl; reflexivity|..]
+  end.
+
+Ltac checks_are_true :=
+  repeat match goal with
+    | |- context[(_ =? _)%nat] =>
+        replace (_ =? _)%nat with true by (symmetry; apply Nat.eqb_eq; lia)
+    | |- context[(_ <? _)%nat] =>
+        replace (_ <? _)%nat with true by (symmetry; apply Nat.ltb_lt; lia)
+    end.
+
+Ltac do_arith :=
+  repeat match goal with
+    | |- _ => progress intros
+    | |- Forall2 _ _ _ => constructor
+    | |- _ /\ _ => split
+    | |- _ => lia
+    end.
+
+Ltac prove_sideconditions :=
+  match goal with
+  | |- Wf_fvar_ATLExpr _ =>
+  simpl; apply WfByUnnatify; simpl; reflexivity
+  | |- fvar_sound_sizeof _ _ =>
+      simpl; intros; checks_are_true; try (exact I)
+  | |- fvar_idxs_in_bounds' _ _ =>
+      simpl; intros; do_arith
+  | |- fvar_sum_bounds_good _ _ =>
+  simpl; intros; do_arith
+  | |- _ => idtac
+  end.
+
+Ltac prove_spec_of := prove_spec_of0; prove_sideconditions.
+
 (* Ltac R := *)
 (*   let foo := fresh "foo" in *)
 (*   let _ := match goal with *)
