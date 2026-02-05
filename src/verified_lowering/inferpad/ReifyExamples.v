@@ -67,7 +67,8 @@ Definition matmul_size1 :=
 Derive string_matmul_tiled in
   (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size1 string_matmul_tiled (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4))
     as string_matmul_tiled_correct.
-Proof. cbv [matmul_tiled]. Set Ltac Profiling. Time prove_spec_of0.
+Proof. cbv [matmul_tiled]. lazy [Z.to_nat Z.of_nat PosDef.Pos.to_nat PosDef.Pos.iter_op Nat.add PosDef.Pos.of_succ_nat PosDef.Pos.succ]. prove_spec_of.
+       Time Qed. (*takes forever*)
 Goal
     (fun A B C m1 m2 => matmul A B C m1 m2) = (fun A B C m1 m2 => matmul_tiled (Z.to_nat A) (Z.to_nat B) (Z.to_nat C) m1 m2 4%Z).
 Proof.

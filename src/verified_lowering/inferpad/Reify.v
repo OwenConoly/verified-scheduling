@@ -252,13 +252,16 @@ Ltac make_types_reifiable_in x :=
   repeat change (@gget_R ?n (@get _ _ ?v ?idx) ?idxs) with (@gget_R (S n) v (idx :: idxs)) in x;
   change Z with (interp_type tZ) in x;
   cbv [gen sum Common.Truncr] in x;
-  (*Z's are not allowed to be used as constants;
-    in particular, they cannot be used to define nats*)
-  (*the following is OK, because things inside Z.to_nat must *always* be constants*)
-  repeat match goal with
-    | x := context[(Z.to_nat ?y)] |- _ =>
-        let k := fresh "k" in set (k := Z.to_nat y)
-    end;
+  (*i do not understand why i wrote the following code.  also, it sometimes loops*)
+  
+  (* (*Z's are not allowed to be used as constants; *)
+  (*   in particular, they cannot be used to define nats*) *)
+  (* (*the following is OK, because things inside Z.to_nat must *always* be constants*) *)
+  (* repeat match goal with *)
+  (*   | x := context[(Z.to_nat ?y)] |- _ => *)
+  (*       let k := fresh "k" in set (k := Z.to_nat y) *)
+  (*   end; *)
+
   repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n) in x;
   repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n) in x;
   repeat change (@iverson (interp_type (tensor_n ?n)) _) with (iverson_n n) in x;
