@@ -55,7 +55,7 @@ Derive string_matmul in
   (spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 O matmul_size string_matmul matmul)
     as string_matmul_correct.
 Proof. cbv [matmul]. prove_spec_of. Qed.
-  
+
 Definition matmul_size1 :=
   with_T_var [64; 64] (with_T_var [64; 64] (size_nil True)).
 
@@ -83,7 +83,7 @@ Definition conv_size :=
        with_T_var [Z.to_nat n]
          (with_Z_var
             (fun m =>
-               size_nil (0 < n /\ -m + 1 < n)%Z))).       
+               size_nil (0 < n /\ -m + 1 < n /\ 0 < m)%Z))).
 
 Derive string_conv4 in
   (spec_of [tZ; tensor_n 1; tZ] 1 O conv_size string_conv4 (fun n c m => conv4 c n m))
@@ -93,50 +93,40 @@ Proof. cbv [conv4]. prove_spec_of. Qed.
 Derive string_conv1 in
   (spec_of [tZ; tensor_n 1; tZ] 1 O conv_size string_conv1 (fun n c m => conv1 c n m))
     as string_conv1_correct.
-Proof. cbv [conv1]. Print normalize. normalize_rec.
-       match goal with
-  | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
-        let e' := fresh "e'" in
-        Reify shallow_expr e'; refine
-         (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _);
-         [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map
-               interp_pZexpr Var' e'];
-            reflexivity
-         | .. ]; cycle -1
-       end.
-       Print normalize.
-       Print normalize_types.
-       simpl.
-       normalize_rec.
-       { lazy [varify e']. simpl.
-       Print prove_spec_of0. Qed.
+Proof. cbv [conv1]. prove_spec_of. Qed.
 
-Abort.
+Definition size0 :=
+  with_Z_var
+    (fun n =>
+       with_Z_var
+         (fun m =>
+            with_T_var [Z.to_nat n; Z.to_nat m]
+              (size_nil (2 < n /\ 0 < m)%Z))).
 
-Goal (fun c n m => conv1 c n m) = (fun c n m => conv4 c n m).
-Proof.
-  cbv [conv1].
-  Reify_lhs reified_conv1.
-Abort.
-
-Goal forall n m,
-    (fun l : list (list R) =>
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m l =>
        transpose (
            (GEN [ j < 1 ]
-              GEN [ i < Z.of_nat n ]
+              GEN [ i < n ]
               l _[i;j])
              <++>
-             (GEN [ 1 <= j < Z.of_nat m ]
+             (GEN [ 1 <= j < m ]
                 (GEN [ i < 1 ]
                    l _[i;j])
                 <++>
-                (GEN [ 1 <= i < Z.of_nat n - 1]
+                (GEN [ 1 <= i < n - 1]
                    l _[i;j])
                 <++>
-                (GEN [ Z.of_nat n - 1 <= i < Z.of_nat n ]
+                (GEN [ n - 1 <= i < n ]
                    l _[i;j])
-             )
-    ))
+         )) in
+   spec_of [tZ; tZ; tensor_n 2] 2 O size0 string_prog shallow_prog)
+    as string_prog_correct.
+Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Print list_eq_dec. simpl. cbv [list_eq_dec]. subst.
+Goal forall n m,
+    (fun l : list (list R) =>
+       )
     = (fun l => nil).
 Proof.
   intros.
@@ -149,7 +139,7 @@ Goal forall n m,
            (GEN [ j < 1 ]
               GEN [ i < Z.of_nat n ]
               l _[i;j])
-             <++>          
+             <++>
              (GEN [ 1 <= j < Z.of_nat m ]
                 GEN [ i < Z.of_nat n ]
                 l _[i;j])
@@ -168,9 +158,9 @@ Goal forall n m,
                  v _[i;j])
               <++>
               (GEN [ 1 <= i < Z.of_nat n ]
-                 v _[i;j])             
+                 v _[i;j])
            )
-             <++>          
+             <++>
              (GEN [ 1 <= j < Z.of_nat m ]
                 GEN [ i < Z.of_nat n ]
                 v _[i;j]
@@ -207,9 +197,9 @@ Goal forall n m,
                  <++>
                  (GEN [ 1 <= i < Z.of_nat m ]
                     (GEN [ j < Z.of_nat n ]
-                       l _[j * Z.of_nat m + i]))              
+                       l _[j * Z.of_nat m + i]))
     )))
-      
+
     = (fun _ => nil).
 Proof.
   intros.
@@ -223,7 +213,7 @@ Proof.
   cbv [blurimmediate].
   Reify_lhs foo.
 Abort.
- 
+
 Goal forall N M,
     (fun v : list (list R) => blurtwostage N M v) = (fun v => blurimmediate v M N).
 Proof.
@@ -258,7 +248,7 @@ Goal (fun W x w => gather W x w) = (fun _ _ _ => nil).
 Proof.
   cbv [gather].
   Reify_lhs foo.
-Abort.      
+Abort.
 
 Goal (fun W x w => scatter W x w) = (fun _ _ _ => nil).
 Proof.
@@ -270,7 +260,7 @@ Goal (fun K W RR (w : list (list R)) (x : list R) => im2colminilifted K W RR w x
 Proof.
   cbv [im2colminilifted].
   Reify_lhs foo.
-Abort.      
+Abort.
 
 (*why is this the same thing*)
 Goal (fun K W RR (w : list (list R)) (x : list R) => im2colminilifted K W RR w x) = (fun K W RR w x => im2colmini K W RR w x).

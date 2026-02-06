@@ -244,7 +244,7 @@ Ltac get_fun x :=
 Ltac make_types_reifiable_in x :=
   lazy[dim_n];
   (*Line above prevents line below from caulsing following error.
-    Error: Replacement would lead to an ill-typed term: In pattern-matching on term 
+    Error: Replacement would lead to an ill-typed term: In pattern-matching on term
     "n" the branch for constructor "O" has type "Type" which should be
     "Set".*)
   change R with (interp_type (tensor_n O)) in x;
@@ -257,7 +257,7 @@ Ltac make_types_reifiable_in x :=
   change Z with (interp_type tZ) in x;
   cbv [gen sum Common.Truncr] in x;
   (*i do not understand why i wrote the following code.  also, it sometimes loops*)
-  
+
   (* (*Z's are not allowed to be used as constants; *)
   (*   in particular, they cannot be used to define nats*) *)
   (* (*the following is OK, because things inside Z.to_nat must *always* be constants*) *)
@@ -339,7 +339,9 @@ Ltac do_arith :=
   repeat match goal with
     | |- _ => progress intros
     | H: (_ <? _)%Z = true |- _ => apply Z.ltb_lt in H
+    | H: (_ <=? _)%Z = true |- _ => apply Z.leb_le in H
     | |- Forall2 _ _ _ => constructor
+    | H: _ /\ _ |- _ => destruct H
     | |- _ /\ _ => split
     | |- _ => lia
     end.
@@ -351,13 +353,20 @@ Ltac prove_sideconditions :=
   | |- fvar_sound_sizeof _ _ =>
       simpl; intros; checks_are_true; try (exact I)
   | |- fvar_idxs_in_bounds' _ _ =>
-      simpl; intros; do_arith
+      simpl; intros; repeat progress (do_arith || checks_are_true)
   | |- fvar_sum_bounds_good _ _ =>
   simpl; intros; do_arith
   | |- _ => idtac
   end.
 
-Ltac prove_spec_of := prove_spec_of0; prove_sideconditions.
+Ltac normalize_spec_of :=
+  match goal with
+  | |- spec_of _ _ _ _ _ ?p =>
+      eassert (p = _) as -> by
+        (repeat (apply functional_extensionality; intro); normalize; reflexivity)
+  end.
+
+Ltac prove_spec_of := normalize_spec_of; prove_spec_of0; prove_sideconditions.
 
 (* Ltac R := *)
 (*   let foo := fresh "foo" in *)
@@ -371,8 +380,8 @@ Ltac prove_spec_of := prove_spec_of0; prove_sideconditions.
 (*         let y := eval simpl in x in *)
 (*           y. *)
 
-           
-           
+
+
 (*leaving this here, for now, for comparison*)
 (*what was normalize good for?  should i do that still?*)
 
@@ -385,7 +394,7 @@ Ltac prove_spec_of := prove_spec_of0; prove_sideconditions.
 (*                            normalize end in *)
 
 (*   let prog := match goal with |- ?prog = _ => prog end in *)
-  
+
 (*   let ast := reify prog in *)
 (*   let ast := eval simpl in ast in *)
 (*   ast. *)
@@ -411,7 +420,7 @@ Proof.
 
     let x := match goal with H : e1t |- _ => H end in
     let xstr := constr:(ltac:(to_str x)) in
-    
+
     let body' := constr:(e2 x) in
     let body := eval simpl in body' in
       let re2 := reify body in
