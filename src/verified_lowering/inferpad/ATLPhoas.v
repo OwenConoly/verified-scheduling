@@ -130,7 +130,7 @@ Lemma to_radix_small r fuel n :
 Proof.
   intros Hr. revert n. induction fuel; simpl; intros; constructor; auto.
   apply Nat.mod_upper_bound. lia.
-Qed.  
+Qed.
 
 Definition encode {T} (default : T) (alphabet : list T) (n : list nat) :=
   map (fun digit => nth_default default alphabet digit) n.
@@ -163,7 +163,7 @@ Proof.
   - apply nth_error_In in E. apply E.
   - apply nth_error_None in E. lia.
 Qed.
-  
+
 Definition nat_to_string n :=
   string_of_list_ascii (encode (ascii_of_nat O) alphabet (to_radix (length alphabet) n n)).
 
@@ -208,7 +208,7 @@ Proof.
     + invert H. auto.
     + eauto.
 Qed.
-  
+
 Lemma nat_to_string_In x :
   Forall (fun digit => In digit alphabet) (list_ascii_of_string (nat_to_string x)).
 Proof.
@@ -325,7 +325,7 @@ Fixpoint stringvar_B (e : pBexpr tagged_nat) : Bexpr :=
   match e with
   | BAnd x y => Bexpr.And (stringvar_B x) (stringvar_B y)
   | BBop o x y => (stringvar_Bbop o) (stringvar_Z x) (stringvar_Z y)
-  end.                                                 
+  end.
 
 Fixpoint interp_pBexpr (e : pBexpr tagged_Z) : bool :=
   match e with
@@ -543,6 +543,26 @@ Fixpoint interp_fvar_pATLexpr ts n (e : fvar_pATLexpr interp_type_tagged ts n) :
   | _ :: ts' => fun e => fun x => interp_fvar_pATLexpr ts' n (e x)
   end e.
 
+(*https://github.com/mit-plv/coqutil/blob/master/src/coqutil/Datatypes/List.v*)
+Definition list_eqb {A} (aeqb : A -> A -> bool) (x y : list A) : bool :=
+  ((length x =? length y)%nat && forallb (fun xy => aeqb (fst xy) (snd xy)) (combine x y)).
+
+Lemma list_eqb_spec A (aeqb : A -> _) :
+  (forall x y, aeqb x y = true <-> x = y) ->
+  (forall l1 l2, list_eqb aeqb l1 l2 = true <-> l1 = l2).
+Proof.
+  intros H l1. induction l1; intros l2; destruct l2; simpl.
+  - split; reflexivity.
+  - cbv [list_eqb]. simpl. split; congruence.
+  - cbv [list_eqb]. simpl. split; congruence.
+  - cbv [list_eqb]. simpl. split; intros H'.
+    + apply andb_prop in H'. destruct H' as [H'1 H'2]. apply andb_prop in H'2.
+      destruct H'2 as [H'2 H'3]. apply H in H'2. subst. f_equal. apply IHl1.
+      cbv [list_eqb]. rewrite H'1, H'3. reflexivity.
+    + invs'. assert (H': l2 = l2) by reflexivity. apply IHl1 in H'.
+      eassert (H'': _ = _) by reflexivity. apply H in H''. rewrite H''. simpl. apply H'.
+Qed.
+
 Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> option Z) (e : pATLexpr var n) : option (list nat) :=
   match e with
   | Gen lo hi body =>
@@ -566,7 +586,7 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
   | Concat x y =>
       match sound_sizeof dummy sizeof_var x, sound_sizeof dummy sizeof_var y with
       | Some (nx :: restx), Some (ny :: resty) =>
-          if list_eq_dec Nat.eq_dec restx resty then
+          if list_eqb Nat.eqb restx resty then
             Some (nx + ny :: restx)
           else
             None
@@ -613,7 +633,7 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
     match sound_sizeof dummy sizeof_var e with
     | Some (m :: rest) => Some (n + m :: rest)
     | _ => None
-    end                  
+    end
   | Var x => None (*should never happen*)
   | @Get _ n v idxs =>
       if (length idxs =? n)%nat then
@@ -747,7 +767,7 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
         match r with
         | Result.SS _ => r
         | Result.SX => Result.SS 0%R
-        end                          
+        end
   | SBop o x y =>
       match result_of_pATLexpr x, result_of_pATLexpr y with
       | Result.S x0, Result.S y0 => Result.S (bin_scalar_result (interp_Sbop o) x0 y0)
@@ -1111,7 +1131,7 @@ Lemma dom_ec_of ctx :
 Proof.
   induction ctx; simpl.
   - rewrite dom_empty. sets.
-  - destruct a. simpl. destruct ctx_elt_t1; try solve[sets]. 
+  - destruct a. simpl. destruct ctx_elt_t1; try solve[sets].
     rewrite dom_add. sets.
 Qed.
 
@@ -1341,7 +1361,7 @@ Ltac prove_sound_sizeof :=
 Ltac specialize' H :=
   let hyp := fresh "hyp" in
   eassert _ as hyp;
-  [clear H|specialize (H hyp); clear hyp].  
+  [clear H|specialize (H hyp); clear hyp].
 
 Ltac epose_dep H :=
   repeat lazymatch type of H with
@@ -1378,7 +1398,7 @@ Definition mul_ctxs {var1 var2} (ctx1 : list (ctx_elt var1)) (ctx2 : list (ctx_e
                           | None => []
                           end)
     (list_prod ctx1 ctx2).
-    
+
 Lemma sound_sizeof_size_of var2 (dummy2 : forall t, var2 t) n e_nat ctx sz e2 e_string name name' sizeof1 sizeof2 v :
   wf_ATLexpr (fun _ => tagged_nat) var2 ctx n e_nat e2 ->
   (forall x, sizeof1 (itervarnat x) = sizeof2 (dummy2 tZ)) ->
@@ -1407,6 +1427,8 @@ Proof.
           apply Nat.ltb_lt in H
       | H: (_ <=? _)%nat = true |- _ =>
           apply Nat.leb_le in H
+      | H: list_eqb Nat.eqb _ _ = true |- _ =>
+          apply list_eqb_spec in H; [|apply Nat.eqb_eq]; subst
       end;
     try solve [size_of_constr; eauto; repeat (lia || f_equal)].
   - constructor.
@@ -1471,7 +1493,7 @@ Proof.
       | H: (_ <? _)%nat = true |- _ =>
           apply Nat.ltb_lt in H
       | H: _ |- _ => specialize (H _ _ ltac:(eassumption))
-      | H: _ |- _ => specialize (H _ eq_refl)            
+      | H: _ |- _ => specialize (H _ eq_refl)
       end;
     simpl in *;
     try solve [intros [?|?]; [lia|auto] ].
@@ -1626,7 +1648,7 @@ Proof.
     + simpl. f_equal. erewrite IHb.
       -- f_equal. f_equal. lia.
       -- lia.
-Qed.  
+Qed.
 
 Lemma split_zrange min mid max :
   (min <= mid < max)%Z ->
@@ -1962,7 +1984,7 @@ Proof.
     + destruct xs0; [|discriminate H2]. constructor.
     + destruct xs0; [discriminate H2|]. simpl in H2, H5. invert H5. invert H2.
       simpl. constructor; auto.
-Qed.  
+Qed.
 
 Lemma fold_right_pres {A B : Type} (f : B -> A -> A) l Q a :
   Q a ->
@@ -2039,6 +2061,8 @@ Proof.
           apply Nat.ltb_lt in H
       | H: (_ <=? _)%nat = true |- _ =>
           apply Nat.leb_le in H
+      | H: list_eqb Nat.eqb _ _ = true |- _ =>
+          apply list_eqb_spec in H; [|apply Nat.eqb_eq]; subst
       end;
     repeat match goal with
       | H: _ |- _ => specialize (H _ ltac:(eassumption) eq_refl)
@@ -2089,7 +2113,7 @@ Proof.
       | H1: _, H2: stringvar_ATLexpr _ _ = _ |- _ => apply H1 in H2
       end; lia || congruence.
 Qed.
-    
+
 Lemma vars_of_stringvar_ATLexpr n name (e : pATLexpr _ n) name' e_string :
   stringvar_ATLexpr name e = Some (name', e_string) ->
   (forall str,
@@ -2461,7 +2485,7 @@ Proof.
   - simpl. destruct sz; try contradiction. intros H; invs'; subst; simpl; auto.
     rewrite map_length. split; [reflexivity|].
     rewrite Forall_Forall' in *. apply Forall_map. eapply Forall_impl; eauto.
-Qed.  
+Qed.
 
 Lemma consistent_of_tensor_has_size' n sh (x : dim_n n) :
   tensor_has_size' sh x ->
@@ -2589,7 +2613,7 @@ Proof.
   intros Hx Hys H1 H2. epose proof fold_right_map' as H'. epose_dep H'.
   specialize (H' Hx). repeat (specialize (H' ltac:(eassumption))).
   destruct H'. assumption.
-Qed.  
+Qed.
 
 Lemma tensor_add_is_map2_bin n (xs ys : dim_n (S n)) :
   length xs = length ys ->
@@ -2660,7 +2684,7 @@ Proof.
   rewrite nth_error_firstn_elim by lia. rewrite nth_error_skipn.
   destruct (_ <? _)%Z eqn:E.
   - apply Z.ltb_lt in E. cbv [iverson]. rewrite mul_1_id.
-    rewrite nth_error_app1 by lia. rewrite <- (Nat2Z.id (k * i + j)). 
+    rewrite nth_error_app1 by lia. rewrite <- (Nat2Z.id (k * i + j)).
     rewrite nth_error_is_get by lia. f_equal. lia.
   - apply Z.ltb_nlt in E. cbv [iverson]. rewrite nth_error_app2 by lia.
     rewrite nth_error_repeat.
@@ -2921,7 +2945,7 @@ Lemma tensor_has_size'_genr n lo hi f len sz :
   tensor_has_size' (n := S n) (len :: sz) (genr lo hi f).
 Proof.
   simpl. rewrite genr_is_map. rewrite length_map, length_zrange.
-  intros. split; [lia|]. 
+  intros. split; [lia|].
   apply Forall_Forall'. apply Forall_map. apply Forall_forall. intros x Hx.
   apply In_zrange in Hx. auto.
 Qed.
@@ -2952,6 +2976,8 @@ Proof.
           apply Nat.eqb_neq in H
       | H: (_ <=? _)%nat = true |- _ =>
           apply Nat.leb_le in H
+      | H: list_eqb Nat.eqb _ _ = true |- _ =>
+          apply list_eqb_spec in H; [|apply Nat.eqb_eq]; subst
       end;
     repeat match goal with
       | IH: _ -> _ -> forall _, _ -> _ |- _ =>
@@ -2996,7 +3022,11 @@ Proof.
       | H: context[match ?x with _ => _ end] |- _ =>
           let E := fresh "E" in destruct x eqn:E; try congruence; []
       end;
-    invs'.
+    invs';
+    repeat match goal with
+      | H: list_eqb Nat.eqb _ _ = true |- _ =>
+          apply list_eqb_spec in H; [|apply Nat.eqb_eq]; subst
+      end.
   - f_equal. rewrite genr_is_map. rewrite map_map.
     erewrite <- (Zexprs_corresp_same _ _ lo2) in * by eassumption.
     erewrite <- (Zexprs_corresp_same _ _ hi2) in * by eassumption.
@@ -3329,7 +3359,7 @@ Proof.
            eapply includes_add_new. apply not_In_valuation_of_None. intros H'.
            apply Hctx2 in H'. lia. }
       { erewrite <- sound_sizeof_wf. 2: eauto. 1: eassumption. 1: apply blah. auto. }
-      apply blah.      
+      apply blah.
   - eapply mk_eval_sum.
     + eapply sound_sizeof_size_of. 6: eassumption. all: eauto.
       3: { constructor; eauto. simpl. auto. }
@@ -3561,7 +3591,7 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
           result_has_shape' sh r ->
           fvar_idxs_in_bounds sz (e r)
   | tZ :: ts', with_Z_var sz => fun e => forall r,
-                                  fvar_idxs_in_bounds (sz r) (e (argvarZ r))           
+                                  fvar_idxs_in_bounds (sz r) (e (argvarZ r))
   (* | tB :: ts', with_B_var sz => *)
   (*     (* fun e => forall r, fvar_idxs_in_bounds sz (e r)*) *)
   (*     fun _ => False *)
@@ -3575,7 +3605,7 @@ Fixpoint fvar_idxs_in_bounds' {ts n} (sizes : size_spec) (e : fvar_pATLexpr inte
       n = length sh /\
         fvar_idxs_in_bounds' sz (e sh)
   | tZ :: ts', with_Z_var sz => fun e => forall r,
-                                  fvar_idxs_in_bounds' (sz r) (e (argvarZ r))           
+                                  fvar_idxs_in_bounds' (sz r) (e (argvarZ r))
   | _, _ => fun _ => False
   end e.
 
@@ -3592,7 +3622,7 @@ Proof.
   - destruct t; try contradiction.
     + destruct sizes; try contradiction. eauto.
     + destruct sizes; try contradiction. invs'. eauto.
-Qed.    
+Qed.
 
 Fixpoint fvar_sound_sizeof {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_type_result ts n) : Prop :=
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
@@ -3605,7 +3635,7 @@ Fixpoint fvar_sound_sizeof {ts n} (sizes : size_spec) (e : fvar_pATLexpr interp_
   | tensor_n n :: ts', with_T_var sh sz =>
       fun e => forall r, fvar_sound_sizeof sz (e r)
   | tZ :: ts', with_Z_var sz =>
-      fun e => forall r, fvar_sound_sizeof (sz r) (e (argvarZ r))           
+      fun e => forall r, fvar_sound_sizeof (sz r) (e (argvarZ r))
   | _, _ => fun _ => False
   end e.
 

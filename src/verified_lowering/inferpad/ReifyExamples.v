@@ -62,7 +62,7 @@ Definition matmul_size1 :=
 Derive string_matmul_tiled in
   (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size1 string_matmul_tiled (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4))
     as string_matmul_tiled_correct.
-Proof. cbv [matmul_tiled]. prove_spec_of. all: fail. Abort.
+Proof. cbv [matmul_tiled]. prove_spec_of. Fail Fail Qed. Abort.
 
 Definition matmul_size2 :=
   with_T_var [50; 70] (with_T_var [70; 30] (size_nil True)).
@@ -70,12 +70,12 @@ Definition matmul_size2 :=
 Derive string_matmul_tiled_split in
   (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size2 string_matmul_tiled_split (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4))
     as string_matmul_tiled_split_correct.
-Proof. cbv [matmul_tiled_split]. prove_spec_of. all: fail. Abort.
+Proof. cbv [matmul_tiled_split]. prove_spec_of. Fail Fail Qed. Abort.
 
 Derive string_matmul_tiled_split in
   (spec_of [tensor_n 2; tensor_n 2] 2 O matmul_size2 string_matmul_tiled_split (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4))
     as string_matmul_tiled_split_correct.
-Proof. cbv [matmul_tiled_split]. prove_spec_of. all: fail. Abort.
+Proof. cbv [matmul_tiled_split]. prove_spec_of. Fail Fail Qed. Abort.
 
 Definition conv_size :=
   with_Z_var
@@ -101,7 +101,7 @@ Definition size0 :=
        with_Z_var
          (fun m =>
             with_T_var [Z.to_nat n; Z.to_nat m]
-              (size_nil (2 < n /\ 0 < m)%Z))).
+              (size_nil (2 < n /\ 1 < m)%Z))).
 
 Derive string_prog in
   (let shallow_prog :=
@@ -123,89 +123,124 @@ Derive string_prog in
          )) in
    spec_of [tZ; tZ; tensor_n 2] 2 O size0 string_prog shallow_prog)
     as string_prog_correct.
-Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Print list_eq_dec. simpl. cbv [list_eq_dec]. subst.
-Goal forall n m,
-    (fun l : list (list R) =>
-       )
-    = (fun l => nil).
-Proof.
-  intros.
-  Reify_lhs foo.
-Abort.
+Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Fail Fail Qed. Abort.
 
-Goal forall n m,
-    (fun l : list (list R) =>
+Definition size1 :=
+  with_Z_var
+    (fun n =>
+       with_Z_var
+         (fun m =>
+            with_T_var [Z.to_nat n; Z.to_nat m]
+              (size_nil (0 < n /\ 1 < m)%Z))).
+
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m l =>
        transpose (
            (GEN [ j < 1 ]
-              GEN [ i < Z.of_nat n ]
+              GEN [ i < n ]
               l _[i;j])
              <++>
-             (GEN [ 1 <= j < Z.of_nat m ]
-                GEN [ i < Z.of_nat n ]
-                l _[i;j])
-    ))
-    = (fun _ => nil).
-Proof.
-  intros.
-  Reify_lhs foo.
-Abort.
+             (GEN [ 1 <= j < m ]
+                GEN [ i < n ]
+                l _[i;j])) in
+   spec_of [tZ; tZ; tensor_n 2] 2 O size1 string_prog shallow_prog)
+    as string_prog_correct.
+Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Fail Fail Qed. Abort.
 
-Goal forall n m,
-    (fun v : list (list R) =>
+Definition size2 :=
+  with_Z_var
+    (fun n =>
+       with_Z_var
+         (fun m =>
+            with_T_var [Z.to_nat n; Z.to_nat m]
+              (size_nil (1 < n /\ 1 < m)%Z))).
+
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m v =>
        transpose (
            (GEN [ j < 1 ]
               (GEN [ i < 1 ]
                  v _[i;j])
               <++>
-              (GEN [ 1 <= i < Z.of_nat n ]
-                 v _[i;j])
-           )
+              (GEN [ 1 <= i < n ]
+                 v _[i;j]))
              <++>
-             (GEN [ 1 <= j < Z.of_nat m ]
-                GEN [ i < Z.of_nat n ]
-                v _[i;j]
-             )
-    ))
-    = (fun _ => nil).
-Proof.
-  intros.
-  Reify_lhs foo.
-Abort.
+             (GEN [ 1 <= j < m ]
+                GEN [ i < n ]
+                v _[i;j])) in
+   spec_of [tZ; tZ; tensor_n 2] 2 O size2 string_prog shallow_prog)
+    as string_prog_correct.
+Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Fail Fail Qed. Abort.
 
-Goal forall n m,
-    (fun l : list (list R) => transpose (
-               GEN [ j < Z.of_nat m ]
-                 (GEN [ i < 1 ]
-                    l _[i;j])
-                 <++>
-                 (GEN [ 1 <= i < Z.of_nat n ]
-                    l _[i;j])))
-    = (fun _ => nil).
-Proof.
-  intros.
-  Reify_lhs foo.
-Abort.
+Definition size3 :=
+  with_Z_var
+    (fun n =>
+       with_Z_var
+         (fun m =>
+            with_T_var [Z.to_nat n; Z.to_nat m]
+              (size_nil (1 < n /\ 0 < m)%Z))).
 
-Goal forall n m,
-    (fun l : list R =>
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m l =>
+       transpose (
+           GEN [ j < m ]
+             (GEN [ i < 1 ]
+                l _[i;j])
+             <++>
+             (GEN [ 1 <= i < n ]
+                l _[i;j])) in
+   spec_of [tZ; tZ; tensor_n 2] 2 O size3 string_prog shallow_prog)
+    as string_prog_correct.
+Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Fail Fail Qed. Abort.
+
+Definition size4 :=
+  with_Z_var
+    (fun n =>
+       with_Z_var
+         (fun m =>
+            with_T_var [Z.to_nat n * Z.to_nat m]
+              (size_nil (0 < n /\ 1 < m)%Z))).
+
+Axiom f : False.
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m l =>
        Common.flatten (
            Common.transpose
              (
                (GEN [ i < 1 ]
-                  (GEN [ j < Z.of_nat n ]
-                     l _[j * Z.of_nat m + i]))
+                  (GEN [ j < n ]
+                     l _[j * m + i]))
                  <++>
-                 (GEN [ 1 <= i < Z.of_nat m ]
-                    (GEN [ j < Z.of_nat n ]
-                       l _[j * Z.of_nat m + i]))
-    )))
-
-    = (fun _ => nil).
+                 (GEN [ 1 <= i < m ]
+                    (GEN [ j < n ]
+                       l _[j * m + i])))) in
+   spec_of [tZ; tZ; tensor_n 1] 1 O size4 string_prog shallow_prog)
+    as string_prog_correct.
 Proof.
-  intros.
-  Reify_lhs foo.
+  intro shallow_prog. subst shallow_prog. prove_spec_of.
+  { rewrite Nat2Z.inj_mul. do 2 rewrite Z2Nat.id by lia.
+                         (*probably true*) destruct f. }
+  { rewrite Nat2Z.inj_mul. do 2 rewrite Z2Nat.id by lia.
+                         (*probably true*) destruct f. }
+  Fail Fail Qed.
 Abort.
 
+Definition blur_size :=
+  with_Z_var
+    (fun N =>
+       with_Z_var
+         (fun M =>
+            with_T_var [Z.to_nat N; Z.to_nat M]
+              (size_nil True))).
+
+About blurimmediate.
+Derive blurimmediate_string in
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurimmediate_string blurimmediate)
+    as blurimmediate_string_correct.
 Goal forall N M,
     (fun v : list (list R) => blurimmediate v M N) = (fun v => blurtwostage N M v).
 Proof.

@@ -351,15 +351,16 @@ Ltac prove_sideconditions :=
   | |- Wf_fvar_ATLExpr _ =>
   simpl; apply WfByUnnatify; simpl; reflexivity
   | |- fvar_sound_sizeof _ _ =>
-      simpl; intros; checks_are_true; try (exact I)
+      repeat progress (intros; cbv [list_eqb]; cbn -[Nat.eqb Nat.ltb]; checks_are_true); try (exact I)
   | |- fvar_idxs_in_bounds' _ _ =>
-      simpl; intros; repeat progress (do_arith || checks_are_true)
+      repeat progress (intros; cbv [list_eqb]; cbn -[Nat.eqb Nat.ltb]; checks_are_true; do_arith)
   | |- fvar_sum_bounds_good _ _ =>
-  simpl; intros; do_arith
+      simpl; intros; do_arith
   | |- _ => idtac
   end.
 
 Ltac normalize_spec_of :=
+  lazy[dim_n];
   match goal with
   | |- spec_of _ _ _ _ _ ?p =>
       eassert (p = _) as -> by
