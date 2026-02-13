@@ -240,49 +240,53 @@ Definition blur_size :=
 Derive blurimmediate_string in
   (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurimmediate_string (fun N M v => blurimmediate v M N))
     as blurimmediate_string_correct.
+Proof. cbv [blurimmediate]. prove_spec_of. Qed.
+
+Check spec_of. Search result_has_shape'.
+Fixpoint same_function ts n sz (f1 f2 : fun_type interp_type ts (dim_n n)) :=
+  match ts, sz return fun_type _ ts _ -> fun_type _ ts _ -> _ with
+  | [], size_nil P => fun f1 f2 =>
+      P ->
+      f1 = f2
+  | tZ :: ts', with_Z_var sz' => fun f1 f2 =>
+                                 forall x, same_function ts' n (sz' x) (f1 x) (f2 x)
+  | tensor_n _ :: ts', with_T_var sh sz' => fun f1 f2 =>
+                                            forall x,
+                                              consistent x (tuple_of_list sh) ->
+                                              same_function ts' n sz' (f1 x) (f2 x)
+  | _, _ => fun _ _ => False
+  end f1 f2.
+
+Lemma spec_of_ext ts n name sz e_string f1 f2 :
+  spec_of ts n name sz e_string f1 ->
+  same_function ts n sz f1 f2 ->
+  spec_of ts n name sz e_string f2.
 Proof.
-  cbv [blurimmediate]. Print prove_spec_of. normalize_spec_of. prove_spec_of0.
+  revert sz.
+  induction ts as [|t ?]; simpl; intros H1 H2; destruct sz; try contradiction.
+  - cbv [spec_of spec_of'] in *. intros. rewrite <- H2 by assumption. auto.
+  - destruct t; contradiction.
+  - destruct t; try contradiction. cbv [spec_of] in *. simpl in *. intros. eapply IHts. simpl.
 
-  prove_sideconditions.
-  prove_sideconditions.
-  simpl.
-  prove_sideconditions.
 
-3:  prove_sideconditions.
-  Print prove_spec_of.
-  normalize_spec_of.
-  match goal with
-  | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
-        let e' := fresh "e'" in
-        Reify shallow_expr e'; refine
-         (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _);
-         [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map
-               interp_pZexpr Var' e'];
-            reflexivity
-         | .. ]
-  end.
-  5: { simpl. lazy [e' varify Var' stringvar_fvar_ATLexpr stringvar_ATLexpr].
-       eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
-       eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
-       cbv match.
-                match goal with
-                | |- context[stringvar_S (SBop ATLPhoas.Add (SBop ?x ?y ?z) ?w)] =>
-                    set (r := stringvar_S (SBop ATLPhoas.Add (SBop x y z) w))
-                end.
-                simpl in r.
-       eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
-       eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
-       Print stringvar_S. simpl.
 
-  | fail].
-  (*expected.  cannot be making nat from z.  need to rewrite blurimmediate.*)
-Abort.
 
-Derive blurimmediate_string in
-  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurimmediate_string (fun N M => blurtwostage (Z.to_nat N) (Z.to_nat M)))
-    as blurimmediate_string_correct.
+Derive blurtwostage_string in
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurtwostage_string blurtwostage)
+    as blurtwostage_string_correct.
 Proof.
   cbv [blurtwostage].
+  lazy[dim_n];
+   match goal with
+   | |- spec_of _ _ _ _ _ ?p =>
+       eassert (p = _) as ->;
+                            [repeat (apply functional_extensionality; intro)|]
+   end.
+  { Print normalize. Print normalize_ssa. Print normalize_types. Print normalize_rec.
+
+
+
+    ; normalize_ssa.
   Fail first[prove_spec_of | fail].
   (*expected.  program is in the wrong.*)
 Abort.

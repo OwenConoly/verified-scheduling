@@ -344,6 +344,7 @@ Ltac do_arith :=
     | H: _ /\ _ |- _ => destruct H
     | |- _ /\ _ => split
     | |- _ => lia
+    | |- _ = _ => reflexivity
     end.
 
 Ltac prove_sideconditions :=
