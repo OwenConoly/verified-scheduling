@@ -634,7 +634,11 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
     | Some (m :: rest) => Some (n + m :: rest)
     | _ => None
     end
-  | Var x => None (*should never happen*)
+  | @Var _ n _ =>
+      match n with
+      | O => Some []
+      | _ => None
+      end
   | @Get _ n v idxs =>
       if (length idxs =? n)%nat then
         match v with
@@ -762,7 +766,7 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
   | Var x =>
       (*why is it not just x here :( *)
       match x with
-      | Result.V _ => x
+      | Result.V _ => Result.S (SS 0)
       | Result.S (SS _) => x
       | Result.S SX => Result.S (SS 0)
       end
@@ -1512,7 +1516,6 @@ Proof.
     + pose proof ndiv_pos as H'. specialize (H' n1 n0 ltac:(lia) ltac:(lia)). lia.
     + auto.
   - intros [?| [?|?] ]; [lia|lia|auto].
-  - congruence.
 Qed.
 
 Lemma map_seq a b :
@@ -2096,7 +2099,7 @@ Proof.
       -- eauto.
       -- prove_sound_sizeof.
   - destruct (interp_pBexpr _); auto.
-  - congruence.
+  - destruct v2 as [ [ | ] | ]; constructor.
   - destruct x2; constructor.
   - destruct (result_of_pATLexpr _); auto. destruct (result_of_pATLexpr _); auto.
 Qed.
@@ -3027,7 +3030,6 @@ Proof.
     rewrite of_nat_div_distr in H'. rewrite Nat2Z.id in H'.
     eapply H'; eauto.
   - rewrite Nat.add_comm. eauto with consistent.
-  - congruence.
     Unshelve. all: exact (dummy_result _).
 Qed.
 
@@ -3264,7 +3266,8 @@ Proof.
       apply Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
       intros. apply tensor_of_result_size; auto. apply sound_sizeof_gives_dim in E.
       simpl in E. lia.
-  - congruence.
+  - invert Hidxs. rewrite Forall_forall in Hctx. specialize (Hctx _ ltac:(eassumption)).
+    simpl in Hctx. subst. destruct s; reflexivity.
   - apply invert_wf_var in H. invs'. rewrite H1 in *. clear i H1.
     assert (map interp_pZexpr idxs1 = map interp_pZexpr idxs2) as ->.
     { clear -H0 Hctx. induction H0; simpl; f_equal; eauto.

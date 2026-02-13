@@ -235,13 +235,20 @@ Definition blur_size :=
        with_Z_var
          (fun M =>
             with_T_var [Z.to_nat N; Z.to_nat M]
-              (size_nil True))).
+              (size_nil (0 < N /\ 0 < M)%Z))).
 
 Derive blurimmediate_string in
   (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurimmediate_string (fun N M v => blurimmediate v M N))
     as blurimmediate_string_correct.
 Proof.
-  cbv [blurimmediate].
+  cbv [blurimmediate]. Print prove_spec_of. normalize_spec_of. prove_spec_of0.
+
+  prove_sideconditions.
+  prove_sideconditions.
+  simpl.
+  prove_sideconditions.
+
+3:  prove_sideconditions.
   Print prove_spec_of.
   normalize_spec_of.
   match goal with
@@ -254,7 +261,7 @@ Proof.
             reflexivity
          | .. ]
   end.
-  5: { lazy [e' varify Var' stringvar_fvar_ATLexpr stringvar_ATLexpr].
+  5: { simpl. lazy [e' varify Var' stringvar_fvar_ATLexpr stringvar_ATLexpr].
        eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
        eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
        cbv match.
