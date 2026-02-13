@@ -759,15 +759,25 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       | V xs, _ :: sh => V (xs ++ gen_pad_list (k :: sh))
       | _, _ => V []
       end
-  | Var x => x
+  | Var x =>
+      (*why is it not just x here :( *)
+      match x with
+      | Result.V _ => x
+      | Result.S (SS _) => x
+      | Result.S SX => Result.S (SS 0)
+      end
   | Get x idxs =>
-      (*why is it like this*)
-      let r := eval_get' (result_of_pATLexpr x) (map interp_pZexpr idxs) in
-      Result.S
-        match r with
-        | Result.SS _ => r
-        | Result.SX => Result.SS 0%R
-        end
+      match x with
+      | Var y =>
+          let r := eval_get' y (map interp_pZexpr idxs) in
+          Result.S
+            (* why :( *)
+            match r with
+            | Result.SS _ => r
+            | Result.SX => Result.SS 0%R
+            end
+      | _ => Result.S SX
+      end
   | SBop o x y =>
       match result_of_pATLexpr x, result_of_pATLexpr y with
       | Result.S x0, Result.S y0 => Result.S (bin_scalar_result (interp_Sbop o) x0 y0)
@@ -936,6 +946,7 @@ Fixpoint stringvar_S {n} (e : pATLexpr (fun _ => tagged_nat) n) : option Sexpr :
       | Var y => Some (Sexpr.Get (nat_to_string y) (map stringvar_Z idxs))
       | _ => None
       end
+  | Var x => Some (Sexpr.Get (nat_to_string x) [])
   | _ => None
   end.
 
@@ -2086,6 +2097,7 @@ Proof.
       -- prove_sound_sizeof.
   - destruct (interp_pBexpr _); auto.
   - congruence.
+  - destruct x2; constructor.
   - destruct (result_of_pATLexpr _); auto. destruct (result_of_pATLexpr _); auto.
 Qed.
 
@@ -2170,12 +2182,15 @@ Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
   | Flatten e | Split _ e | Transpose e | Truncr _ e | Truncl _ e | Padr _ e
   | Padl _ e =>
       idxs_in_bounds e
-  | Var x => True
+  | Var x => result_has_shape' [] x
   | Get v idxs =>
-      idxs_in_bounds v /\
-      exists sh,
-      result_has_shape' sh (result_of_pATLexpr v) /\
-        Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs) sh
+      match v with
+      | Var x =>
+          exists sh,
+          result_has_shape' sh x /\
+            Forall2 (fun i len => (0 <= i < Z.of_nat len)%Z) (map interp_pZexpr idxs) sh
+      | _ => False
+      end
   | SBop o x y =>
       match o with
       | Div =>
@@ -2225,7 +2240,7 @@ Fixpoint idxs_in_bounds' {n} (e : pATLexpr interp_type_result' n) :=
   | Flatten e | Split _ e | Transpose e | Truncr _ e | Truncl _ e | Padr _ e
   | Padl _ e =>
       idxs_in_bounds' e
-  | Var x => True
+  | Var sh => sh = []
   | Get v idxs =>
       match v with
       | Var sh =>
@@ -2296,8 +2311,11 @@ Proof.
     eapply sound_sizeof_result_has_shape. 1: eassumption. 3: eassumption.
     1: reflexivity. eauto using Forall_impl, corresp'_sizes_consistent.
   - invs'. eauto.
-  - destruct_one_match_hyp; try contradiction. simpl in *. split; eauto.
-    apply inv_wf_ATLexpr in H. invs'. simpl. pose proof Hcorresp' as H'.
+  - subst. rewrite Forall_forall in Hcorresp'.
+    specialize (Hcorresp' _ ltac:(eassumption)). apply Hcorresp'.
+  - destruct_one_match_hyp; try contradiction. simpl in *.
+    remember (Var i) eqn:Ei. destruct H; try congruence. subst. invert Ei.
+    pose proof Hcorresp' as H'.
     rewrite Forall_forall in H'.
     specialize (H' _ ltac:(eassumption)). simpl in H'. eexists.
     split; [eassumption|].
@@ -2394,14 +2412,26 @@ Proof.
       | H: context[match ?x with _ => _ end] |- _ => destruct x; try congruence; []
       end;
     invs'.
+  - invert Hbds. destruct s.
+    + split; [reflexivity|]. eassert (SS _ = _) as ->; cycle 1.
+      { econstructor.
+        - eapply ec_of_correct; eauto.
+        - constructor. }
+      reflexivity.
+    + split; [reflexivity|]. eassert (SS _ = _) as ->; cycle 1.
+      { econstructor.
+        - eapply ec_of_correct; eauto.
+        - constructor. }
+      reflexivity.
   - remember (Var _) eqn:E'. destruct H; try congruence. invert E'.
-    split; [reflexivity|].
+    split; [reflexivity|]. invs'.
     eassert (eval_get' _ _ = _) as ->; cycle 1.
     { econstructor.
       - eapply ec_of_correct; eauto.
       - eapply eval_get_eval_get'. 1: eauto. 3: eauto. 3: eauto.
-        { simpl in *. assumption. }
-        apply Forall2_length in H5. rewrite length_map in H5. auto. }
+        { simpl in *. invs'. assumption. }
+        apply Forall2_length in H4. rewrite length_map in H4. auto. }
+    simpl.
     reflexivity.
   - specialize (IHwf_ATLexpr1 ltac:(eassumption) _ eq_refl ltac:(assumption)).
     specialize (IHwf_ATLexpr2 ltac:(eassumption) _ eq_refl ltac:(assumption)).
@@ -3235,7 +3265,7 @@ Proof.
       intros. apply tensor_of_result_size; auto. apply sound_sizeof_gives_dim in E.
       simpl in E. lia.
   - congruence.
-  - apply invert_wf_var in H. invs'. rewrite H3 in *. clear H3 i.
+  - apply invert_wf_var in H. invs'. rewrite H1 in *. clear i H1.
     assert (map interp_pZexpr idxs1 = map interp_pZexpr idxs2) as ->.
     { clear -H0 Hctx. induction H0; simpl; f_equal; eauto.
       eauto using Zexprs_corresp_same. }
@@ -3326,7 +3356,7 @@ Proof.
       end;
     invs';
     simpl in *;
-    repeat (destruct_one_match_hyp; try congruence; []);
+    repeat (destruct_one_match_hyp; try (congruence || contradiction); []);
     invs';
     repeat match goal with
       | H: (_ <? _)%nat = true |- _ =>
@@ -3537,7 +3567,7 @@ Proof.
   - pose proof stringvar_S_correct as H'.
     epose proof (H' _ _ _ _ _) as H'.
     specialize (H' ltac:(eassumption)).
-    specialize H' with (2 := E1).
+    specialize H' with (2 := E2).
     specialize (H' ltac:(constructor; eauto) ltac:(simpl; eauto)).
     simpl in H'.
     invs'. constructor. assumption.

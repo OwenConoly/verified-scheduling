@@ -237,26 +237,49 @@ Definition blur_size :=
             with_T_var [Z.to_nat N; Z.to_nat M]
               (size_nil True))).
 
-About blurimmediate.
 Derive blurimmediate_string in
-  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurimmediate_string blurimmediate)
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurimmediate_string (fun N M v => blurimmediate v M N))
     as blurimmediate_string_correct.
-Goal forall N M,
-    (fun v : list (list R) => blurimmediate v M N) = (fun v => blurtwostage N M v).
 Proof.
-  intros.
   cbv [blurimmediate].
-  Reify_lhs foo.
+  Print prove_spec_of.
+  normalize_spec_of.
+  match goal with
+  | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
+        let e' := fresh "e'" in
+        Reify shallow_expr e'; refine
+         (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _);
+         [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map
+               interp_pZexpr Var' e'];
+            reflexivity
+         | .. ]
+  end.
+  5: { lazy [e' varify Var' stringvar_fvar_ATLexpr stringvar_ATLexpr].
+       eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
+       eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
+       cbv match.
+                match goal with
+                | |- context[stringvar_S (SBop ATLPhoas.Add (SBop ?x ?y ?z) ?w)] =>
+                    set (r := stringvar_S (SBop ATLPhoas.Add (SBop x y z) w))
+                end.
+                simpl in r.
+       eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
+       eassert (stringvar_S _ = _) as -> by (simpl; reflexivity).
+       Print stringvar_S. simpl.
+
+  | fail].
+  (*expected.  cannot be making nat from z.  need to rewrite blurimmediate.*)
 Abort.
 
-Goal forall N M,
-    (fun v : list (list R) => blurtwostage N M v) = (fun v => blurimmediate v M N).
+Derive blurimmediate_string in
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurimmediate_string (fun N M => blurtwostage (Z.to_nat N) (Z.to_nat M)))
+    as blurimmediate_string_correct.
 Proof.
-  intros.
   cbv [blurtwostage].
-  Reify_lhs foo.
+  Fail first[prove_spec_of | fail].
+  (*expected.  program is in the wrong.*)
 Abort.
-
+Print fusion_no_boundary.
 Goal forall n m,
     (fun l : list (list R) => blur_tiles_guarded l n m 4 4)
     = (fun _ => nil).

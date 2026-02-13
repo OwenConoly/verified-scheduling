@@ -15,7 +15,7 @@ Set Warnings "-omega-is-deprecated,-deprecated".
 Import ListNotations.
 
 From ATL Require Import ATL Tactics Div Common CommonTactics.
-From Examples Require Import Blur. 
+From Examples Require Import Blur.
 
 Generalizable All Variables.
 (*
@@ -86,7 +86,7 @@ Ltac safe :=
         match cvsh with
         | consistent _ (?n,_) => n
         end in
-    assert (i < Z.of_nat n)%Z by eauto with crunch; 
+    assert (i < Z.of_nat n)%Z by eauto with crunch;
     apply get_eq_index;
     safe
   | |- _ = _ =>
@@ -97,11 +97,12 @@ Ltac safe :=
 Ltac check_safe := etransitivity; [ safe; try reflexivity | eauto ]; lazy beta.
 
 Goal forall X (H : TensorElem X) N M (v : list (list R)) s,
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,s)) ->
+    (0 < N)%Z ->
+    (0 < M)%Z ->
+    consistent v (Z.to_nat N,(Z.to_nat M,s)) ->
     blur_tiles_guarded v N M 4 4 = @nil _.
 Proof.
   intros. autounfold with examples.
+  (*TODO what is this doing?  did i break it?*)
   check_safe.
 Abort.
