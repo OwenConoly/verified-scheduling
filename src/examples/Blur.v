@@ -81,17 +81,15 @@ Section two_to_part.
   Proof.
     reschedule.
 
-    rw^ Nat2Z.inj_add. simpl.
+    progress rw^ @split_gen upto (N + 2)%Z at 1%Z.
 
-    rw^ @split_gen upto (N + 2)%Z at 1%Z.
-
-    rw^ @split_genr upto (N + 2)%Z at (N + 1)%Z.
+    progress rw^ @split_genr upto (N + 2)%Z at (N + 1)%Z.
 
     etransitivity.
     apply tlet_eq_bound.
     apply concat_eq_r.
-    rw^ split_gen upto M at 1%Z.
-    rw^ @split_genr upto M at (M - 1)%Z.
+    progress rw^ split_gen upto M at 1%Z.
+    progress rw^ @split_genr upto M at (M - 1)%Z.
     reflexivity.
 
     simpl_guard.

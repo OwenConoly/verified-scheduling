@@ -40,8 +40,8 @@ Definition gen_n n := @genr (dim_n n) _.
 Definition sum_n n := @sumr (dim_n n) _.
 Definition iverson_n n := @iverson (dim_n n) _.
 Definition flatten_n n := @Common.flatten (dim_n n) _.
-Definition truncr_n n := @truncr (dim_n n) _.
-Definition truncl_n n := @truncl (dim_n n) _.
+Definition truncr_n n := @Common.Truncr (dim_n n) _.
+Definition truncl_n n := @Common.Truncl (dim_n n) _.
 Definition transpose_n n := @transpose (dim_n n) _.
 Definition concat_n n := @concat (dim_n n) _.
 Definition tile_n n := @tile (dim_n n) _.
@@ -80,9 +80,9 @@ Definition pairs_to_reify :=
    (flatten_n, fun var => @Flatten var)
      : pair_to_reify (fun var => forall n, var (tensor_n (S (S n))) -> var (tensor_n (S n)));
    (truncr_n, fun var => @Truncr var)
-     : pair_to_reify (fun var => forall n, nat -> var (tensor_n (S n)) -> var (tensor_n (S n)));
+     : pair_to_reify (fun var => forall n, var tZ -> var (tensor_n (S n)) -> var (tensor_n (S n)));
    (truncl_n, fun var => @Truncl var)
-     : pair_to_reify (fun var => forall n, nat -> var (tensor_n (S n)) -> var (tensor_n (S n)));
+     : pair_to_reify (fun var => forall n, var tZ -> var (tensor_n (S n)) -> var (tensor_n (S n)));
    (transpose_n, fun var => @Transpose var)
      : pair_to_reify (fun var => forall n, var (tensor_n (S (S n))) -> var (tensor_n (S (S n))));
    (concat_n, fun var => @Concat var)
@@ -202,9 +202,13 @@ Ltac pattern_shallows x :=
 ,( flatten_n :
 (forall n : nat, interp_type (tensor_n (S (S n))) -> interp_type (tensor_n (S n))) )
 ,( truncr_n :
-(forall n : nat, nat -> interp_type (tensor_n (S n)) -> interp_type (tensor_n (S n))) )
+(forall n : nat,
+ interp_type tZ -> interp_type (tensor_n (S n)) -> interp_type (tensor_n (S n)))
+)
 ,( truncl_n :
-(forall n : nat, nat -> interp_type (tensor_n (S n)) -> interp_type (tensor_n (S n))) )
+(forall n : nat,
+ interp_type tZ -> interp_type (tensor_n (S n)) -> interp_type (tensor_n (S n)))
+)
 ,( transpose_n :
 (forall n : nat, interp_type (tensor_n (S (S n))) -> interp_type (tensor_n (S (S n))))
 )
@@ -239,10 +243,10 @@ Ltac get_fun x :=
   lazymatch x with
   | ?f _ => get_fun f
   | _ => x
-  end. Check Common.Truncr. Check truncl. Print Common.Truncr.
+  end.
 
 Ltac make_types_reifiable_in x :=
-  lazy[dim_n];
+  lazy [dim_n] in x;
   (*Line above prevents line below from caulsing following error.
     Error: Replacement would lead to an ill-typed term: In pattern-matching on term
     "n" the branch for constructor "O" has type "Type" which should be
@@ -255,7 +259,7 @@ Ltac make_types_reifiable_in x :=
   repeat change (@get _ _ ?v ?i) with (@gget_R (S O) v [i]) in x;
   repeat change (@gget_R ?n (@get _ _ ?v ?idx) ?idxs) with (@gget_R (S n) v (idx :: idxs)) in x;
   change Z with (interp_type tZ) in x;
-  cbv [gen sum Common.Truncr] in x;
+  cbv [gen sum] in x;
   (*i do not understand why i wrote the following code.  also, it sometimes loops*)
 
   (* (*Z's are not allowed to be used as constants; *)
@@ -270,8 +274,8 @@ Ltac make_types_reifiable_in x :=
   repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n) in x;
   repeat change (@iverson (interp_type (tensor_n ?n)) _) with (iverson_n n) in x;
   repeat change (@Common.flatten (interp_type (tensor_n ?n)) _) with (flatten_n n) in x;
-  repeat change (@truncr (interp_type (tensor_n ?n)) _) with (truncr_n n) in x;
-  repeat change (@truncl (interp_type (tensor_n ?n)) _) with (truncl_n n) in x;
+  repeat change (@Common.Truncr (interp_type (tensor_n ?n)) _) with (truncr_n n) in x;
+  repeat change (@Common.Truncl (interp_type (tensor_n ?n)) _) with (truncl_n n) in x;
   repeat change (@transpose (interp_type (tensor_n ?n)) _) with (transpose_n n) in x;
   repeat change (@concat (interp_type (tensor_n ?n)) _) with (concat_n n) in x;
   repeat change (@tile (interp_type (tensor_n ?n)) _) with (tile_n n) in x;

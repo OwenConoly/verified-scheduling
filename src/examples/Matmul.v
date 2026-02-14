@@ -19,7 +19,7 @@ Definition matmul A B C (m1 m2 : (list (list R))) :=
       SUM [ k < B ]
       (m1 _[i;k] * m2 _[k;j])%R.
 
-Hint Unfold matmul : examples.  
+Hint Unfold matmul : examples.
 
 Section Tile.
   Variables (A B C : Z) (m1 m2 : (list (list R))) (k : Z).
@@ -47,22 +47,26 @@ Section Tile.
     rw @consistent_length.
     rw @consistent_length.
     rw @get_gen_some.
-    rw^ @gp_gen_iverson.    
+    rw^ @gp_gen_iverson.
     rw @get_gen_some.
-    
+
     wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < C ] _)
       with (Z.to_nat k).
 
     inline tile.
     rw @get_gen_some.
-    rw^ @gp_gen_iverson.    
+    rw^ @gp_gen_iverson.
 
     rw @gp_double_iverson.
+
+    rw truncr_Truncr.
+    Fail progress rw truncr_Truncr. rewrite truncr_Truncr. (*??*)
+
     done.
   Defined.
 End Tile.
 
-Hint Unfold matmul matmul_tiled : examples.  
+Hint Unfold matmul matmul_tiled : examples.
 
 Hint Resolve floor_lt_ceil Z.div_pos : crunch.
 
@@ -95,22 +99,24 @@ Section Tile.
     rw @consistent_length.
     rw @consistent_length.
     rw @get_gen_some.
-    rw^ @gp_gen_iverson.    
+    rw^ @gp_gen_iverson.
     rw @get_gen_some.
-    
+
     wrapid^ @flatten_truncr_tile_id' around (GEN [ _ < C ] _)
       with (Z.to_nat k).
 
     inline tile.
     rw @get_gen_some.
-    rw^ @gp_gen_iverson.    
+    rw^ @gp_gen_iverson.
 
     rw^ @split_gen upto (C // k)%Z at (C / k )%Z.
     simpl_guard.
+
+    rw truncr_Truncr.
+    Fail progress rw truncr_Truncr. rewrite truncr_Truncr. (*??*)
 
     done.
   Defined.
 End Tile.
 
-Hint Unfold matmul_tiled_split : examples.  
-
+Hint Unfold matmul_tiled_split : examples.

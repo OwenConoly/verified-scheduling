@@ -304,75 +304,132 @@ Proof.
 Abort.
 
 Print blur_tiles_guarded.
-Print blur_size.
+Print blur_size. Print blur_size.
+Definition blur_size' :=
+  with_Z_var
+    (fun N =>
+       with_Z_var
+         (fun M =>
+            with_T_var [Z.to_nat N; Z.to_nat M]
+              (size_nil (2 < N /\ 2 < M)%Z))).
+
 Derive blur_tiles_guarded_string in
-  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blur_tiles_guarded_string (fun n m v => blur_tiles_guarded v n m 4 4))
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size' blur_tiles_guarded_string (fun n m v => blur_tiles_guarded v n m 4 4))
     as blur_tiles_guarded_string_correct.
 Proof.
-  cbv [blur_tiles_guarded]. normalize_spec_of. prove_spec_of0.
-  intros. autounfold with examples.
-  Reify_lhs foo.
+  cbv [blur_tiles_guarded]. Time normalize_spec_of. Time prove_spec_of0.
+  prove_sideconditions.
+  prove_sideconditions. destruct f.
+  prove_sideconditions; destruct f.
+  prove_sideconditions.
+  Fail Fail Qed.
 Abort.
 
-Goal (fun l : list (list R) => tlet y := l in y)
-    = (fun _ => nil).
+Definition size5 := with_T_var [100; 100] (size_nil True).
+
+Derive string_prog in
+  (spec_of [tensor_n 2] 2 O size5 string_prog (fun l : list (list R) => tlet y := l in y))
+    as string_prog_correct.
+Proof. Fail first [prove_spec_of | fail]. (*is this supposed to work?*) Abort.
+  (* eapply spec_of_ext. 1: simpl; auto. 1: cbn -[tensor_has_size']; intros. symmetry. normalize. assert (consistent x1 (Z.to_nat x, (Z.to_nat x0, tt))). { admit. } normalize. *)
+
+Definition fusion_size :=
+  with_Z_var
+    (fun n =>
+       with_Z_var
+         (fun m =>
+            with_T_var [Z.to_nat n; Z.to_nat m]
+              (size_nil (2 < n /\ 2 < m)%Z))).
+
+Derive fusion_no_boundary_string in
+  (spec_of [tZ; tZ; tensor_n 2] 2 O fusion_size fusion_no_boundary_string fusion_no_boundary)
+    as fusion_no_boundary_string_correct.
+Proof. cbv [fusion_no_boundary]. prove_spec_of. Qed.
+
+Definition gather_size :=
+  with_Z_var
+    (fun W =>
+       with_Z_var
+         (fun R0 =>
+            with_T_var [Z.to_nat R0]
+              (with_T_var [Z.to_nat R0]
+            (size_nil (Z.of_nat (Z.to_nat R0) < W)%Z)))).
+
+Derive gather_string in
+  (spec_of [tZ; tZ; tensor_n 1; tensor_n 1] 1 O gather_size gather_string (fun W R0 => gather W))
+    as gather_string_correct.
 Proof.
-  Reify_lhs foo.
+  cbv [gather]. prove_spec_of.
+(*idk what these parameters are supposed to represent,
+  so idk how to fix this*)
+  all: destruct f.
+  Fail Fail Qed.
 Abort.
 
-Goal forall n m,
-    (fun l : list (list R) => fusion_no_boundary n m l) = (fun _ => nil).
+Definition scatter_size := gather_size.
+
+Derive scatter_string in
+  (spec_of [tZ; tZ; tensor_n 1; tensor_n 1] 1 O scatter_size scatter_string (fun W R0 => scatter W))
+    as scatter_string_correct.
 Proof.
-  intros.
-  cbv [fusion_no_boundary].
-  Reify_lhs foo.
+  cbv [scatter]. prove_spec_of.
+  all: destruct f.
+  Fail Fail Qed.
 Abort.
 
-Goal (fun W x w => gather W x w) = (fun _ _ _ => nil).
+Definition im2col_size A B :=
+  with_Z_var
+    (fun K =>
+       with_Z_var
+         (fun W =>
+            with_Z_var
+              (fun RR =>
+                 with_T_var [A; B]
+                   (with_T_var [Z.to_nat K]
+                      (size_nil (0 < K /\ 0 < W /\ 0 < RR)%Z))))).
+
+Derive im2colminilifted_string in
+  (forall A B, spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 1] 2 O (im2col_size A B) im2colminilifted_string im2colminilifted)
+    as im2colminilifted_string_correct.
 Proof.
-  cbv [gather].
-  Reify_lhs foo.
+  cbv [im2colminilifted]. intros.
+  eapply spec_of_ext. 1: simpl; auto. 1: cbn -[tensor_has_size']; intros. symmetry.
+  Fail first [(clear H1; normalize) | fail]. (*why does it need hypotheses to do a noop normalization?  i guess it is recursing under something.*)
+  normalize.
+  reflexivity.
+  prove_spec_of0; prove_sideconditions.
+  (*again i do not understand the spec of this function, so not sure how to make these true*)
+  all: destruct f.
+  Fail Fail Qed.
 Abort.
 
-Goal (fun W x w => scatter W x w) = (fun _ _ _ => nil).
+Derive im2colmini_string in
+  (forall A B, spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 1] 2 O (im2col_size A B) im2colmini_string im2colmini)
+    as im2colmini_string_correct.
 Proof.
-  cbv [scatter].
-  Reify_lhs foo.
+  cbv [im2colmini]. intros. prove_spec_of.
+  all: destruct f.
+  Fail Fail Qed.
 Abort.
 
-Goal (fun K W RR (w : list (list R)) (x : list R) => im2colminilifted K W RR w x) = (fun K W RR w x => im2colmini K W RR w x).
-Proof.
-  cbv [im2colminilifted].
-  Reify_lhs foo.
-Abort.
+Derive blurimmediate_partition_string in
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size' blurimmediate_partition_string blurimmediate_partition)
+    as blurimmediate_partition_string_correct.
+Proof. cbv [blurimmediate_partition]. prove_spec_of. Qed.
 
-(*why is this the same thing*)
-Goal (fun K W RR (w : list (list R)) (x : list R) => im2colminilifted K W RR w x) = (fun K W RR w x => im2colmini K W RR w x).
-Proof.
-  cbv [im2colminilifted].
-  Reify_lhs foo.
-Abort.
+Derive blurimmediate_isolate_string in
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size' blurimmediate_isolate_string blurimmediate_isolate)
+    as blurimmediate_isolate_string_correct.
+Proof. cbv [blurimmediate_isolate]. prove_spec_of. Qed.
 
-Goal forall n m,
-    (fun v : list (list R) => blurimmediate_partition n m v) = (fun _ => nil).
-Proof.
-  intros.
-  cbv [blurimmediate_partition].
-  Reify_lhs foo.
-Abort.
-
-Goal forall n m,
-    (fun v : list (list R) => blurimmediate_isolate n m v) = (fun _ => nil).
-Proof.
-  intros.
-  cbv [blurimmediate_isolate].
-  Reify_lhs foo.
-Abort.
-
-Goal forall N M,
-    (fun v : list (list R) => blurtwostage_partition N M v) = (fun _ => nil).
-Proof.
-  intros.
-  cbv [blurtwostage_partition].
-  Reify_lhs foo.
-Abort.
+Derive blurtwostage_partition_string in
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size' blurtwostage_partition_string blurtwostage_partition)
+    as blurtwostage_partition_string_correct.
+Proof. cbv [blurtwostage_partition].
+       eapply spec_of_ext. 1: simpl; auto. 1: cbn [same_function blur_size']; intros.
+       symmetry.
+       Fail first [(clear H1; normalize) | fail].
+       normalize.
+       reflexivity.
+       prove_spec_of0; prove_sideconditions.
+Qed.
