@@ -381,8 +381,8 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 | Flatten {n} : pATLexpr (S (S n)) -> pATLexpr (S n)
 | Split {n} : nat -> pATLexpr (S n) -> pATLexpr (S (S n))
 | Transpose {n} : pATLexpr (S (S n)) -> pATLexpr (S (S n))
-| Truncr {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
-| Truncl {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
+| Truncr {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
+| Truncl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
 | Padr {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
 | Padl {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
 | Var {n} : var (tensor_n n) -> pATLexpr n
@@ -472,12 +472,14 @@ Inductive wf_ATLexpr : list ctx_elt2 -> forall n, pATLexpr var1 n -> pATLexpr va
 | wf_Transpose ctx n x1 x2 :
   wf_ATLexpr ctx (S (S n)) x1 x2 ->
   wf_ATLexpr ctx _ (Transpose x1) (Transpose x2)
-| wf_Truncr ctx n k x1 x2 :
+| wf_Truncr ctx n k1 k2 x1 x2 :
+  wf_Zexpr ctx k1 k2 ->
   wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx _ (Truncr k x1) (Truncr k x2)
-| wf_Truncl ctx n k x1 x2 :
+  wf_ATLexpr ctx _ (Truncr k1 x1) (Truncr k2 x2)
+| wf_Truncl ctx n k1 k2 x1 x2 :
+  wf_Zexpr ctx k1 k2 ->
   wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx _ (Truncl k x1) (Truncl k x2)
+  wf_ATLexpr ctx _ (Truncl k1 x1) (Truncl k2 x2)
 | wf_Padl ctx n k x1 x2 :
   wf_ATLexpr ctx (S n) x1 x2 ->
   wf_ATLexpr ctx _ (Padl k x1) (Padl k x2)
@@ -526,8 +528,8 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type_tagged n) : interp_type (
   | Flatten x => Common.flatten (interp_pATLexpr x)
   | Split k x => tile (interp_pATLexpr x) k
   | Transpose x => transpose (interp_pATLexpr x)
-  | Truncr k x => truncr k (interp_pATLexpr x)
-  | Truncl k x => truncl k (interp_pATLexpr x)
+  | Truncr k x => Common.Truncr (interp_pZexpr k) (interp_pATLexpr x)
+  | Truncl k x => Common.Truncl (interp_pZexpr k) (interp_pATLexpr x)
   | Padl k x => pad_l k (interp_pATLexpr x)
   | Padr k x => pad_r k (interp_pATLexpr x)
   | Var x => x
@@ -619,9 +621,13 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
           this is because shallow ATL has weird semantics for zero-length tensors,
           which are incompatible with deep ATL semantics.
          *)
-        if (n <? m)%nat then
-          Some (m - n :: rest)
-        else None
+        match sizeof_pZexpr sizeof_var n with
+        | Some n =>
+            if (Z.to_nat n <? m)%nat then
+              Some (m - Z.to_nat n :: rest)
+            else None
+        | None => None
+        end
     | _ => None
     end
   | Padr n e =>
@@ -745,12 +751,12 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       end
   | Truncr k x =>
       match result_of_pATLexpr x with
-      | V xs => V (rev (skipn k (rev xs)))
+      | V xs => V (rev (skipn (Z.to_nat (interp_pZexpr k)) (rev xs)))
       | _ => V []
       end
   | Truncl k x =>
       match result_of_pATLexpr x with
-      | V xs => V (skipn k xs)
+      | V xs => V (skipn (Z.to_nat (interp_pZexpr k)) xs)
       | _ => V []
       end
   | Padl k x =>
@@ -845,8 +851,8 @@ Fixpoint unnatify {var n} (ctx : list (ctx_elt var)) (e : pATLexpr (fun _ => nat
   | Flatten x => Flatten (unnatify ctx x)
   | Split k x => Split k (unnatify ctx x)
   | Transpose x => Transpose (unnatify ctx x)
-  | Truncr k x => Truncr k (unnatify ctx x)
-  | Truncl k x => Truncl k (unnatify ctx x)
+  | Truncr k x => Truncr (unnatify_Z ctx k) (unnatify ctx x)
+  | Truncl k x => Truncl (unnatify_Z ctx k) (unnatify ctx x)
   | Padl k x => Padl k (unnatify ctx x)
   | Padr k x => Padr k (unnatify ctx x)
   (*i do not understand why need @Var _ n here*)
@@ -998,11 +1004,11 @@ Some (name',
 | Truncr k e1 =>
     [[name', e1']] <- stringvar_ATLexpr name e1;
 Some (name',
-    ATLDeep.Truncr (Zexpr.ZLit (Z.of_nat k)) e1')
+    ATLDeep.Truncr (stringvar_Z k) e1')
 | Truncl k e1 =>
     [[name', e1']] <- stringvar_ATLexpr name e1;
 Some (name',
-    ATLDeep.Truncl (Zexpr.ZLit (Z.of_nat k)) e1')
+    ATLDeep.Truncl (stringvar_Z k) e1')
 | Padl k e1 =>
     [[name', e1']] <- stringvar_ATLexpr name e1;
 Some (name',
@@ -1300,16 +1306,18 @@ Lemma inv_wf_ATLexpr {var1 var2} ctx n e1 e2 :
         exists x2,
           wf_ATLexpr var1 var2 ctx (S (S _)) x1 x2 /\
             e2 = Transpose x2
-  | Truncr k x1 =>
+  | Truncr k1 x1 =>
       fun e2 =>
-        exists x2,
-          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Truncr k x2
-  | Truncl k x1 =>
+        exists k2 x2,
+          wf_Zexpr var1 var2 ctx k1 k2  /\
+            wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            e2 = Truncr k2 x2
+  | Truncl k1 x1 =>
       fun e2 =>
-        exists x2,
-          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Truncl k x2
+        exists k2 x2,
+          wf_Zexpr var1 var2 ctx k1 k2  /\
+            wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            e2 = Truncl k2 x2
   | Padl k x1 =>
       fun e2 =>
         exists x2,
@@ -1454,6 +1462,8 @@ Proof.
     eapply H2. 3: eassumption. 1: eauto. prove_sound_sizeof.
   - constructor; eauto.
     eapply H1. 3: eassumption. 1: eauto. prove_sound_sizeof.
+  - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
+  - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
   - congruence.
     Unshelve.
     all: auto.
@@ -2088,12 +2098,13 @@ Proof.
     repeat (erewrite <- sound_sizeof_wf by eauto;
             match goal with
             | H: sound_sizeof _ _ _ = Some _ |- _ => rewrite H
-            end); eauto; auto 10.
+            end);
+    repeat (erewrite sound_sizeof_wf_Z in * by eassumption);
+    repeat (erewrite sizeof_pZexpr_interp_pZexpr by eauto);
+    eauto; auto 10.
   - constructor.
     + rewrite zrange_seq.
       do 2 rewrite map_length. rewrite seq_length.
-      erewrite sound_sizeof_wf_Z in * by eassumption.
-      do 2 erewrite sizeof_pZexpr_interp_pZexpr by eauto.
       reflexivity.
     + apply Forall_map. apply Forall_forall. intros x _. eapply H2.
       -- eauto.
@@ -3018,9 +3029,9 @@ Proof.
           simpl in IH
       end;
     cbn -[consistent];
+    repeat (erewrite sizeof_pZexpr_interp_pZexpr in * by eassumption);
     eauto with consistent.
-  - do 2 erewrite sizeof_pZexpr_interp_pZexpr in * by eassumption. simpl.
-    apply consistent_genr.
+  - apply consistent_genr.
     + lia.
     + intros. eapply H2; eauto. prove_sound_sizeof.
   - invs'. apply consistent_sumr; auto. intros. eapply H2; eauto. prove_sound_sizeof.
@@ -3029,6 +3040,8 @@ Proof.
   - simpl. epose proof consistent_tile as H'. epose_dep H'.
     rewrite of_nat_div_distr in H'. rewrite Nat2Z.id in H'.
     eapply H'; eauto.
+  - apply consistent_truncr; eauto with consistent.
+  - apply consistent_truncl; eauto with consistent.
   - rewrite Nat.add_comm. eauto with consistent.
     Unshelve. all: exact (dummy_result _).
 Qed.
@@ -3231,16 +3244,20 @@ Proof.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr.
+    cbv [Common.Truncr].
     rewrite truncr_is_rev_skipn_rev.
     rewrite map_rev. rewrite <- skipn_map. rewrite map_rev.
+    erewrite <- Zexprs_corresp_same by eassumption.
     reflexivity.
   - pose proof E as E'.
     eapply sound_sizeof_result_has_shape in E'; eauto.
     destruct (result_of_pATLexpr x2); [invert0 E' |].
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr.
+    cbv [Common.Truncl].
     rewrite truncl_is_skipn.
     rewrite <- skipn_map.
+    erewrite <- Zexprs_corresp_same by eassumption.
     reflexivity.
   - pose proof E as E'.
     eapply sound_sizeof_result_has_shape in E'; eauto.
@@ -3510,27 +3527,26 @@ Proof.
     + eauto.
     + eapply sound_sizeof_size_of; eauto; simpl; auto.
       intros x ? ?. destruct x; congruence || auto.
-  - pose proof E2 as E2'.
-    apply name_gets_bigger in E2'.
+  - pose proof E3 as E3'.
+    apply name_gets_bigger in E3'.
     eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E.
-    replace k with (Z.to_nat (Z.of_nat k)) by lia.
+    Search interp_pZexpr.
     constructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H
         end.
-    + simpl. f_equal. lia.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; assumption.
     + eauto.
-  - pose proof E2 as E2'.
-    apply name_gets_bigger in E2'.
+  - pose proof E3 as E3'.
+    apply name_gets_bigger in E3'.
     eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E.
-    replace k with (Z.to_nat (Z.of_nat k)) by lia.
     constructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H
         end.
-    + simpl. f_equal. lia.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; assumption.
     + eauto.
   - pose proof E1 as E1'.
     apply name_gets_bigger in E1'.

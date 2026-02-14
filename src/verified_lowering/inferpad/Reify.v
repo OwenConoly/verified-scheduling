@@ -239,7 +239,7 @@ Ltac get_fun x :=
   lazymatch x with
   | ?f _ => get_fun f
   | _ => x
-  end.
+  end. Check Common.Truncr. Check truncl. Print Common.Truncr.
 
 Ltac make_types_reifiable_in x :=
   lazy[dim_n];
