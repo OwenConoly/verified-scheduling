@@ -3619,7 +3619,6 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil P => fun e => P -> idxs_in_bounds e
   | tensor_n n :: ts', with_T_var sh sz => fun e =>
-      n = length sh /\
         forall r,
           result_has_shape' sh r ->
           fvar_idxs_in_bounds sz (e r)
@@ -3635,7 +3634,6 @@ Fixpoint fvar_idxs_in_bounds' {ts n} (sizes : size_spec) (e : fvar_pATLexpr inte
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil P => fun e => P -> idxs_in_bounds' e
   | tensor_n n :: ts', with_T_var sh sz => fun e =>
-      n = length sh /\
         fvar_idxs_in_bounds' sz (e sh)
   | tZ :: ts', with_Z_var sz => fun e => forall r,
                                   fvar_idxs_in_bounds' (sz r) (e (argvarZ r))
@@ -3746,7 +3744,7 @@ Proof.
       -- auto.
       -- auto.
       -- assumption.
-    + intros x Hx. destruct Hbds as [? Hbds]. subst. simpl in H0.
+    + intros x Hx. simpl in H0.
       epose proof (H0 (argvarnat _) _) as H0. eapply H0.
       -- constructor; auto. cbv [untagged_fst_ctx_elt]. simpl.
          intros H'. apply Hname in H'. lia.

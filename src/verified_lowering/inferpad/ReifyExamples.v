@@ -242,7 +242,14 @@ Derive blurimmediate_string in
     as blurimmediate_string_correct.
 Proof. cbv [blurimmediate]. prove_spec_of. Qed.
 
-Check spec_of. Search result_has_shape'.
+Fixpoint size_correct ts sz :=
+  match ts, sz with
+  | [], size_nil _ => True
+  | tZ :: ts', with_Z_var sz' => forall x, size_correct ts' (sz' x)
+  | tensor_n n :: ts', with_T_var sh sz' => n = length sh /\ size_correct ts' sz'
+  | _, _ => False
+  end.
+
 Fixpoint same_function ts n sz (f1 f2 : fun_type interp_type ts (dim_n n)) :=
   match ts, sz return fun_type _ ts _ -> fun_type _ ts _ -> _ with
   | [], size_nil P => fun f1 f2 =>
@@ -252,49 +259,57 @@ Fixpoint same_function ts n sz (f1 f2 : fun_type interp_type ts (dim_n n)) :=
                                  forall x, same_function ts' n (sz' x) (f1 x) (f2 x)
   | tensor_n _ :: ts', with_T_var sh sz' => fun f1 f2 =>
                                             forall x,
-                                              consistent x (tuple_of_list sh) ->
+                                              tensor_has_size' sh x ->
                                               same_function ts' n sz' (f1 x) (f2 x)
   | _, _ => fun _ _ => False
   end f1 f2.
 
-Lemma spec_of_ext ts n name sz e_string f1 f2 :
-  spec_of ts n name sz e_string f1 ->
+Lemma spec_of'_ext ts n name sz e_string f1 f2 v ec :
+  size_correct ts sz ->
+  spec_of' ts n name sz e_string f1 v ec ->
   same_function ts n sz f1 f2 ->
-  spec_of ts n name sz e_string f2.
+  spec_of' ts n name sz e_string f2 v ec.
 Proof.
-  revert sz.
-  induction ts as [|t ?]; simpl; intros H1 H2; destruct sz; try contradiction.
-  - cbv [spec_of spec_of'] in *. intros. rewrite <- H2 by assumption. auto.
+  revert name sz v ec.
+  induction ts as [|t ?]; simpl; intros name sz v ec H1 H2 H3; destruct sz; try contradiction.
+  - cbv [spec_of spec_of'] in *. intros. rewrite <- H3 by assumption. auto.
   - destruct t; contradiction.
-  - destruct t; try contradiction. cbv [spec_of] in *. simpl in *. intros. eapply IHts. simpl.
+  - destruct t; try contradiction. simpl in *. intros. eapply IHts; eauto.
+  - destruct t; try contradiction. simpl in *. invs'. intros. eapply IHts; eauto.
+    apply H3. apply tensor_of_result_size; auto.
+Qed.
 
+Lemma spec_of_ext ts n name sz e_string f1 f2 :
+  size_correct ts sz ->
+  same_function ts n sz f1 f2 ->
+  spec_of ts n name sz e_string f1 ->
+  spec_of ts n name sz e_string f2.
+Proof. intros. eapply spec_of'_ext; eassumption. Qed.
 
-
+Print prove_spec_of.
+Print normalize_spec_of.
 
 Derive blurtwostage_string in
   (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurtwostage_string blurtwostage)
     as blurtwostage_string_correct.
 Proof.
   cbv [blurtwostage].
-  lazy[dim_n];
-   match goal with
-   | |- spec_of _ _ _ _ _ ?p =>
-       eassert (p = _) as ->;
-                            [repeat (apply functional_extensionality; intro)|]
-   end.
-  { Print normalize. Print normalize_ssa. Print normalize_types. Print normalize_rec.
-
-
-
-    ; normalize_ssa.
-  Fail first[prove_spec_of | fail].
-  (*expected.  program is in the wrong.*)
+  eapply spec_of_ext. 1: simpl; auto. 1: cbn -[tensor_has_size']; intros. symmetry. normalize. assert (consistent x1 (Z.to_nat x, (Z.to_nat x0, tt))). { admit. } normalize.
+  reflexivity.
+  prove_spec_of0.
+  prove_sideconditions.
+  prove_sideconditions.
+  prove_sideconditions.
+  prove_sideconditions.
 Abort.
-Print fusion_no_boundary.
-Goal forall n m,
-    (fun l : list (list R) => blur_tiles_guarded l n m 4 4)
-    = (fun _ => nil).
+
+Print blur_tiles_guarded.
+Print blur_size.
+Derive blur_tiles_guarded_string in
+  (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blur_tiles_guarded_string (fun n m v => blur_tiles_guarded v n m 4 4))
+    as blur_tiles_guarded_string_correct.
 Proof.
+  cbv [blur_tiles_guarded]. normalize_spec_of. prove_spec_of0.
   intros. autounfold with examples.
   Reify_lhs foo.
 Abort.
