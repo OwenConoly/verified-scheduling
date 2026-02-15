@@ -85,9 +85,10 @@ Search no_dup. About no_dup. (*why is this a thing?*)
 Search NoDup. Search nodup. Check nodup. Search nodup. Search NoDup.
 (*is this in stdlib?*)
 Fixpoint to_radix r fuel n :=
-  match fuel with
-  | S fuel' => n mod r :: to_radix r fuel' (n / r)
-  | O => nil
+  match fuel, n with
+  | S fuel', S n' => n mod r :: to_radix r fuel' (n / r)
+  | O, _ => nil
+  | _, O => nil
   end.
 
 Fixpoint from_radix r n :=
@@ -103,11 +104,12 @@ Lemma from_radix_to_radix r fuel n :
 Proof.
   intros Hn Hr. revert n Hn. induction fuel; intros n Hn.
   - simpl. lia.
-  - simpl.
+  - simpl. destruct n; [reflexivity|].
+    remember (S n) as n' eqn:E. clear n E. simpl.
     rewrite IHfuel.
-    + rewrite (Nat.div_mod_eq n r) at 3. lia.
-    + rewrite (Nat.div_mod_eq n r) in Hn.
-      remember (n / r) as k eqn:Ek. clear Ek. assert (k + k <= r * k).
+    + rewrite (Nat.div_mod_eq n' r) at 3. lia.
+    + rewrite (Nat.div_mod_eq n' r) in Hn.
+      remember (n' / r) as k eqn:Ek. clear Ek. assert (k + k <= r * k).
       { destruct r; try lia. destruct r; lia. }
       lia.
 Qed.
@@ -128,7 +130,7 @@ Lemma to_radix_small r fuel n :
   1 <= r ->
   Forall (fun digit => digit < r) (to_radix r fuel n).
 Proof.
-  intros Hr. revert n. induction fuel; simpl; intros; constructor; auto.
+  intros Hr. revert n. induction fuel; simpl; intros; destruct n; constructor; auto.
   apply Nat.mod_upper_bound. lia.
 Qed.
 
@@ -164,8 +166,10 @@ Proof.
   - apply nth_error_None in E. lia.
 Qed.
 
+Compute (to_radix 2 5 5).
+
 Definition nat_to_string n :=
-  string_of_list_ascii (encode (ascii_of_nat O) alphabet (to_radix (length alphabet) n n)).
+  ("var_" ++ string_of_list_ascii (encode (ascii_of_nat O) alphabet (to_radix (length alphabet) n n)))%string.
 
 Lemma alphabet_long : 2 <= length alphabet.
 Proof. vm_compute. lia. Qed.
@@ -185,7 +189,8 @@ Lemma nat_to_string_injective x y :
   nat_to_string x = nat_to_string y ->
   x = y.
 Proof.
-  cbv [nat_to_string]. intros. pose proof alphabet_long.
+  cbv [nat_to_string]. intros H. apply string_app_l in H.
+  pose proof alphabet_long.
   eapply to_radix_injective; cycle 1.
   - eapply encode_injective; cycle -1.
     + apply string_of_list_ascii_injective. eassumption.
@@ -194,8 +199,6 @@ Proof.
     + apply to_radix_small. lia.
   - lia.
 Qed.
-Search ascii string substring.
-Search substring.
 
 Lemma contains_substring_In c s :
   contains_substring (String c EmptyString) s ->
@@ -210,10 +213,14 @@ Proof.
 Qed.
 
 Lemma nat_to_string_In x :
-  Forall (fun digit => In digit alphabet) (list_ascii_of_string (nat_to_string x)).
+  Forall (fun digit => In digit (list_ascii_of_string "var_") \/ In digit alphabet) (list_ascii_of_string (nat_to_string x)).
 Proof.
-  cbv [nat_to_string]. rewrite list_ascii_of_string_of_list_ascii.
-  apply encode_In. apply to_radix_small. pose proof alphabet_long. lia.
+  cbv [nat_to_string]. lazy [list_ascii_of_string append].
+  do 4 (constructor; [left; simpl; auto|]).
+  rewrite list_ascii_of_string_of_list_ascii.
+  eapply Forall_impl.
+  2: { apply encode_In. apply to_radix_small. pose proof alphabet_long. lia. }
+  cbv beta. auto.
 Qed.
 
 Opaque alphabet_string. (*Qed is slow otherwise, not sure why*)
@@ -222,8 +229,9 @@ Lemma no_question_marks n :
 Proof.
   intros H. apply contains_substring_In in H.
   eapply Forall_forall in H; [|apply nat_to_string_In]. cbv beta in H.
-  cbv [alphabet] in H. apply nodup_In in H.
-  apply in_remove in H. destruct H as (_&H). congruence.
+  cbv [alphabet] in H. destruct H as [H|H].
+  - simpl in H. repeat (destruct H as [H|H]; [congruence|]). contradiction.
+  - apply nodup_In in H. apply in_remove in H. destruct H as (_&H). congruence.
 Qed.
 
 Variant tagged_Z := argvarZ (_ : Z) | itervarZ (_ : Z).
