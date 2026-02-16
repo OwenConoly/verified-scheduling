@@ -422,13 +422,60 @@ Ltac prove_sideconditions :=
   | |- _ => idtac
   end.
 
+Fixpoint size_correct ts sz :=
+  match ts, sz with
+  | [], size_nil _ => True
+  | tZ :: ts', with_Z_var sz' => forall x, size_correct ts' (sz' x)
+  | tensor_n n :: ts', with_T_var sh sz' => n = length sh /\ size_correct ts' sz'
+  | _, _ => False
+  end.
+
+Fixpoint same_function ts n sz (f1 f2 : fun_type interp_type ts (dim_n n)) :=
+  match ts, sz return fun_type _ ts _ -> fun_type _ ts _ -> _ with
+  | [], size_nil P => fun f1 f2 =>
+      P ->
+      f1 = f2
+  | tZ :: ts', with_Z_var sz' => fun f1 f2 =>
+                                 forall x, same_function ts' n (sz' x) (f1 x) (f2 x)
+  | tensor_n _ :: ts', with_T_var sh sz' => fun f1 f2 =>
+                                            forall x,
+                                              tensor_has_size' sh x ->
+                                              same_function ts' n sz' (f1 x) (f2 x)
+  | _, _ => fun _ _ => False
+  end f1 f2.
+
+Lemma spec_of'_ext ts n names sz e_string f1 f2 v ec :
+  size_correct ts sz ->
+  spec_of' ts n names sz e_string f1 v ec ->
+  same_function ts n sz f1 f2 ->
+  spec_of' ts n names sz e_string f2 v ec.
+Proof.
+  revert names sz v ec.
+  induction ts as [|t ?]; simpl; intros names sz v ec H1 H2 H3; try destruct t; destruct sz, names; try contradiction.
+  - cbv [spec_of spec_of'] in *. intros. rewrite <- H3 by assumption. auto.
+  - intros. eapply IHts; eauto.
+  - invs'. intros. eapply IHts; eauto.
+    apply H3. apply tensor_of_result_size; auto.
+Qed.
+
+Lemma spec_of_ext ts n name sz e_string f1 f2 :
+  size_correct ts sz ->
+  same_function ts n sz f1 f2 ->
+  spec_of ts n name sz e_string f1 ->
+  spec_of ts n name sz e_string f2.
+Proof. intros. eapply spec_of'_ext; eassumption. Qed.
+
+(* Ltac normalize_spec_of := *)
+(*   lazy[dim_n]; *)
+(*   match goal with *)
+(*   | |- spec_of _ _ _ _ _ ?p => *)
+(*       eassert (p = _) as -> by *)
+(*         (repeat (apply functional_extensionality; intro); normalize; reflexivity) *)
+(*   end. *)
+
 Ltac normalize_spec_of :=
   lazy[dim_n];
-  match goal with
-  | |- spec_of _ _ _ _ _ ?p =>
-      eassert (p = _) as -> by
-        (repeat (apply functional_extensionality; intro); normalize; reflexivity)
-  end.
+  eapply spec_of_ext; [solve[simpl; auto] | cbn [same_function]; intros; symmetry; normalize; reflexivity |].
 
 Ltac prove_spec_of := normalize_spec_of; prove_spec_of0; prove_sideconditions.
 
