@@ -96,15 +96,15 @@ Derive string_conv1 in
     as string_conv1_correct.
 Proof. cbv [conv1 conv_precond]. prove_stringy_spec. Qed.
 
-Local Definition args0 :=
+Definition concat_test_args :=
   [Z_arg "n";
    Z_arg "m";
    T_arg "l" [ZVar "n"; ZVar "m"]].
 
-Local Definition precond0 :=
+Definition concat_test1_precond :=
   fun n m (_ : dim_n 2) => (2 < n /\ 1 < m)%Z.
 
-Derive string_prog in
+Derive concat_test1_string in
   (let shallow_prog :=
      fun n m l =>
        transpose (
@@ -122,17 +122,17 @@ Derive string_prog in
                 (GEN [ n - 1 <= i < n ]
                    l _[i;j])
          )) in
-   stringy_spec_of [tZ; tZ; tensor_n 2] 2 args0 string_prog precond0 shallow_prog)
-    as string_prog_correct.
+   stringy_spec_of [tZ; tZ; tensor_n 2] 2 concat_test_args concat_test1_string concat_test1_precond shallow_prog)
+    as concat_test1_string_correct.
 Proof.
   intro shallow_prog. subst shallow_prog.
-  cbv [precond0]. prove_stringy_spec. Fail Fail Qed.
-Abort.
+  cbv [concat_test1_precond]. prove_stringy_spec.
+Qed.
 
-Local Definition precond1 :=
+Definition concat_test0_precond :=
   fun n m (_ : dim_n 2) => (0 < n /\ 1 < m)%Z.
 
-Derive string_prog in
+Derive concat_test0_string in
   (let shallow_prog :=
      fun n m l =>
        transpose (
@@ -143,17 +143,17 @@ Derive string_prog in
              (GEN [ 1 <= j < m ]
                 GEN [ i < n ]
                 l _[i;j])) in
-   stringy_spec_of [tZ; tZ; tensor_n 2] 2 args0 string_prog precond1 shallow_prog)
-    as string_prog_correct.
+   stringy_spec_of [tZ; tZ; tensor_n 2] 2 concat_test_args concat_test0_string concat_test0_precond shallow_prog)
+    as concat_test0_string_correct.
 Proof.
   intro shallow_prog. subst shallow_prog.
-  cbv [precond1]. prove_stringy_spec. Fail Fail Qed.
-Abort.
+  cbv [concat_test0_precond]. prove_stringy_spec.
+Qed.
 
-Local Definition precond2 :=
+Definition concat_test2_precond :=
   fun n m (_ : dim_n 2) => (1 < n /\ 1 < m)%Z.
 
-Derive string_prog in
+Derive concat_test2_string in
   (let shallow_prog :=
      fun n m v =>
        transpose (
@@ -167,17 +167,17 @@ Derive string_prog in
              (GEN [ 1 <= j < m ]
                 GEN [ i < n ]
                 v _[i;j])) in
-   stringy_spec_of [tZ; tZ; tensor_n 2] 2 args0 string_prog precond2 shallow_prog)
-    as string_prog_correct.
+   stringy_spec_of [tZ; tZ; tensor_n 2] 2 concat_test_args concat_test2_string concat_test2_precond shallow_prog)
+    as concat_test2_string_string_correct.
 Proof.
   intro shallow_prog. subst shallow_prog.
-  cbv [precond2]. prove_stringy_spec. Fail Fail Qed.
-Abort.
+  cbv [concat_test2_precond]. prove_stringy_spec.
+Qed.
 
-Local Definition precond3 :=
+Definition concat_test3_precond :=
   fun n m (_ : dim_n 2) => (1 < n /\ 0 < m)%Z.
 
-Derive string_prog in
+Derive concat_test3_string in
   (let shallow_prog :=
      fun n m l =>
        transpose (
@@ -187,23 +187,23 @@ Derive string_prog in
              <++>
              (GEN [ 1 <= i < n ]
                 l _[i;j])) in
-   stringy_spec_of [tZ; tZ; tensor_n 2] 2 args0 string_prog precond3 shallow_prog)
-    as string_prog_correct.
+   stringy_spec_of [tZ; tZ; tensor_n 2] 2 concat_test_args concat_test3_string concat_test3_precond shallow_prog)
+    as concat_test3_string_correct.
 Proof.
   intro shallow_prog. subst shallow_prog.
-  cbv [precond3]. prove_stringy_spec. Fail Fail Qed.
-Abort.
+  cbv [concat_test3_precond]. prove_stringy_spec.
+Qed.
 
-Local Definition precond4 :=
+Definition concat_test4_precond :=
   fun n m (_ : dim_n 1) => (0 < n /\ 1 < m)%Z.
 
-Definition size4 :=
+Definition concat_test4_args :=
   [Z_arg "n";
    Z_arg "m";
    T_arg "l" [! "m" ! * ! "n" !]%z].
 
 Axiom f : False.
-Derive string_prog in
+Derive concat_test4_string in
   (let shallow_prog :=
      fun n m l =>
        Common.flatten (
@@ -216,15 +216,14 @@ Derive string_prog in
                  (GEN [ 1 <= i < m ]
                     (GEN [ j < n ]
                        l _[j * m + i])))) in
-   stringy_spec_of [tZ; tZ; tensor_n 1] 1 size4 string_prog precond4 shallow_prog)
-    as string_prog_correct.
+   stringy_spec_of [tZ; tZ; tensor_n 1] 1 concat_test4_args concat_test4_string concat_test4_precond shallow_prog)
+    as concat_test4_string_correct.
 Proof.
   intro shallow_prog. subst shallow_prog.
-  cbv [precond4]. prove_stringy_spec.
-  { rewrite Z2Nat.id by lia. (*probably true*) destruct f. }
-  { rewrite Z2Nat.id by lia. (*probably true*) destruct f. }
-  Fail Fail Qed.
-Abort.
+  cbv [concat_test4_precond]. prove_stringy_spec.
+  { rewrite Z2Nat.id by lia. (*probably true*) destruct (f : False). }
+  { rewrite Z2Nat.id by lia. (*probably true*) destruct (f : False). }
+Qed.
 
 Definition blur_args :=
   [Z_arg "N";

@@ -166,145 +166,57 @@ Goal True.
   in idtac_list s.
 Abort.
 
-Goal forall (c : (list R)) n m,
-    conv4 c n m = conv1 c n m.
+Check string_conv4_correct.
+Goal True.
 Proof.
-  intros.
   let s := Llibfunc constr:("conv4")
-                             constr:(($0 $+ ("c",[ZLit n])))
+                             conv_args
+                             string_conv4
   in idtac_list s.
 Abort.
 
-Goal forall (c : (list R)) n m,
-    conv4 c n m = conv1 c n m.
+Check string_conv1_correct.
+Goal True.
 Proof.
-  intros.
-  let s := Llibfunc constr:("conv4")
-                             constr:(($0 $+ ("c",[ZLit n])))
-  in idtac_list s.
-Abort.
-
-Goal forall (c : (list R)) (n m : Z),
-    (0 < n)%Z ->
-    (-m+1 < n)%Z ->
-    consistent c (Z.to_nat n,tt) ->
-    conv1 c n m = conv4 c n m.
-Proof.
-  intros.
   let s := Llibfunc constr:("conv1")
-                             constr:(($0 $+ ("c",[ZLit n])))
+                             conv_args
+                             string_conv1
   in idtac_list s.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    Common.transpose (
-        (GEN [ j < 1 ]
-            GEN [ i < n ]
-            l _[i;j])
-          <++>
-          (GEN [ 1 <= j < m ]
-            (GEN [ i < 1 ]
-                 l _[i;j])
-            <++>
-            (GEN [ 1 <= i < n - 1]
-                 l _[i;j])
-            <++>
-            (GEN [ n - 1 <= i < n ]
-                 l _[i;j])
-          )
-        )
- = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("concattest1")
-                             constr:($0 $+ ("l",[ZLit n; ZLit m]))
+                             concat_test_args
+                             concat_test1_string
   in idtac_list s.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    consistent l (n,(m,tt)) ->
-    Common.transpose (
-        (GEN [ j < 1 ]
-            GEN [ i < Z.of_nat n ]
-            l _[i;j])
-          <++>
-          (GEN [ 1 <= j < Z.of_nat m ]
-               GEN [ i < Z.of_nat n ]
-            l _[i;j])
-          )
- = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("concattest0")
-                             constr:($0 $+ ("l",[ZLit (Z.of_nat n);
-                                                 ZLit (Z.of_nat m)]))
+                             concat_test_args
+                             concat_test0_string
   in idtac_list s.
 Abort.
 
-Goal forall n m (v : list (list R)),
-    0 < n ->
-    0 < m ->
-    consistent v (n,(m,tt)) ->
-    Common.transpose (
-        (GEN [ j < 1 ]
-           (GEN [ i < 1 ]
-                 v _[i;j])
-            <++>
-            (GEN [ 1 <= i < Z.of_nat n ]
-                 v _[i;j])
-            )
-          <++>
-          (GEN [ 1 <= j < Z.of_nat m ]
-               GEN [ i < Z.of_nat n ]
-               v _[i;j]
-          )
-        )
- = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("concattest2")
-                             constr:($0 $+ ("v",[ZLit (Z.of_nat n);
-                                                 ZLit (Z.of_nat m)]))
+                             concat_test_args
+                             concat_test2_string
   in idtac_list s.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    consistent l (n,(m,tt)) ->
-    Common.transpose (
-        GEN [ j < Z.of_nat m ]
-            (GEN [ i < 1 ]
-            l _[i;j])
-            <++>
-            (GEN [ 1 <= i < Z.of_nat n ]
-            l _[i;j]))
- = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("concattest3")
-                               constr:($0 $+ ("l",[ZLit (Z.of_nat n);
-                                                 ZLit (Z.of_nat m)]))
+                             concat_test_args
+                             concat_test3_string
   in idtac_list s.
 Abort.
 
-Goal forall n m (l : (list R)),
-    consistent l (n*m,tt) ->
-    Common.flatten (
-        Common.transpose
-          (
-            (GEN [ i < 1 ]
-             (GEN [ j < Z.of_nat n ]
-                  l _[j * Z.of_nat m + i]))
-              <++>
-            (GEN [ 1 <= i < Z.of_nat m ]
-             (GEN [ j < Z.of_nat n ]
-                 l _[j * Z.of_nat m + i]))
-      ))
-
- = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("concattest4")
-  constr:($0 $+ ("l",[ZLit (Z.of_nat n); ZLit (Z.of_nat m)])) in idtac_list s.
+                             concat_test4_args
+                             concat_test4_string
+  in idtac_list s.
 Abort.
 
  Goal forall N M (v : list (list R)),
