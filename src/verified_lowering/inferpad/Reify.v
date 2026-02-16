@@ -326,7 +326,7 @@ Ltac prove_spec_of0 :=
   | |- spec_of ?ts ?n ?name ?size ?string_expr ?shallow_expr =>
       let e' := fresh "e'" in
       Reify shallow_expr e';
-      refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _);
+      refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _ _ _);
       [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map interp_pZexpr Var' e']; reflexivity | .. ];
       cycle -1; [ subst string_expr; simpl; reflexivity | .. ]
   end.
@@ -351,10 +351,68 @@ Ltac do_arith :=
     | |- _ = _ => reflexivity
     end.
 
+Fixpoint nodupb {T : Type} (eqb : T -> T -> bool) l :=
+  match l with
+  | x :: l' => if existsb (eqb x) l' then false else nodupb eqb l'
+  | [] => true
+  end.
+
+(*gemini does something*)
+Lemma existsb_false_implies : forall {A : Type} (f : A -> bool) (l : list A),
+  existsb f l = false -> forall x, In x l -> f x = false.
+Proof.
+  intros A f l H_exists x H_in.
+
+  (* We branch on whether f x evaluates to true or false *)
+  destruct (f x) eqn:H_eval.
+
+  - (* If f x = true, it implies existsb f l = true, which contradicts H_exists *)
+    assert (H_true : existsb f l = true).
+    { apply existsb_exists. exists x. auto. }
+    congruence.
+
+  - (* If f x = false, we are done! *)
+    reflexivity.
+Qed.
+
+Lemma nodupb_correct T (eqb : T -> _) l :
+  (forall x, eqb x x = true) ->
+  nodupb eqb l = true ->
+  NoDup l.
+Proof.
+  intros Heqb H. induction l; simpl in *.
+  - constructor.
+  - destruct (existsb _ _) eqn:E; try congruence. constructor; auto.
+    intro.
+    eapply existsb_false_implies in E; eauto. rewrite Heqb in E. congruence.
+Qed.
+
+Lemma nodupb_string_correct l :
+  nodupb String.eqb l = true ->
+  NoDup l.
+Proof.
+  intros. eapply nodupb_correct; [|eassumption].
+  intros. Search String.eqb. apply String.eqb_refl.
+Qed.
+
+Lemma forallb_not_prefix_correct l :
+  forallb (fun x => negb (prefix "var_" x)) l = true ->
+  Forall (fun x => ~starts_with_var x) l.
+Proof.
+  intros H. apply Forall_forall. intros.
+  eapply forallb_forall in H; eauto.
+  cbv [starts_with_var].
+  intros H'. invs'. simpl in H. destruct x0; simpl in H; congruence.
+Qed.
+
 Ltac prove_sideconditions :=
   match goal with
   | |- Wf_fvar_ATLExpr _ =>
-  simpl; apply WfByUnnatify; simpl; reflexivity
+      simpl; apply WfByUnnatify; simpl; reflexivity
+  | |- NoDup _ =>
+      apply nodupb_string_correct; reflexivity
+  | |- Forall (fun x => ~starts_with_var x) _ =>
+      apply forallb_not_prefix_correct; reflexivity
   | |- fvar_sound_sizeof _ _ =>
       repeat progress (intros; cbv [list_eqb]; cbn -[Nat.eqb Nat.ltb]; checks_are_true); try (exact I)
   | |- fvar_idxs_in_bounds' _ _ =>

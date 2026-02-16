@@ -73,6 +73,13 @@ Proof.
                simpl; apply with_T_var_eq
            | _ => simpl; reflexivity
            end. }
+  cbv [add add_precond].
+  normalize_spec_of.
+  prove_spec_of.
+Qed.
+  Search NoDup. Check nodupb.
+  3: {
+  Print prove_spec_of.
   prove_spec_of.
 
     .
