@@ -61,6 +61,13 @@ Section Tile.
 
     rw truncr_Truncr.
     Fail progress rw truncr_Truncr. rewrite truncr_Truncr. (*??*)
+    rewrite Nat2Z.inj_sub.
+    2: { apply div_ceil_n_lower_bound. lia. }
+    rewrite Nat2Z.inj_sub.
+    2: { apply div_ceil_n_lower_bound. lia. }
+    do 2 rewrite Nat2Z.inj_mul.
+    do 2 rewrite <- of_nat_div_distr.
+    do 3 rewrite Z2Nat.id by lia.
 
     done.
   Defined.
@@ -114,6 +121,13 @@ Section Tile.
 
     rw truncr_Truncr.
     Fail progress rw truncr_Truncr. rewrite truncr_Truncr. (*??*)
+    rewrite Nat2Z.inj_sub.
+    2: { apply div_ceil_n_lower_bound. lia. }
+    rewrite Nat2Z.inj_sub.
+    2: { apply div_ceil_n_lower_bound. lia. }
+    do 2 rewrite Nat2Z.inj_mul.
+    do 2 rewrite <- of_nat_div_distr.
+    do 3 rewrite Z2Nat.id by lia.
 
     done.
   Defined.

@@ -387,7 +387,7 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 | Lbind {n m} : pATLexpr n -> (var (tensor_n n) -> pATLexpr m) -> pATLexpr m
 | Concat {n} : pATLexpr (S n) -> pATLexpr (S n) -> pATLexpr (S n)
 | Flatten {n} : pATLexpr (S (S n)) -> pATLexpr (S n)
-| Split {n} : nat -> pATLexpr (S n) -> pATLexpr (S (S n))
+| Split {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S (S n))
 | Transpose {n} : pATLexpr (S (S n)) -> pATLexpr (S (S n))
 | Truncr {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
 | Truncl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
@@ -474,9 +474,10 @@ Inductive wf_ATLexpr : list ctx_elt2 -> forall n, pATLexpr var1 n -> pATLexpr va
 | wf_Flatten ctx n x1 x2 :
   wf_ATLexpr ctx (S (S n)) x1 x2 ->
   wf_ATLexpr ctx _ (Flatten x1) (Flatten x2)
-| wf_Split ctx n k x1 x2 :
+| wf_Split ctx n k1 k2 x1 x2 :
+  wf_Zexpr ctx k1 k2 ->
   wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx _ (Split k x1) (Split k x2)
+  wf_ATLexpr ctx _ (Split k1 x1) (Split k2 x2)
 | wf_Transpose ctx n x1 x2 :
   wf_ATLexpr ctx (S (S n)) x1 x2 ->
   wf_ATLexpr ctx _ (Transpose x1) (Transpose x2)
@@ -534,7 +535,7 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type_tagged n) : interp_type (
   | Lbind x f => let_binding (interp_pATLexpr x) (fun x0 => interp_pATLexpr (f x0))
   | Concat x y => concat (interp_pATLexpr x) (interp_pATLexpr y)
   | Flatten x => Common.flatten (interp_pATLexpr x)
-  | Split k x => tile (interp_pATLexpr x) k
+  | Split k x => Tile (interp_pATLexpr x) (interp_pZexpr k)
   | Transpose x => transpose (interp_pATLexpr x)
   | Truncr k x => Common.Truncr (interp_pZexpr k) (interp_pATLexpr x)
   | Truncl k x => Common.Truncl (interp_pZexpr k) (interp_pATLexpr x)
@@ -610,9 +611,13 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
   | Split k e =>
     match sound_sizeof dummy sizeof_var e with
     | Some (a :: rest) =>
-        if (0 <? k)%nat then
-          Some (a //n k :: k :: rest)
-        else None
+        match sizeof_pZexpr sizeof_var k with
+        | Some k =>
+            if (0 <? Z.to_nat k)%nat then
+              Some (a //n (Z.to_nat k) :: Z.to_nat k :: rest)
+            else None
+        | None => None
+        end
     | _ => None
     end
   | Transpose e =>
@@ -749,7 +754,7 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       end
   | Split k x =>
       match result_of_pATLexpr x with
-      | V xs => V (split_result k xs)
+      | V xs => V (split_result (Z.to_nat (interp_pZexpr k)) xs)
       | _ => V []
       end
   | Transpose x =>
@@ -857,7 +862,7 @@ Fixpoint unnatify {var n} (ctx : list (ctx_elt var)) (e : pATLexpr (fun _ => nat
         (fun x => unnatify ({|ctx_elt0 := x |} :: ctx) (f (length ctx)))
   | Concat x y => Concat (unnatify ctx x) (unnatify ctx y)
   | Flatten x => Flatten (unnatify ctx x)
-  | Split k x => Split k (unnatify ctx x)
+  | Split k x => Split (unnatify_Z ctx k) (unnatify ctx x)
   | Transpose x => Transpose (unnatify ctx x)
   | Truncr k x => Truncr (unnatify_Z ctx k) (unnatify ctx x)
   | Truncl k x => Truncl (unnatify_Z ctx k) (unnatify ctx x)
@@ -1004,7 +1009,7 @@ Some (name',
 | Split k e1 =>
     [[name', e1']] <- stringvar_ATLexpr name e1;
 Some (name',
-    ATLDeep.Split (Zexpr.ZLit (Z.of_nat k)) e1')
+    ATLDeep.Split (stringvar_Z k) e1')
 | Transpose e1 =>
     [[name', e1']] <- stringvar_ATLexpr name e1;
 Some (name',
@@ -1302,11 +1307,12 @@ Lemma inv_wf_ATLexpr {var1 var2} ctx n e1 e2 :
         exists x2,
           wf_ATLexpr var1 var2 ctx (S (S _)) x1 x2 /\
             e2 = Flatten x2
-  | Split k x1 =>
+  | Split k1 x1 =>
       fun e2 =>
-        exists x2,
-          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Split k x2
+        exists k2 x2,
+          wf_Zexpr var1 var2 ctx k1 k2 /\
+            wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
+            e2 = Split k2 x2
   | Transpose x1 =>
       fun e2 =>
         exists x2,
@@ -1470,6 +1476,7 @@ Proof.
     eapply H1. 3: eassumption. 1: eauto. prove_sound_sizeof.
   - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
   - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
+  - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
   - congruence.
     Unshelve.
     all: auto.
@@ -1529,7 +1536,8 @@ Proof.
     simpl in *;
     try solve [intros [?|?]; [lia|auto] ].
   - intros [?| [?|?] ]; try lia.
-    + pose proof ndiv_pos as H'. specialize (H' n1 n0 ltac:(lia) ltac:(lia)). lia.
+    + pose proof ndiv_pos as H'. specialize (H' n0 (Z.to_nat z) ltac:(lia) ltac:(lia)).
+      lia.
     + auto.
   - intros [?| [?|?] ]; [lia|lia|auto].
 Qed.
@@ -3199,13 +3207,16 @@ Proof.
     erewrite result_has_shape_result_shape_nat by eassumption.
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite filter_until_not_in by assumption. simpl.
+    cbv [Tile].
     erewrite tile_is_split; cycle 1.
     + eassumption.
     + apply result_has_shape'_iff in E'.
       eapply tensor_of_result_size in E'; eauto. simpl in E'.
       apply sound_sizeof_gives_dim in E. simpl in E. invert E.
       apply E'.
-    + rewrite length_map. cbv [nat_range]. apply map_ext. intros i.
+    + rewrite length_map. cbv [nat_range].
+      erewrite <- Zexprs_corresp_same by eassumption.
+      apply map_ext. intros i.
       rewrite <- firstn_map. rewrite <- skipn_map. rewrite map_app.
       rewrite map_repeat. reflexivity.
   - pose proof E as E'.
@@ -3506,17 +3517,16 @@ Proof.
         end.
     + eauto.
     + eapply Forall_impl; [|eassumption]. invert 1; eauto.
-  - pose proof E2 as E2'.
-    apply name_gets_bigger in E2'.
+  - pose proof E3 as E3'.
+    apply name_gets_bigger in E3'.
     eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E.
-    replace k with (Z.to_nat (Z.of_nat k)) by lia.
     constructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H
         end.
     + eauto.
-    + simpl. f_equal. lia.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; assumption.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.
     pose proof E as E'.
@@ -3536,7 +3546,6 @@ Proof.
     apply name_gets_bigger in E3'.
     eapply sound_sizeof_result_has_shape in E; eauto; [].
     invert E.
-    Search interp_pZexpr.
     constructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H

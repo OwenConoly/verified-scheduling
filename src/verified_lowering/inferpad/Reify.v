@@ -44,7 +44,7 @@ Definition truncr_n n := @Common.Truncr (dim_n n) _.
 Definition truncl_n n := @Common.Truncl (dim_n n) _.
 Definition transpose_n n := @transpose (dim_n n) _.
 Definition concat_n n := @concat (dim_n n) _.
-Definition tile_n n := @tile (dim_n n) _.
+Definition tile_n n := @Tile (dim_n n) _.
 (*i guess we only reify bin_n O*)
 Definition bin_n n := @bin (dim_n n) _.
 Definition let_nm n m := @let_binding (dim_n n) (dim_n m).
@@ -88,7 +88,7 @@ Definition pairs_to_reify :=
    (concat_n, fun var => @Concat var)
      : pair_to_reify (fun var => forall n, var (tensor_n (S n)) -> var (tensor_n (S n)) -> var (tensor_n (S n)));
    (tile_n, fun var => (fun n x k => @Split var n k x))
-     : pair_to_reify (fun var => forall n, var (tensor_n (S n)) -> nat -> var (tensor_n (S (S n))));
+     : pair_to_reify (fun var => forall n, var (tensor_n (S n)) -> var tZ -> var (tensor_n (S (S n))));
    (Z.of_nat, fun var => ZZ_of_nat)
      : pair_to_reify (fun var => nat -> var tZ);
    (Z.add, fun var => ZBop ZPlus)
@@ -219,7 +219,7 @@ Ltac pattern_shallows x :=
 )
 ,( tile_n :
 (forall n : nat,
- interp_type (tensor_n (S n)) -> nat -> interp_type (tensor_n (S (S n))))
+ interp_type (tensor_n (S n)) -> interp_type tZ -> interp_type (tensor_n (S (S n))))
 )
 ,( Z.of_nat : (nat -> interp_type tZ) )
 ,( Z.add : (interp_type tZ -> interp_type tZ -> interp_type tZ) )
@@ -278,7 +278,7 @@ Ltac make_types_reifiable_in x :=
   repeat change (@Common.Truncl (interp_type (tensor_n ?n)) _) with (truncl_n n) in x;
   repeat change (@transpose (interp_type (tensor_n ?n)) _) with (transpose_n n) in x;
   repeat change (@concat (interp_type (tensor_n ?n)) _) with (concat_n n) in x;
-  repeat change (@tile (interp_type (tensor_n ?n)) _) with (tile_n n) in x;
+  repeat change (@Tile (interp_type (tensor_n ?n)) _) with (tile_n n) in x;
   repeat change (@let_binding (interp_type (tensor_n ?n)) (interp_type (tensor_n ?m))) with (let_nm n m) in x;
   change (@bin (interp_type (tensor_n O)) _) with Rplus in x.
 

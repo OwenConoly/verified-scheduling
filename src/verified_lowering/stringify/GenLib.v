@@ -110,70 +110,59 @@ Goal True.
   in idtac_list s.
 Abort.
 
+Derive string_matmul_tiled in
+  (stringy_spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 matmul_args string_matmul_tiled matmul_precond (fun A B C m1 m2 => matmul_tiled A B C m1 m2 4%Z))
+    as string_matmul_correct.
+Proof.
+  cbv [matmul_tiled matmul_precond]. prove_stringy_spec.
+  { destruct (f : False). (*seems true*) }
+Qed.
+
 Goal True.
   let s := Llibfunc
              constr:("matmul_tiled")
-                      matmul_tiled_args
+                      matmul_args
                       string_matmul_tiled
   in idtac_list s.
 Abort.
 
-Goal forall A B C (m1 m2 : list (list R)),
-     (0 < A)%Z ->
-     (0 < B)%Z ->
-     (0 < C)%Z ->
-     consistent m1 (Z.to_nat A,(Z.to_nat B,tt)) ->
-     consistent m2 (Z.to_nat B,(Z.to_nat C,tt)) ->
-     matmul_tiled_split (Z.to_nat A) (Z.to_nat B) (Z.to_nat C) m1 m2 4%Z =
-       matmul A B C m1 m2.
+Derive string_matmul_tiled_split in
+  (stringy_spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 matmul_args string_matmul_tiled_split matmul_precond (fun A B C m1 m2 => matmul_tiled_split A B C m1 m2 4%Z))
+    as string_matmul_tiled_correct.
 Proof.
- intros.
+  cbv [matmul_tiled_split matmul_precond]. prove_stringy_spec.
+  { destruct (f : False). (*seems true*) }
+Qed.
+
+Goal True.
  let s := Llibfunc
             constr:("matmul_tiled_split")
-                     constr:(($0 $+ ("m1", [ZLit A;ZLit B])
-                                $+ ("m2", [ZLit B;ZLit C])))
+                     matmul_args
+                     string_matmul_tiled_split
  in idtac_list s.
 Abort.
 
-Goal forall (A B C D : nat) (m1 m2 : (list (list (list (list R))))),
-         0 < A ->
-         0 < B ->
-         0 < C ->
-         0 < D ->
-         consistent m1 (A,(B,(C,(D,tt)))) ->
-         consistent m2 (A,(B,(C,(D,tt)))) ->
-         add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2 =
-           add_split A B C D m1 m2.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc
              constr:("tensoradd")
-             constr:(($0
-                        $+ ("m1",
-                          [ZLit (Z.of_nat A);ZLit (Z.of_nat B);ZLit (Z.of_nat C);ZLit (Z.of_nat A)])
-                        $+ ("m2",
-                          [ZLit (Z.of_nat A);ZLit (Z.of_nat B);ZLit (Z.of_nat C);ZLit (Z.of_nat A)])))
+                      add_args
+                      string_add
   in idtac_list s.
 Abort.
 
-Goal forall (A B C D : nat) (m1 m2 : (list (list (list (list R))))),
-         0 < A ->
-         0 < B ->
-         0 < C ->
-         0 < D ->
-         consistent m1 (A,(B,(C,(D,tt)))) ->
-         consistent m2 (A,(B,(C,(D,tt)))) ->
-         add_split A B C D m1 m2 =
-           add (Z.of_nat A) (Z.of_nat B) (Z.of_nat C) (Z.of_nat D) m1 m2.
+Derive string_add_split in
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 add_args string_add_split add_precond add_split)
+    as string_add_split_correct.
 Proof.
-  intros.
+  cbv [add_precond add_split]. prove_stringy_spec.
+  all: (destruct (f : False)). (*arithmetic, seems true*)
+Qed.
+
+Goal True.
   let s := Llibfunc
              constr:("tensoradd_split")
-             constr:(($0
-                        $+ ("m1",
-                          [ZLit (Z.of_nat A);ZLit (Z.of_nat B);ZLit (Z.of_nat C);ZLit (Z.of_nat A)])
-                        $+ ("m2",
-                          [ZLit (Z.of_nat A);ZLit (Z.of_nat B);ZLit (Z.of_nat C);ZLit (Z.of_nat A)])))
+                      add_args
+                      string_add_split
   in idtac_list s.
 Abort.
 

@@ -2755,4 +2755,17 @@ Lemma truncl_Truncl {X} `{TensorElem X} :
     truncl n l = Truncl (Z.of_nat n) l.
 Proof. intros. unfold Truncl. rewrite Nat2Z.id. eauto. Qed.
 
+Definition Tile {X} `{TensorElem X} l k :=
+  tile l (Z.to_nat k).
+
+Lemma Tile_eq {X} `{TensorElem X} : forall k l1 l2,
+    l1 = l2 ->
+    Tile l1 k = Tile l2 k.
+Proof. intros. subst. eauto. Qed.
+
+Lemma tile_Tile {X} `{TensorElem X} :
+  forall l n,
+    tile l n = Tile l (Z.of_nat n).
+Proof. intros. unfold Tile. rewrite Nat2Z.id. eauto. Qed.
+
 Lemma minus_plus : forall n m : nat, n + m - n = m. Proof. lia. Qed.
