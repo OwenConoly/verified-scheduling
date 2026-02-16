@@ -15,7 +15,7 @@ From Stdlib Require Import QArith.
 
 Import ListNotations.
 
-From ATL Require Import ATL Tactics Common CommonTactics Div Reshape.
+From ATL Require Import ATL Tactics Common CommonTactics Div Reshape Map.
 From Codegen Require Import IdentParsing NatToString IntToString CodeGen Normalize CheckSafe.
 From Examples Require Import GatherScatter Convolution Im2col Blur TensorAdd Matmul.
 From Inferpad Require Import Reify ATLPhoas.
@@ -38,10 +38,55 @@ Definition add_size :=
                         (with_T_var [Z.to_nat A; Z.to_nat C; Z.to_nat B; Z.to_nat D]
                                    (size_nil (0 < A /\ 0 < B /\ 0 < C /\ 0 < D)%Z)))))).
 
+Definition add_args :=
+  [Z_arg "A";
+   Z_arg "B";
+   Z_arg "C";
+   Z_arg "D";
+   T_arg "m1" [ZVar "A"; ZVar "C"; ZVar "B"; ZVar "D"];
+   T_arg "m2" [ZVar "A"; ZVar "C"; ZVar "B"; ZVar "D"]].
+
+Definition add_precond : fun_type interp_type [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] _ := fun A B C D _ _ => (0 < A /\ 0 < B /\ 0 < C /\ 0 < D)%Z.
+
+Lemma with_Z_var_eq f g :
+  f = g ->
+  with_Z_var f = with_Z_var g.
+Proof. intros. subst. reflexivity. Qed.
+
+Lemma with_T_var_eq s f g :
+  f = g ->
+  with_T_var s f = with_T_var s g.
+Proof. intros. subst. reflexivity. Qed.
+
 Derive string_add in
-  (spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 O add_size string_add add)
+  (fancy_spec_of0 [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 add_args string_add add_precond add)
     as string_add_correct.
-Proof. cbv [add]. Set Ltac Profiling. Time prove_spec_of. Show Ltac Profile. Time Qed.
+Proof.
+  cbv [fancy_spec_of0]. simpl map. (*this would be relatively clean if there were not fmaps everywhere...*) eassert (size_spec_of _ _ _ _ = _) as ->.
+  { cbv [size_spec_of]. simpl.
+    repeat match goal with
+           | |- _ =>
+               progress (cbv [option_map]; simpl; first [rewrite lookup_add_ne by congruence | rewrite lookup_add_eq by reflexivity])
+           | |- with_Z_var _ = _ =>
+               apply with_Z_var_eq; apply functional_extensionality; intro
+           | |- with_T_var _ _ = _ =>
+               simpl; apply with_T_var_eq
+           | _ => simpl; reflexivity
+           end. }
+  prove_spec_of.
+
+    .
+    apply with_T_var_eq.
+
+    cbv [option_map].
+    rewrite lookup_add_eq by reflexivity.
+    2: {
+
+  cbv [size_spec_of]. simpl.
+  Ltac simpl_
+
+
+  cbv [add]. Set Ltac Profiling. Time prove_spec_of. Show Ltac Profile. Time Qed.
 
 Definition matmul_size :=
   with_Z_var
@@ -353,7 +398,7 @@ Definition gather_size :=
          (fun R0 =>
             with_T_var [Z.to_nat R0]
               (with_T_var [Z.to_nat R0]
-            (size_nil (Z.of_nat (Z.to_nat R0) < W)%Z)))).
+                 (size_nil (Z.of_nat (Z.to_nat R0) < W)%Z)))).
 
 Derive gather_string in
   (spec_of [tZ; tZ; tensor_n 1; tensor_n 1] 1 O gather_size gather_string (fun W R0 => gather W))
