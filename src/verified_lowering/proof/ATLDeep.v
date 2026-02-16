@@ -124,17 +124,17 @@ Fixpoint sizeof (e : ATLexpr) : list Zexpr :=
     match sizeof e with
     | m :: rest => (m - n)%z :: rest
     | [] => []
-    end           
+    end
   | Padr n e =>
     match sizeof e with
     | m :: rest => (m + n)%z :: rest
     | [] => []
-    end         
+    end
   | Padl n e =>
     match sizeof e with
     | m :: rest => (m + n)%z :: rest
     | [] => []
-    end                  
+    end
   | Scalar s =>
     []
   end.
@@ -179,11 +179,11 @@ Fixpoint lower
       let xlen := match sizeof x with
                   | n::_ => n
                   | _ => | 0 |%z
-                  end in 
+                  end in
       let ylen := match sizeof y with
                   | n::_ => n
                   | _ => | 0 |%z
-                  end in   
+                  end in
       Seq (lower x (fun l =>
                       f (match l with
                          | (v,d)::xs =>
@@ -209,7 +209,7 @@ Fixpoint lower
                         | (v,d)::(vi,di)::xs =>
                             ((v * di + vi)%z, (d * di)%z)::xs
                         | _ => l
-                        end)) p asn sh          
+                        end)) p asn sh
   | Truncr n e =>
       lower e (fun l => f (match l with
                         | (v,d)::xs =>
@@ -618,7 +618,7 @@ Lemma length_eval_expr_gen : forall c v e l i lo hi,
       length l = Z.to_nat z.
 Proof.
   induct 1; intros.
-  - simpl in *. invert H2. rewrite H,H0 in *. invert H4. lia. 
+  - simpl in *. invert H2. rewrite H,H0 in *. invert H4. lia.
   - invert H6. rewrite H,H0 in *. invert H8.
     simpl.
     erewrite IHeval_expr2.
@@ -678,7 +678,7 @@ Lemma eq_eval_stmt_for :
 Proof.
   induct 1; intros.
   - rewrite H,H0 in *. invert H4. invert H5.
-    eapply EvalForStep; eauto.    
+    eapply EvalForStep; eauto.
     eapply H6. lia. eassumption.
     eapply IHeval_stmt2. reflexivity.
     simpl. rewrite H. reflexivity.
@@ -737,7 +737,7 @@ Proof.
         try lia; try discriminate; propositional.
       invert H1.
     + eapply EvalReduceV; eauto.
-      * unfold not in *. intros. apply H8.        
+      * unfold not in *. intros. apply H8.
         specialize (H0 []); simpl in *.
         invert H0. invs.
         rewrite H in *.
@@ -807,7 +807,7 @@ Proof.
     eapply result_has_shape_add_result. eassumption.
     2: { eapply IHn in H19. eassumption. eassumption. eassumption.
          simpl. rewrite H2. reflexivity.
-         eauto. lia. } 
+         eauto. lia. }
     eapply H. 3: eassumption.
     { eapply nonneg_bounds_includes; [|eassumption]. sets. }
     { eapply size_of_includes; [|eassumption]. sets. }
@@ -917,7 +917,7 @@ Proof.
     assert (Hor : (i' = loz \/ loz + 1 <= i')%Z) by lia.
     destruct Hor as [Hle|Heq].
     -- subst. replace (Z.to_nat _) with O by lia. simpl. assumption.
-    -- 
+    --
       specialize (IH i' ltac:(lia)). destruct IH as (_&_&IH).
       replace (Z.to_nat (i' - loz)) with (Datatypes.S (Z.to_nat (i' - (loz + 1)))) by lia.
       simpl. assumption.

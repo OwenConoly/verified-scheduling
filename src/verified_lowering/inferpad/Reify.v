@@ -18,7 +18,7 @@ Set Warnings "-omega-is-deprecated,-deprecated".
 
 From Codegen Require Import IdentParsing NatToString IntToString Normalize CodeGen.
 From Lower Require Import ATLDeep Sexpr Zexpr Bexpr.
-From ATL Require Import ATL Common CommonTactics Div.
+From ATL Require Import ATL Common CommonTactics Div Map.
 From Inferpad Require Import ATLPhoas.
 
 Open Scope string_scope.
@@ -431,6 +431,38 @@ Ltac normalize_spec_of :=
   end.
 
 Ltac prove_spec_of := normalize_spec_of; prove_spec_of0; prove_sideconditions.
+
+Lemma with_Z_var_eq f g :
+  f = g ->
+  with_Z_var f = with_Z_var g.
+Proof. intros. subst. reflexivity. Qed.
+
+Lemma with_T_var_eq s f g :
+  f = g ->
+  with_T_var s f = with_T_var s g.
+Proof. intros. subst. reflexivity. Qed.
+
+Ltac normalize_size_spec :=
+  cbv [size_spec_of];
+  simpl;
+  repeat match goal with
+    | |- _ =>
+        progress (cbv [option_map]; simpl; first [rewrite lookup_add_ne by congruence | rewrite lookup_add_eq by reflexivity])
+    | |- with_Z_var _ = _ =>
+        apply with_Z_var_eq; apply functional_extensionality; intro
+    | |- with_T_var _ _ = _ =>
+        simpl; apply with_T_var_eq
+    | _ => simpl; reflexivity
+    end.
+
+Ltac prove_stringy_spec :=
+  cbv [stringy_spec_of];
+  simpl map;
+  match goal with
+  | |- spec_of _ _ _ ?size _ _ =>
+      eassert (size = _) as -> by normalize_size_spec
+  end;
+  prove_spec_of.
 
 (* Ltac R := *)
 (*   let foo := fresh "foo" in *)

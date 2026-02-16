@@ -3749,29 +3749,7 @@ Fixpoint eval_Zexprlist_Z v (xs : list Zexpr) : option (list Z) :=
       end
   end.
 
-Fixpoint fancy_spec_of' ts n (args : list arg_spec) (fd : ATLexpr) (P : fun_type interp_type ts Prop) (fs : fun_type interp_type ts (dim_n n)) (v : fmap string Z) (ec : fmap string Result.result) :=
-  match ts, args return fun_type _ ts _ -> fun_type _ ts _ -> _ with
-  | [], [] => fun P fs =>
-               P ->
-               exists r,
-                 eval_expr v ec fd r /\
-                   tensor_of_result r = fs
-  | tZ :: ts', Z_arg name :: args' => fun P fs =>
-                                     forall (x : Z),
-                                       fancy_spec_of' ts' n args' fd (P x) (fs x) (v $+ (name, x)) ec
-  | tensor_n m :: ts', T_arg name size :: args' => fun P fs =>
-                                                   forall (x : Result.result),
-                                                     match eval_Zexprlist_Z v size with
-                                                     | Some sh =>
-                                                         result_has_shape' (map Z.to_nat sh) x
-                                                     | None => True
-                                                     end ->
-                                                     fancy_spec_of' ts' n args' fd (P (tensor_of_result x)) (fs (tensor_of_result x)) v (ec $+ (name, x))
-  | _, _ => fun _ _ => False
-  end P fs.
-
 Definition spec_of ts n name size fd fs := spec_of' ts n name size fd fs $0 $0.
-Definition fancy_spec_of ts n args fd P fs := fancy_spec_of' ts n args fd P fs $0 $0.
 
 Definition starts_with_var x :=
   exists y, x = ("var_" ++ y)%string.
@@ -3955,5 +3933,5 @@ Proof.
   eapply fvar_idxs_in_bounds'_fvar_idxs_in_bounds; eauto.
 Qed.
 
-Definition fancy_spec_of0 ts n args fd P fs :=
+Definition stringy_spec_of ts n args fd P fs :=
   spec_of ts n (map name_of args) (size_spec_of ts $0 P args) fd fs.
