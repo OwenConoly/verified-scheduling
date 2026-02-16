@@ -78,170 +78,166 @@ Derive string_matmul_tiled_split in
     as string_matmul_tiled_split_correct.
 Proof. cbv [matmul_tiled_split]. prove_stringy_spec. Fail Fail Qed. Abort.
 
-(* Definition conv_size := *)
-(*   with_Z_var *)
-(*     (fun n => *)
-(*        with_T_var [Z.to_nat n] *)
-(*          (with_Z_var *)
-(*             (fun m => *)
-(*                size_nil (0 < n /\ -m + 1 < n /\ 0 < m)%Z))). *)
+Definition conv_args :=
+  [Z_arg "n";
+   T_arg "c" [ZVar "n"];
+   Z_arg "m"].
 
-(* Derive string_conv4 in *)
-(*   (spec_of [tZ; tensor_n 1; tZ] 1 O conv_size string_conv4 (fun n c m => conv4 c n m)) *)
-(*     as string_conv4_correct. *)
-(* Proof. cbv [conv4]. prove_spec_of. Qed. *)
+Definition conv_precond :=
+  fun n (_ : dim_n 1) m => (0 < n /\ -m + 1 < n /\ 0 < m)%Z.
 
-(* Derive string_conv1 in *)
-(*   (spec_of [tZ; tensor_n 1; tZ] 1 O conv_size string_conv1 (fun n c m => conv1 c n m)) *)
-(*     as string_conv1_correct. *)
-(* Proof. cbv [conv1]. prove_spec_of. Qed. *)
+Derive string_conv4 in
+  (stringy_spec_of [tZ; tensor_n 1; tZ] 1 conv_args string_conv4 conv_precond (fun n c m => conv4 c n m))
+    as string_conv4_correct.
+Proof. cbv [conv4 conv_precond]. prove_stringy_spec. Qed.
 
-(* Definition size0 := *)
-(*   with_Z_var *)
-(*     (fun n => *)
-(*        with_Z_var *)
-(*          (fun m => *)
-(*             with_T_var [Z.to_nat n; Z.to_nat m] *)
-(*               (size_nil (2 < n /\ 1 < m)%Z))). *)
+Derive string_conv1 in
+  (stringy_spec_of [tZ; tensor_n 1; tZ] 1 conv_args string_conv1 conv_precond (fun n c m => conv1 c n m))
+    as string_conv1_correct.
+Proof. cbv [conv1 conv_precond]. prove_stringy_spec. Qed.
 
-(* Derive string_prog in *)
-(*   (let shallow_prog := *)
-(*      fun n m l => *)
-(*        transpose ( *)
-(*            (GEN [ j < 1 ] *)
-(*               GEN [ i < n ] *)
-(*               l _[i;j]) *)
-(*              <++> *)
-(*              (GEN [ 1 <= j < m ] *)
-(*                 (GEN [ i < 1 ] *)
-(*                    l _[i;j]) *)
-(*                 <++> *)
-(*                 (GEN [ 1 <= i < n - 1] *)
-(*                    l _[i;j]) *)
-(*                 <++> *)
-(*                 (GEN [ n - 1 <= i < n ] *)
-(*                    l _[i;j]) *)
-(*          )) in *)
-(*    spec_of [tZ; tZ; tensor_n 2] 2 O size0 string_prog shallow_prog) *)
-(*     as string_prog_correct. *)
-(* Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Fail Fail Qed. Abort. *)
+Local Definition args0 :=
+  [Z_arg "n";
+   Z_arg "m";
+   T_arg "l" [ZVar "n"; ZVar "m"]].
 
-(* Definition size1 := *)
-(*   with_Z_var *)
-(*     (fun n => *)
-(*        with_Z_var *)
-(*          (fun m => *)
-(*             with_T_var [Z.to_nat n; Z.to_nat m] *)
-(*               (size_nil (0 < n /\ 1 < m)%Z))). *)
+Local Definition precond0 :=
+  fun n m (_ : dim_n 2) => (2 < n /\ 1 < m)%Z.
 
-(* Derive string_prog in *)
-(*   (let shallow_prog := *)
-(*      fun n m l => *)
-(*        transpose ( *)
-(*            (GEN [ j < 1 ] *)
-(*               GEN [ i < n ] *)
-(*               l _[i;j]) *)
-(*              <++> *)
-(*              (GEN [ 1 <= j < m ] *)
-(*                 GEN [ i < n ] *)
-(*                 l _[i;j])) in *)
-(*    spec_of [tZ; tZ; tensor_n 2] 2 O size1 string_prog shallow_prog) *)
-(*     as string_prog_correct. *)
-(* Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Fail Fail Qed. Abort. *)
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m l =>
+       transpose (
+           (GEN [ j < 1 ]
+              GEN [ i < n ]
+              l _[i;j])
+             <++>
+             (GEN [ 1 <= j < m ]
+                (GEN [ i < 1 ]
+                   l _[i;j])
+                <++>
+                (GEN [ 1 <= i < n - 1]
+                   l _[i;j])
+                <++>
+                (GEN [ n - 1 <= i < n ]
+                   l _[i;j])
+         )) in
+   stringy_spec_of [tZ; tZ; tensor_n 2] 2 args0 string_prog precond0 shallow_prog)
+    as string_prog_correct.
+Proof.
+  intro shallow_prog. subst shallow_prog.
+  cbv [precond0]. prove_stringy_spec. Fail Fail Qed.
+Abort.
 
-(* Definition size2 := *)
-(*   with_Z_var *)
-(*     (fun n => *)
-(*        with_Z_var *)
-(*          (fun m => *)
-(*             with_T_var [Z.to_nat n; Z.to_nat m] *)
-(*               (size_nil (1 < n /\ 1 < m)%Z))). *)
+Local Definition precond1 :=
+  fun n m (_ : dim_n 2) => (0 < n /\ 1 < m)%Z.
 
-(* Derive string_prog in *)
-(*   (let shallow_prog := *)
-(*      fun n m v => *)
-(*        transpose ( *)
-(*            (GEN [ j < 1 ] *)
-(*               (GEN [ i < 1 ] *)
-(*                  v _[i;j]) *)
-(*               <++> *)
-(*               (GEN [ 1 <= i < n ] *)
-(*                  v _[i;j])) *)
-(*              <++> *)
-(*              (GEN [ 1 <= j < m ] *)
-(*                 GEN [ i < n ] *)
-(*                 v _[i;j])) in *)
-(*    spec_of [tZ; tZ; tensor_n 2] 2 O size2 string_prog shallow_prog) *)
-(*     as string_prog_correct. *)
-(* Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Fail Fail Qed. Abort. *)
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m l =>
+       transpose (
+           (GEN [ j < 1 ]
+              GEN [ i < n ]
+              l _[i;j])
+             <++>
+             (GEN [ 1 <= j < m ]
+                GEN [ i < n ]
+                l _[i;j])) in
+   stringy_spec_of [tZ; tZ; tensor_n 2] 2 args0 string_prog precond1 shallow_prog)
+    as string_prog_correct.
+Proof.
+  intro shallow_prog. subst shallow_prog.
+  cbv [precond1]. prove_stringy_spec. Fail Fail Qed.
+Abort.
 
-(* Definition size3 := *)
-(*   with_Z_var *)
-(*     (fun n => *)
-(*        with_Z_var *)
-(*          (fun m => *)
-(*             with_T_var [Z.to_nat n; Z.to_nat m] *)
-(*               (size_nil (1 < n /\ 0 < m)%Z))). *)
+Local Definition precond2 :=
+  fun n m (_ : dim_n 2) => (1 < n /\ 1 < m)%Z.
 
-(* Derive string_prog in *)
-(*   (let shallow_prog := *)
-(*      fun n m l => *)
-(*        transpose ( *)
-(*            GEN [ j < m ] *)
-(*              (GEN [ i < 1 ] *)
-(*                 l _[i;j]) *)
-(*              <++> *)
-(*              (GEN [ 1 <= i < n ] *)
-(*                 l _[i;j])) in *)
-(*    spec_of [tZ; tZ; tensor_n 2] 2 O size3 string_prog shallow_prog) *)
-(*     as string_prog_correct. *)
-(* Proof. intro shallow_prog. subst shallow_prog. prove_spec_of. Fail Fail Qed. Abort. *)
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m v =>
+       transpose (
+           (GEN [ j < 1 ]
+              (GEN [ i < 1 ]
+                 v _[i;j])
+              <++>
+              (GEN [ 1 <= i < n ]
+                 v _[i;j]))
+             <++>
+             (GEN [ 1 <= j < m ]
+                GEN [ i < n ]
+                v _[i;j])) in
+   stringy_spec_of [tZ; tZ; tensor_n 2] 2 args0 string_prog precond2 shallow_prog)
+    as string_prog_correct.
+Proof.
+  intro shallow_prog. subst shallow_prog.
+  cbv [precond2]. prove_stringy_spec. Fail Fail Qed.
+Abort.
 
-(* Definition size4 := *)
-(*   with_Z_var *)
-(*     (fun n => *)
-(*        with_Z_var *)
-(*          (fun m => *)
-(*             with_T_var [Z.to_nat n * Z.to_nat m] *)
-(*               (size_nil (0 < n /\ 1 < m)%Z))). *)
+Local Definition precond3 :=
+  fun n m (_ : dim_n 2) => (1 < n /\ 0 < m)%Z.
 
-(* Axiom f : False. *)
-(* Derive string_prog in *)
-(*   (let shallow_prog := *)
-(*      fun n m l => *)
-(*        Common.flatten ( *)
-(*            Common.transpose *)
-(*              ( *)
-(*                (GEN [ i < 1 ] *)
-(*                   (GEN [ j < n ] *)
-(*                      l _[j * m + i])) *)
-(*                  <++> *)
-(*                  (GEN [ 1 <= i < m ] *)
-(*                     (GEN [ j < n ] *)
-(*                        l _[j * m + i])))) in *)
-(*    spec_of [tZ; tZ; tensor_n 1] 1 O size4 string_prog shallow_prog) *)
-(*     as string_prog_correct. *)
-(* Proof. *)
-(*   intro shallow_prog. subst shallow_prog. prove_spec_of. *)
-(*   { rewrite Nat2Z.inj_mul. do 2 rewrite Z2Nat.id by lia. *)
-(*                          (*probably true*) destruct f. } *)
-(*   { rewrite Nat2Z.inj_mul. do 2 rewrite Z2Nat.id by lia. *)
-(*                          (*probably true*) destruct f. } *)
-(*   Fail Fail Qed. *)
-(* Abort. *)
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m l =>
+       transpose (
+           GEN [ j < m ]
+             (GEN [ i < 1 ]
+                l _[i;j])
+             <++>
+             (GEN [ 1 <= i < n ]
+                l _[i;j])) in
+   stringy_spec_of [tZ; tZ; tensor_n 2] 2 args0 string_prog precond3 shallow_prog)
+    as string_prog_correct.
+Proof.
+  intro shallow_prog. subst shallow_prog.
+  cbv [precond3]. prove_stringy_spec. Fail Fail Qed.
+Abort.
 
-(* Definition blur_size := *)
-(*   with_Z_var *)
-(*     (fun N => *)
-(*        with_Z_var *)
-(*          (fun M => *)
-(*             with_T_var [Z.to_nat N; Z.to_nat M] *)
-(*               (size_nil (0 < N /\ 0 < M)%Z))). *)
+Local Definition precond4 :=
+  fun n m (_ : dim_n 1) => (0 < n /\ 1 < m)%Z.
 
-(* Derive blurimmediate_string in *)
-(*   (spec_of [tZ; tZ; tensor_n 2] 2 O blur_size blurimmediate_string (fun N M v => blurimmediate v M N)) *)
-(*     as blurimmediate_string_correct. *)
-(* Proof. cbv [blurimmediate]. prove_spec_of. Qed. *)
+Definition size4 :=
+  [Z_arg "n";
+   Z_arg "m";
+   T_arg "l" [! "m" ! * ! "n" !]%z].
+
+Axiom f : False.
+Derive string_prog in
+  (let shallow_prog :=
+     fun n m l =>
+       Common.flatten (
+           Common.transpose
+             (
+               (GEN [ i < 1 ]
+                  (GEN [ j < n ]
+                     l _[j * m + i]))
+                 <++>
+                 (GEN [ 1 <= i < m ]
+                    (GEN [ j < n ]
+                       l _[j * m + i])))) in
+   stringy_spec_of [tZ; tZ; tensor_n 1] 1 size4 string_prog precond4 shallow_prog)
+    as string_prog_correct.
+Proof.
+  intro shallow_prog. subst shallow_prog.
+  cbv [precond4]. prove_stringy_spec.
+  { rewrite Z2Nat.id by lia. (*probably true*) destruct f. }
+  { rewrite Z2Nat.id by lia. (*probably true*) destruct f. }
+  Fail Fail Qed.
+Abort.
+
+Definition blur_args :=
+  [Z_arg "N";
+   Z_arg "M";
+   T_arg "v" [ZVar "N"; ZVar "M"]].
+
+Definition blur_precond :=
+  fun N M (_ : dim_n 2) => (0 < N /\ 0 < M)%Z.
+
+Derive blurimmediate_string in
+  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blurimmediate_string blur_precond (fun N M v => blurimmediate v M N))
+    as blurimmediate_string_correct.
+Proof. cbv [blurimmediate blur_precond]. prove_stringy_spec. Qed.
 
 (* Fixpoint size_correct ts sz := *)
 (*   match ts, sz with *)
