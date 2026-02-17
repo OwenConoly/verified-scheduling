@@ -216,7 +216,7 @@ Ltac Lid lname default_dim :=
   let ret := eval simpl in ret' in
       ret.
 
-Goal forall A B C (m1 m2 : list (list R)),
+Goal forall (m2 m1 : list (list R)) C B A,
     (0 < A)%Z ->
     (0 < B)%Z ->
     (0 < C)%Z ->
@@ -229,7 +229,7 @@ Proof.
   in idtac_list s.
 Abort.
 
-Goal forall A B C (m1 m2 : list (list R)),
+Goal forall (m2 m1 : list (list R)) C B A,
      (0 < A)%Z ->
      (0 < B)%Z ->
      (0 < C)%Z ->
@@ -241,7 +241,7 @@ Proof.
   in idtac_list s.
 Abort.
 
-Goal forall (A B C D : Z) (m1 m2 : (list (list (list (list R))))),
+Goal forall (m2 m1 : (list (list (list (list R))))) D C B A,
          (0 < A)%Z ->
          (0 < B)%Z ->
          (0 < C)%Z ->
@@ -255,7 +255,7 @@ Proof.
   in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -264,7 +264,7 @@ Proof.
   let s := Leq constr:("blurim") constr:("blurtwo") constr:("50") in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (2 < N)%Z ->
     (2 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -273,7 +273,7 @@ Proof.
   let s := Leq constr:("blurpart") constr:("blurim") constr:("50") in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (2 < N)%Z ->
     (2 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -282,7 +282,7 @@ Proof.
   let s := Leq constr:("blurpart") constr:("blurisolate") constr:("50") in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (2 < N)%Z ->
     (2 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -318,7 +318,7 @@ Proof.
   let s := Ltime constr:("tile_nb") constr:("2000") constr:("50") in idtac_list s.
 Abort.
 *)
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -327,7 +327,7 @@ Proof.
   let s := Leq constr:("blurim") constr:("blurtiles") constr:("2000") in idtac_list s.
 Abort.
 
-Goal forall W R0 (x w : list R),
+Goal forall (w x : list R) R0 W,
     consistent w (Z.to_nat R0, tt) ->
     consistent x (Z.to_nat R0, tt) ->
     (0 < W)%Z ->
@@ -337,7 +337,7 @@ Proof.
   let s := Leq constr:("gather") constr:("scatter") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall (c : (list R)) (n m : Z),
+Goal forall (c : (list R)) (m n: Z),
     (0 < n)%Z ->
     (-m+1 < n)%Z ->
     consistent c (Z.to_nat n,tt) ->
@@ -346,7 +346,7 @@ Proof.
   let s := Leq constr:("conv4") constr:("conv1") constr:("100") in idtac_list s.
 Abort.
 
-Goal forall A B K W RR (w : list (list R)) (x : list R),
+Goal forall (x : list R) (w : list (list R)) RR W K B A,
     (0 < K)%Z ->
     (0 < W)%Z ->
     (0 < RR)%Z ->
@@ -357,7 +357,7 @@ Proof.
   let s := Leq constr:("im2collifted") constr:("im2col") constr:("50") in idtac_list s.
 Abort.
 
-Goal forall n m (v : list (list R)),
+Goal forall (v : list (list R)) m n,
     consistent v (Z.to_nat n,(Z.to_nat m,tt)) ->
     transpose (
         (GEN [ j < 1 ]
@@ -374,7 +374,7 @@ Proof.
 Abort.
 
 
-Goal forall n m (v : list (list R)),
+Goal forall (v : list (list R)) m n,
     (0 < n)%Z ->
     (0 < m)%Z ->
     consistent v (Z.to_nat n,(Z.to_nat m,tt)) ->
@@ -396,7 +396,7 @@ Proof.
   let s := Lid constr:("concattest1") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall n m (v : list (list R)),
+Goal forall (v : list (list R)) m n,
     (0 < n)%Z ->
     (0 < m)%Z ->
     consistent v (Z.to_nat n,(Z.to_nat m,tt)) ->
@@ -419,7 +419,7 @@ Proof.
   let s := Lid constr:("concattest2") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall n m (v : list (list R)),
+Goal forall (v : list (list R)) m n,
     consistent v (Z.to_nat n,(Z.to_nat m,tt)) ->
     transpose (
         GEN [ j < m ]
@@ -433,7 +433,7 @@ Proof.
   let s := Lid constr:("concattest3") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall n m (v : (list R)),
+Goal forall (v : (list R)) m n,
     consistent v (Z.to_nat n * Z.to_nat m,tt) ->
     flatten (
        (GEN [ j < n ]
@@ -447,7 +447,7 @@ Proof.
 Abort.
 (* - *)
 
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -456,7 +456,7 @@ Proof.
   let s := Ltime constr:("blurim") constr:("1000") constr:("3") in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (2 < N)%Z ->
     (2 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -465,7 +465,7 @@ Proof.
   let s := Ltime constr:("blurpart") constr:("1000") constr:("3") in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (2 < N)%Z ->
     (2 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -474,7 +474,7 @@ Proof.
   let s := Ltime constr:("blurtwopart") constr:("1000") constr:("3") in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -483,8 +483,7 @@ Proof.
   let s := Ltime constr:("blurtwo") constr:("1000") constr:("3") in idtac_list s.
 Abort.
 
-
-Goal forall N M (v : list (list R)),
+Goal forall (v : list (list R)) M N,
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
@@ -493,7 +492,7 @@ Proof.
   let s := Ltime constr:("blurtiles") constr:("2000") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall W R0 (x w : list R),
+Goal forall (w x : list R) R0 W,
     consistent w (Z.to_nat R0, tt) ->
     consistent x (Z.to_nat R0, tt) ->
     (0 < W)%Z ->
@@ -503,7 +502,7 @@ Proof.
   let s := Ltime constr:("gather") constr:("10") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall W R0 (x w : list R),
+Goal forall (w x : list R) R0 W,
     consistent w (Z.to_nat R0, tt) ->
     consistent x (Z.to_nat R0, tt) ->
     (0 < W)%Z ->
@@ -513,7 +512,7 @@ Proof.
   let s := Ltime constr:("scatter") constr:("10") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall (c : (list R)) (n m : Z),
+Goal forall (c : (list R)) (m n : Z),
     (0 < n)%Z ->
     (-m+1 < n)%Z ->
     consistent c (Z.to_nat n,tt) ->
@@ -522,7 +521,7 @@ Proof.
   let s := Ltime constr:("conv4") constr:("100") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall (c : (list R)) (n m : Z),
+Goal forall (c : (list R)) (m n : Z),
     (0 < n)%Z ->
     (-m+1 < n)%Z ->
     consistent c (Z.to_nat n,tt) ->
@@ -531,7 +530,7 @@ Proof.
   let s := Ltime constr:("conv1") constr:("100") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall A B K W RR (w : list (list R)) (x : list R),
+Goal forall (x : list R) (w : list (list R)) RR W K B A,
     (0 < K)%Z ->
     (0 < W)%Z ->
     (0 < RR)%Z ->
@@ -542,7 +541,7 @@ Proof.
   let s := Ltime constr:("im2collifted") constr:("50") constr:("10") in idtac_list s.
 Abort.
 
-Goal forall A B K W RR (w : list (list R)) (x : list R),
+Goal forall (x : list R) (w : list (list R)) RR W K B A,
     (0 < K)%Z ->
     (0 < W)%Z ->
     (0 < RR)%Z ->

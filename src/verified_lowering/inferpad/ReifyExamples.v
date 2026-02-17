@@ -80,19 +80,19 @@ Proof. cbv [matmul_tiled_split]. prove_stringy_spec. Fail Fail Qed. Abort.
 
 Definition conv_args :=
   [Z_arg "n";
-   T_arg "c" [ZVar "n"];
-   Z_arg "m"].
+   Z_arg "m";
+   T_arg "c" [ZVar "n"]].
 
 Definition conv_precond :=
-  fun n (_ : dim_n 1) m => (0 < n /\ -m + 1 < n /\ 0 < m)%Z.
+  fun n m (_ : dim_n 1) => (0 < n /\ -m + 1 < n /\ 0 < m)%Z.
 
 Derive string_conv4 in
-  (stringy_spec_of [tZ; tensor_n 1; tZ] 1 conv_args string_conv4 conv_precond (fun n c m => conv4 c n m))
+  (stringy_spec_of [tZ; tZ; tensor_n 1] 1 conv_args string_conv4 conv_precond (fun n m c => conv4 c n m))
     as string_conv4_correct.
 Proof. cbv [conv4 conv_precond]. prove_stringy_spec. Qed.
 
 Derive string_conv1 in
-  (stringy_spec_of [tZ; tensor_n 1; tZ] 1 conv_args string_conv1 conv_precond (fun n c m => conv1 c n m))
+  (stringy_spec_of [tZ; tZ; tensor_n 1] 1 conv_args string_conv1 conv_precond (fun n m c => conv1 c n m))
     as string_conv1_correct.
 Proof. cbv [conv1 conv_precond]. prove_stringy_spec. Qed.
 

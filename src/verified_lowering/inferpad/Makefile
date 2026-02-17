@@ -1,4 +1,4 @@
-MODULES := Reify ReifyExamples InferPad
+MODULES := Reify ReifyExamples InferPad ATLPhoas
 VS      := $(MODULES:%=%.v)
 
 .PHONY: coq clean
