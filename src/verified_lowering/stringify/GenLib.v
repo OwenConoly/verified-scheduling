@@ -166,7 +166,6 @@ Goal True.
   in idtac_list s.
 Abort.
 
-Check string_conv4_correct.
 Goal True.
   let s := Llibfunc constr:("conv4")
                              conv_args
