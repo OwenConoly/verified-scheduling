@@ -238,25 +238,21 @@ Derive blurimmediate_string in
     as blurimmediate_string_correct.
 Proof. cbv [blurimmediate blur_precond]. prove_stringy_spec. Qed.
 
-Print prove_spec_of.
-Print normalize_spec_of.
-
 Derive blurtwostage_string in
   (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blurtwostage_string blur_precond blurtwostage)
     as blurtwostage_string_correct.
-Proof. cbv [blurtwostage blur_precond]. prove_stringy_spec. Fail Fail Qed. Abort.
+Proof. cbv [blurtwostage blur_precond]. prove_stringy_spec. Qed.
 
 Definition blur_precond' :=
   fun N M (_ : dim_n 2) => (2 < N /\ 2 < M)%Z.
 
-Derive blur_tiles_guarded_string in
-  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded_string blur_precond' (fun n m v => blur_tiles_guarded v n m 4 4))
-    as blur_tiles_guarded_string_correct.
+Derive blur_tiles_guarded4_string in
+  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded4_string blur_precond' (fun n m v => blur_tiles_guarded v n m 4 4))
+    as blur_tiles_guarded4_string_correct.
 Proof.
   cbv [blur_tiles_guarded blur_precond']. prove_stringy_spec.
-  all: destruct f.
-  Fail Fail Qed.
-Abort.
+  all: destruct (f : False).
+Qed.
 
 Definition args5 :=
   [T_arg "l" [ZLit 100; ZLit 100]].
@@ -281,9 +277,9 @@ Proof. cbv [fusion_no_boundary fusion_precond]. prove_stringy_spec. Qed.
 
 Definition gather_args :=
   [Z_arg "W";
-   Z_arg "R0";
-   T_arg "x" [ZVar "R0"];
-   T_arg "w" [ZVar "R0"]].
+   Z_arg "RR";
+   T_arg "x" [ZVar "RR"];
+   T_arg "w" [ZVar "RR"]].
 
 Definition gather_precond :=
   fun W R0 (_ _ : dim_n 1) => (Z.of_nat (Z.to_nat R0) < W)%Z.
@@ -296,8 +292,7 @@ Proof.
 (*idk what these parameters are supposed to represent, *)
 (*   so idk how to fix this*)
   all: destruct f.
-  Fail Fail Qed.
-Abort.
+Qed.
 
 Definition scatter_args := gather_args.
 Definition scatter_precond := gather_precond.
@@ -307,38 +302,39 @@ Derive scatter_string in
     as scatter_string_correct.
 Proof.
   cbv [scatter scatter_precond gather_precond]. prove_stringy_spec.
+  (*similar to gather, i do not understand why this fails*)
   all: destruct f.
-  Fail Fail Qed.
-Abort.
+Qed.
 
-Definition im2col_args A B :=
-  [Z_arg "K";
+Definition im2col_args :=
+  [Z_arg "A";
+   Z_arg "B";
+   Z_arg "K";
    Z_arg "W";
    Z_arg "RR";
-   T_arg "w" [ZLit A; ZLit B];
+   T_arg "w" [ZVar "A"; ZVar "B"];
    T_arg "x" [ZVar "K"]].
 
 Definition im2col_precond :=
-  fun K W RR (_ : dim_n 2) (_ : dim_n 1) => (0 < K /\ 0 < W /\ 0 < RR)%Z.
+  fun (A B : Z) K W RR (_ : dim_n 2) (_ : dim_n 1) => (0 < K /\ 0 < W /\ 0 < RR)%Z.
 
 Derive im2colminilifted_string in
-  (forall A B, stringy_spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 1] 2 (im2col_args A B) im2colminilifted_string im2col_precond im2colminilifted)
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tZ; tensor_n 2; tensor_n 1] 2 im2col_args im2colminilifted_string im2col_precond (fun A B => im2colminilifted))
     as im2colminilifted_string_correct.
 Proof.
-  cbv [im2colminilifted im2col_precond]. intros. prove_stringy_spec.
-  (*again i do not understand the spec of this function, so not sure how to make these true*)
+  cbv [im2colminilifted im2col_precond]. prove_stringy_spec.
+  (*again i do not understand the spec of this function (what is going on with A and B??), so not sure how to make these true*)
   all: destruct f.
-  Fail Fail Qed.
-Abort.
+Qed.
 
 Derive im2colmini_string in
-  (forall A B, stringy_spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 1] 2 (im2col_args A B) im2colmini_string im2col_precond im2colmini)
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tZ; tensor_n 2; tensor_n 1] 2 im2col_args im2colmini_string im2col_precond (fun A B => im2colmini))
     as im2colmini_string_correct.
 Proof.
-  cbv [im2colmini im2col_precond]. intros. prove_stringy_spec.
+  cbv [im2colmini im2col_precond]. prove_stringy_spec.
+  (*again, not sure why this is false*)
   all: destruct f.
-  Fail Fail Qed.
-Abort.
+Qed.
 
 Derive blurimmediate_partition_string in
   (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blurimmediate_partition_string blur_precond' blurimmediate_partition)

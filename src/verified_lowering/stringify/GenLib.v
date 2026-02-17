@@ -168,16 +168,13 @@ Abort.
 
 Check string_conv4_correct.
 Goal True.
-Proof.
   let s := Llibfunc constr:("conv4")
                              conv_args
                              string_conv4
   in idtac_list s.
 Abort.
 
-Check string_conv1_correct.
 Goal True.
-Proof.
   let s := Llibfunc constr:("conv1")
                              conv_args
                              string_conv1
@@ -219,29 +216,18 @@ Goal True.
   in idtac_list s.
 Abort.
 
- Goal forall N M (v : list (list R)),
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,tt)) ->
-    blurimmediate v M N = blurtwostage N M v.
- Proof.
- intros.
-   let s := Llibfunc constr:("blurim")
-                     constr:($0 $+ ("v",[ZLit (Z.of_nat N);
-                                         ZLit (Z.of_nat M)])) in idtac_list s.
+Goal True.
+  let s := Llibfunc constr:("blurim")
+                             blur_args
+                             blurimmediate_string
+  in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
-    0 < N ->
-    0 < M ->
-    consistent v (N,(M,tt)) ->
-    blurtwostage N M v = blurimmediate v M N.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("blurtwo")
-                             constr:($0 $+ ("v",[ZLit (Z.of_nat N);
-                                                 ZLit (Z.of_nat M)])) in
-  idtac_list s.
+                             blur_args
+                             blurtwostage_string
+  in idtac_list s.
 Abort.
 (*
 Goal forall (n m : nat) (l : list (list R)),
@@ -274,122 +260,73 @@ Proof.
   let s := Llibfunc constr:("blurtiles") in idtac_list s.
 *)
 
-Goal forall n m (l : list (list R)),
-    0 < n ->
-    0 < m ->
-    consistent l (n,(m,tt)) ->
-    blur_tiles_guarded l n m 64 64
-    = @nil _.
+Derive blur_tiles_guarded64_string in
+  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded64_string blur_precond' (fun n m v => blur_tiles_guarded v n m 64 64))
+    as blur_tiles_guarded64_string_correct.
 Proof.
-  autounfold with examples. intros.
+  cbv [blur_tiles_guarded blur_precond']. prove_stringy_spec.
+  all: destruct (f : False).
+Qed.
+
+Goal True.
   let s := Llibfunc constr:("blurtiles")
-  constr:($0 $+ ("l",[ZLit (Z.of_nat n); ZLit (Z.of_nat m)])) in idtac_list s.
+                             blur_args
+                             blur_tiles_guarded64_string
+  in idtac_list s.
 Abort.
 
-Goal forall n m (l : list (list R)),
-    0 < n ->
-    0 < m ->
-    consistent l (n,(m,tt)) ->
-    fusion_no_boundary n m l
-    = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("fusion_nb")
-    constr:($0 $+ ("l",[ZLit (Z.of_nat n); ZLit (Z.of_nat m)])) in idtac_list s.
+                             fusion_args
+                             fusion_no_boundary_string
+  in idtac_list s.
 Abort.
 
-Goal forall W RR (x w : list R),
-    consistent w (Z.to_nat RR, tt) ->
-    consistent x (Z.to_nat RR, tt) ->
-    (0 < W)%Z ->
-    (Z.of_nat (length x) < W)%Z ->
-    gather W x w = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("gather")
-  constr:($0 $+ ("x",[ZLit RR]) $+ ("w",[ ZLit RR])) in idtac_list s.
+                             gather_args
+                             gather_string
+  in idtac_list s.
 Abort.
 
-Goal forall W RR (x w : list R),
-    consistent w (Z.to_nat RR, tt) ->
-    consistent x (Z.to_nat RR, tt) ->
-    (0 < W)%Z ->
-    (Z.of_nat (length x) < W)%Z ->
-    scatter W x w = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("scatter")
-  constr:($0 $+ ("x",[ZLit RR]) $+ ("w",[ ZLit RR])) in idtac_list s.
+                             scatter_args
+                             scatter_string
+  in idtac_list s.
 Abort.
 
-Goal forall A B K W RR (w : list (list R)) (x : list R),
-    (0 < K)%Z ->
-    (0 < W)%Z ->
-    (0 < RR)%Z ->
-    consistent w (A,(B,tt))->
-    consistent x (Z.to_nat K,tt) ->
-    im2colminilifted K W RR w x = im2colmini K W RR w x.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("im2collifted")
-                             constr:($0 $+ ("x",[ZLit K]) $+
-                                       ("w",[ ZLit (Z.of_nat A);
-                                              ZLit (Z.of_nat B)]))
+                             im2col_args
+                             im2colminilifted_string
   in idtac_list s.
 Abort.
 
-Goal forall A B K W RR (w : list (list R)) (x : list R),
-    (0 < K)%Z ->
-    (0 < W)%Z ->
-    (0 < RR)%Z ->
-    consistent w (A,(B,tt))->
-    consistent x (Z.to_nat K,tt) ->
-    im2colminilifted K W RR w x = im2colmini K W RR w x.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("im2col")
-                             constr:($0 $+ ("x",[ZLit K]) $+
-                                       ("w",[ ZLit (Z.of_nat A);
-                                              ZLit (Z.of_nat B)]))
+                             im2col_args
+                             im2colmini_string
   in idtac_list s.
-
 Abort.
 
-Goal forall n m (v : list (list R)),
-    2 < n ->
-    2 < m ->
-    consistent v (n,(m,tt)) ->
-    blurimmediate_partition n m v = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("blurpart")
-                             constr:($0 $+ ("v",[ZLit (Z.of_nat n);
-                                                 ZLit (Z.of_nat m)]))
+                             blur_args
+                             blurimmediate_partition_string
   in idtac_list s.
 Abort.
 
-Goal forall n m (v : list (list R)),
-    2 < n ->
-    2 < m ->
-    consistent v (n,(m,tt)) ->
-    blurimmediate_isolate n m v = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("blurisolate")
-                             constr:($0 $+ ("v",[ZLit (Z.of_nat n);
-                                                 ZLit (Z.of_nat m)]))
+                             blur_args
+                             blurimmediate_isolate_string
   in idtac_list s.
 Abort.
 
-Goal forall N M (v : list (list R)),
-    2 < N ->
-    2 < M ->
-    consistent v (N,(M,tt)) ->
-    blurtwostage_partition N M v = @nil _.
-Proof.
-  intros.
+Goal True.
   let s := Llibfunc constr:("blurtwopart")
-                             constr:($0 $+ ("v",[ZLit (Z.of_nat N);
-                                                 ZLit (Z.of_nat M)]))
+                             blur_args
+                             blurtwostage_partition_string
   in idtac_list s.
 Abort.
