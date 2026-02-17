@@ -291,7 +291,7 @@ Qed.
 
 Section total_tiled.
   Variables (X : Type) (H : TensorElem X)
-            (v : list (list X)) (s : @shape X _) (n m : Z) (n_k m_k : Z).
+            (s : @shape X _) (n m : Z) (v : list (list X)) (n_k m_k : Z).
   Derive blur_tiles_guarded SuchThat
       (2 < n ->
        2 < m ->
@@ -857,7 +857,7 @@ Hint Unfold blur_tiles_guarded : examples.
 
 Section fuse_twostage.
   Variables (X : Type) (H : TensorElem X)
-            (v : list (list X)) (m n k : Z) (s : @shape X _).
+            (n m k : Z) (v : list (list X)) (s : @shape X _).
   Derive blurimmediate SuchThat
          (0 < k -> 0 < m -> 0 < n -> consistent v (Z.to_nat n,(Z.to_nat m,s)) ->
           blurtwostage n m v = blurimmediate)%Z As twostage_immediate.
@@ -987,8 +987,8 @@ flatten_trunc (Z.to_nat n)
            (|[ i * k + n' <? n ]| x _[ n']))).
 Proof. reflexivity. Qed.
 
-Goal forall v m n,
-    blurimmediate v m n =
+Goal forall n m v,
+    blurimmediate n m v =
     GEN [ i < n ]
         GEN [ i0 < m ]
         (|[ 0 <=? i - 1 ]|

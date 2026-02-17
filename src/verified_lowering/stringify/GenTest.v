@@ -259,7 +259,7 @@ Goal forall N M (v : list (list R)),
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
-    blurimmediate v M N = blurtwostage N M v.
+    blurimmediate N M v = blurtwostage N M v.
 Proof.
   let s := Leq constr:("blurim") constr:("blurtwo") constr:("50") in idtac_list s.
 Abort.
@@ -268,7 +268,7 @@ Goal forall N M (v : list (list R)),
     (2 < N)%Z ->
     (2 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
-    blurimmediate_partition N M v = blurimmediate v M N.
+    blurimmediate_partition N M v = blurimmediate N M v.
 Proof.
   let s := Leq constr:("blurpart") constr:("blurim") constr:("50") in idtac_list s.
 Abort.
@@ -322,7 +322,7 @@ Goal forall N M (v : list (list R)),
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
-    blurimmediate v M N = blur_tiles_guarded v N M 64 64.
+    blurimmediate N M v = blur_tiles_guarded N M v 64 64.
 Proof.
   let s := Leq constr:("blurim") constr:("blurtiles") constr:("2000") in idtac_list s.
 Abort.
@@ -451,7 +451,7 @@ Goal forall N M (v : list (list R)),
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
-    blurimmediate v M N = blurtwostage N M v.
+    blurimmediate N M v = blurtwostage N M v.
 Proof.
   let s := Ltime constr:("blurim") constr:("1000") constr:("3") in idtac_list s.
 Abort.
@@ -478,7 +478,7 @@ Goal forall N M (v : list (list R)),
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
-    blurtwostage N M v = blurimmediate v M N.
+    blurtwostage N M v = blurimmediate N M v.
 Proof.
   let s := Ltime constr:("blurtwo") constr:("1000") constr:("3") in idtac_list s.
 Abort.
@@ -488,7 +488,7 @@ Goal forall N M (v : list (list R)),
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
-    blur_tiles_guarded v N M 64 64 = blurimmediate v M N.
+    blur_tiles_guarded N M v 64 64 = blurimmediate N M v.
 Proof.
   let s := Ltime constr:("blurtiles") constr:("2000") constr:("10") in idtac_list s.
 Abort.

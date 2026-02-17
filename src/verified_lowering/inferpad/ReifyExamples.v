@@ -234,7 +234,7 @@ Definition blur_precond :=
   fun N M (_ : dim_n 2) => (0 < N /\ 0 < M)%Z.
 
 Derive blurimmediate_string in
-  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blurimmediate_string blur_precond (fun N M v => blurimmediate v M N))
+  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blurimmediate_string blur_precond blurimmediate)
     as blurimmediate_string_correct.
 Proof. cbv [blurimmediate blur_precond]. prove_stringy_spec. Qed.
 
@@ -247,7 +247,7 @@ Definition blur_precond' :=
   fun N M (_ : dim_n 2) => (2 < N /\ 2 < M)%Z.
 
 Derive blur_tiles_guarded4_string in
-  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded4_string blur_precond' (fun n m v => blur_tiles_guarded v n m 4 4))
+  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded4_string blur_precond' (fun n m v => blur_tiles_guarded n m v 4 4))
     as blur_tiles_guarded4_string_correct.
 Proof.
   cbv [blur_tiles_guarded blur_precond']. prove_stringy_spec.

@@ -260,7 +260,7 @@ Proof.
 *)
 
 Derive blur_tiles_guarded64_string in
-  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded64_string blur_precond' (fun n m v => blur_tiles_guarded v n m 64 64))
+  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded64_string blur_precond' (fun n m v => blur_tiles_guarded n m v 64 64))
     as blur_tiles_guarded64_string_correct.
 Proof.
   cbv [blur_tiles_guarded blur_precond']. prove_stringy_spec.
