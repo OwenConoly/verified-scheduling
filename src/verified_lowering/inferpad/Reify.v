@@ -296,7 +296,7 @@ Ltac Reify0 x name :=
 
 Ltac Reify x name :=
   pose (h := x);
-  lazy [Z.to_nat Z.of_nat PosDef.Pos.to_nat PosDef.Pos.iter_op Nat.add PosDef.Pos.of_succ_nat PosDef.Pos.succ] in h;
+  lazy [Z.to_nat PosDef.Pos.to_nat PosDef.Pos.iter_op Nat.add PosDef.Pos.of_succ_nat PosDef.Pos.succ] in h;
   make_types_reifiable_in h;
   let h0 := (eval cbv [h] in h) in
   subst h;
@@ -322,7 +322,9 @@ Ltac prove_spec_of0 :=
       Reify shallow_expr e';
       refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _ _ _);
       [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map interp_pZexpr Var' e']; reflexivity | .. ];
-      cycle -1; [ subst string_expr; simpl; reflexivity | .. ]
+      cycle -1; [ repeat match goal with
+                    | x := _ : _ |- context[?x] => subst x
+                    end; simpl; reflexivity | .. ]
   end.
 
 Ltac checks_are_true :=
