@@ -302,12 +302,6 @@ Ltac Reify x name :=
   subst h;
   Reify0 h0 name.
 
-Ltac Reify_lhs name :=
-  lazymatch goal with
-  | |- ?x = _ =>
-      Reify x name
-  end.
-
 Definition Var' {t var} (x : var t) : pExpr_type var t :=
   match t return var t -> pExpr_type var t with
   | tZ => ATLPhoas.ZVar
@@ -523,24 +517,43 @@ Ltac prove_stringy_spec :=
 (*         let y := eval simpl in x in *)
 (*           y. *)
 
+Ltac infer_ts' t :=
+  match t with
+  | pExpr_type _ ?t0 -> ?t' =>
+      let ts0 := infer_ts' t' in
+      constr:(@cons ATLPhoas.type t0 ts0)
+  | _ => constr:(@nil ATLPhoas.type)
+  end.
+Ltac infer_ts x :=
+  let x' := constr:(x (fun _ => (unit : Type))) in
+  match type of x' with
+  | ?T => infer_ts' T
+  end.
 
+Ltac Reify_lhs :=
+  let name := fresh "name" in
+  let _ := lazymatch goal with
+           | |- ?x = _ => Reify x name
+           end in
+  let ret := eval cbv[name] in name in
+    let ts := infer_ts ret in
+    let ret := constr:((fun var => varify var ts _ (ret var))) in
+    let ret := eval simpl in ret in
+      let ret := constr:(@ATLPhoas.stringvar_fvar_ATLexpr ts _ (map (fun x => "arg" ++ x) (map ATLPhoas.nat_to_string (seq O (length ts)))) (ret _)) in
+      let ret := eval compute in ret in
+        let ret := match ret with
+                   | Some ?ret => ret
+                   end in
+        ret.
 
-(*leaving this here, for now, for comparison*)
-(*what was normalize good for?  should i do that still?*)
-
-(* Ltac R := *)
-(*   let _ := match goal with _ => intros; *)
-(*                                 try autounfold with examples; *)
-(*                                 mark_lit *)
-(*            end in *)
-(*   let _ := match goal with _ => *)
-(*                            normalize end in *)
-
-(*   let prog := match goal with |- ?prog = _ => prog end in *)
-
-(*   let ast := reify prog in *)
-(*   let ast := eval simpl in ast in *)
-(*   ast. *)
+Ltac R :=
+  let _ := match goal with _ => autounfold with examples end in
+      (* normalize does not work here.
+         the goal does not have the right shape (easy problem to fix),
+         and it does not have the appropriate hypotheses (hard problem to fix) *)
+  (* let _ := match goal with _ => normalize end in *)
+  let ast := Reify_lhs in
+  ast.
 
 (*
 
