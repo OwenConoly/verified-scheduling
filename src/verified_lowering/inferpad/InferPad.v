@@ -16,8 +16,8 @@ Import ListNotations.
 
 From ATL Require Import ATL Map Sets FrapWithoutSets Div Tactics Common CommonTactics.
 From Examples Require Import TensorAdd Matmul GatherScatter Im2col Convolution Blur.
-From Lower Require Import Zexpr Bexpr Array Range Sexpr Result ListMisc Meshgrid VarGeneration Constant ATLDeep Pad.
 From Inferpad Require Import Reify ReifyExamples ATLPhoas.
+From Lower Require Import Zexpr Bexpr Array Range Sexpr Result ListMisc Meshgrid VarGeneration Constant ATLDeep Pad.
 
 Open Scope string_scope.
 
@@ -597,7 +597,7 @@ Proof.
 Abort.
 
 (*writing let ast := R fails here, because normalization is needed*)
-Goal (fun n m v => blurimmediate_partition n m v) = (fun _ _ _ => nil).
+Goal (fun n m (v : list (list R)) => blurimmediate_partition n m v) = (fun _ _ _ => nil).
 Proof.
   Fail let ast := R in idtac.
   let ast := eval compute in blurimmediate_partition_string in

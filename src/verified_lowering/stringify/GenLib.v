@@ -102,11 +102,11 @@ Ltac Llibfunc funcname names e :=
   ret.
 
 Goal True.
-  Check string_matmul_correct.
+  Check matmul_string_correct.
   let s := Llibfunc
              constr:("matmul")
                       matmul_args
-                      string_matmul
+                      matmul_string
   in idtac_list s.
 Abort.
 
@@ -146,7 +146,7 @@ Goal True.
   let s := Llibfunc
              constr:("tensoradd")
                       add_args
-                      string_add
+                      add_string
   in idtac_list s.
 Abort.
 
@@ -169,14 +169,14 @@ Abort.
 Goal True.
   let s := Llibfunc constr:("conv4")
                              conv_args
-                             string_conv4
+                             conv4_string
   in idtac_list s.
 Abort.
 
 Goal True.
   let s := Llibfunc constr:("conv1")
                              conv_args
-                             string_conv1
+                             conv1_string
   in idtac_list s.
 Abort.
 
