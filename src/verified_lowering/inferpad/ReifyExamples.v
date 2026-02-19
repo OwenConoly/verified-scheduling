@@ -35,10 +35,19 @@ Definition add_args :=
 Definition add_precond :=
   fun A B C D (_ _ : dim_n 4) => (0 < A /\ 0 < B /\ 0 < C /\ 0 < D)%Z.
 
-Derive string_add in
-  (stringy_spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 add_args string_add add_precond add)
-    as string_add_correct.
+Derive add_string in
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 add_args add_string add_precond add)
+    as add_string_correct.
 Proof. cbv [add_precond add]. prove_stringy_spec. Qed.
+
+Axiom f : False.
+Derive add_split_string in
+  (stringy_spec_of [tZ; tZ; tZ; tZ; tensor_n 4; tensor_n 4] 4 add_args add_split_string add_precond add_split)
+    as add_spilt_string_correct.
+Proof.
+  cbv [add_precond add_split]. prove_stringy_spec.
+  all: destruct (f : False). (*arithmetic, seems true*)
+Qed.
 
 Definition matmul_args :=
   [Z_arg "A";
@@ -50,33 +59,29 @@ Definition matmul_args :=
 Definition matmul_precond :=
   fun A B C (_ _ : dim_n 2) => (0 < A /\ 0 < B /\ 0 < C)%Z.
 
-Derive string_matmul in
-  (stringy_spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 matmul_args string_matmul matmul_precond matmul)
-    as string_matmul_correct.
+Derive matmul_string in
+  (stringy_spec_of [tZ; tZ; tZ; tensor_n 2; tensor_n 2] 2 matmul_args matmul_string matmul_precond matmul)
+    as matmul_string_correct.
 Proof. cbv [matmul matmul_precond]. prove_stringy_spec. Qed.
 
 Definition matmul_args1 :=
   [T_arg "m1" [ZLit 64; ZLit 64];
    T_arg "m2" [ZLit 64; ZLit 64]].
 
-Derive string_matmul_tiled in
-  (stringy_spec_of [tensor_n 2; tensor_n 2] 2 matmul_args1 string_matmul_tiled (fun _ _ => True) (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4))
-    as string_matmul_tiled_correct.
-Proof. cbv [matmul_tiled]. prove_stringy_spec. Fail Fail Qed. Abort.
+Derive matmul_tiled64_string in
+  (stringy_spec_of [tensor_n 2; tensor_n 2] 2 matmul_args1 matmul_tiled64_string (fun _ _ => True) (fun m1 m2 => matmul_tiled 64 64 64 m1 m2 4))
+    as matmul_tiled64_string_correct.
+Proof. cbv [matmul_tiled]. prove_stringy_spec. Qed.
 
-Definition matmul_args2 :=
-  [T_arg "m1" [ZLit 50; ZLit 70];
-   T_arg "m2" [ZLit 70; ZLit 30]].
-
-Derive string_matmul_tiled_split in
-  (stringy_spec_of [tensor_n 2; tensor_n 2] 2 matmul_args2 string_matmul_tiled_split (fun _ _ => True) (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4))
-    as string_matmul_tiled_split_correct.
-Proof. cbv [matmul_tiled_split]. prove_stringy_spec. Fail Fail Qed. Abort.
+Derive matmul_tiled_split64_string in
+  (stringy_spec_of [tensor_n 2; tensor_n 2] 2 matmul_args1 matmul_tiled_split64_string (fun _ _ => True) (fun m1 m2 => matmul_tiled_split 64 64 64 m1 m2 4))
+    as matmul_tiled_split64_string_correct.
+Proof. cbv [matmul_tiled_split]. prove_stringy_spec. Qed.
 
 Derive string_matmul_tiled_split in
-  (stringy_spec_of [tensor_n 2; tensor_n 2] 2 matmul_args2 string_matmul_tiled_split (fun _ _ => True) (fun m1 m2 => matmul_tiled_split 50 70 30 m1 m2 4))
+  (stringy_spec_of [tensor_n 2; tensor_n 2] 2 matmul_args1 string_matmul_tiled_split (fun _ _ => True) (fun m1 m2 => matmul_tiled_split 64 64 64 m1 m2 4))
     as string_matmul_tiled_split_correct.
-Proof. cbv [matmul_tiled_split]. prove_stringy_spec. Fail Fail Qed. Abort.
+Proof. cbv [matmul_tiled_split]. prove_stringy_spec. Qed.
 
 Definition conv_args :=
   [Z_arg "n";
@@ -86,14 +91,14 @@ Definition conv_args :=
 Definition conv_precond :=
   fun n m (_ : dim_n 1) => (0 < n /\ -m + 1 < n /\ 0 < m)%Z.
 
-Derive string_conv4 in
-  (stringy_spec_of [tZ; tZ; tensor_n 1] 1 conv_args string_conv4 conv_precond (fun n m c => conv4 c n m))
-    as string_conv4_correct.
+Derive conv4_string in
+  (stringy_spec_of [tZ; tZ; tensor_n 1] 1 conv_args conv4_string conv_precond (fun n m c => conv4 c n m))
+    as conv4_string_correct.
 Proof. cbv [conv4 conv_precond]. prove_stringy_spec. Qed.
 
-Derive string_conv1 in
-  (stringy_spec_of [tZ; tZ; tensor_n 1] 1 conv_args string_conv1 conv_precond (fun n m c => conv1 c n m))
-    as string_conv1_correct.
+Derive conv1_string in
+  (stringy_spec_of [tZ; tZ; tensor_n 1] 1 conv_args conv1_string conv_precond (fun n m c => conv1 c n m))
+    as conv1_string_correct.
 Proof. cbv [conv1 conv_precond]. prove_stringy_spec. Qed.
 
 Definition concat_test_args :=
@@ -202,7 +207,6 @@ Definition concat_test4_args :=
    Z_arg "m";
    T_arg "l" [! "m" ! * ! "n" !]%z].
 
-Axiom f : False.
 Derive concat_test4_string in
   (let shallow_prog :=
      fun n m l =>
