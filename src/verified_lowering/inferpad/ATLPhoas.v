@@ -686,34 +686,11 @@ Definition interp_type_result t : Type :=
   | tensor_n _ => result
   end.
 
-Definition add_scalar_result' (x y : scalar_result) :=
-  match x, y with
-  | SX, SX => SX
-  | SX, SS sy => SS sy
-  | SS sx, SX => SS sx
-  | SS sx, SS sy => SS (sx + sy)
-  end.
-
-Lemma add_scalar_result_iff_add_scalar_result' a b c :
-  add_scalar_result' a b = c <-> add_scalar_result a b c.
-Proof.
-  split.
-  - intros. subst. destruct a, b; constructor.
-  - intros H. invert H; reflexivity.
-Qed.
-
 Definition dummy_result (t : type) : interp_type_result t :=
   match t with
   | tZ => itervarZ 0%Z
   | tB => false
   | tensor_n _ => V []
-  end.
-
-Fixpoint add_result' x y :=
-  match x, y with
-  | V xs, V ys => V (map2 add_result' xs ys)
-  | Result.S x0, Result.S y0 => Result.S (add_scalar_result' x0 y0)
-  | _, _ => V []
   end.
 
 Definition sum_with_sz sz min max f :=
@@ -1984,45 +1961,6 @@ Fixpoint tensor_has_size' sh {n} (x : dim_n n) {struct n} :=
              end
   | O => fun _ => sh = []
   end x.
-
-Inductive result_has_shape' : list nat -> result -> Prop :=
-| ScalarShape' s : result_has_shape' [] (Result.S s)
-| VectorShape' xs n sh :
-  n = length xs ->
-  Forall (result_has_shape' sh) xs ->
-  result_has_shape' (n :: sh) (V xs).
-
-Lemma result_has_shape'_iff r sh :
-  result_has_shape' sh r <-> result_has_shape r sh.
-Proof.
-  revert sh. induction r.
-  - intros sh. split; intros H; invert H; constructor.
-  - intros sh. split; intros H'; invert H'.
-    + destruct v.
-      -- constructor.
-      -- invert H3. invert H. simpl. constructor; auto. 1: apply H3; assumption.
-         eapply Forall_impl. 2: apply Forall_and; [apply H4|apply H5]. simpl.
-         intros ? (?&H'). edestruct H'. eauto.
-    + constructor; auto.
-    + constructor; auto. invert H. constructor. 1: apply H4; assumption.
-      eapply Forall_impl. 2: apply Forall_and; [apply H3|apply H5]. simpl.
-      intros ? (?&H'). edestruct H'. eauto.
-Qed.
-
-Lemma add_result_add_result' sz x y :
-  result_has_shape' sz x ->
-  result_has_shape' sz y ->
-  add_result x y (add_result' x y).
-Proof.
-  revert x y. induction sz; simpl; invert 1; invert 1; simpl.
-  - constructor. destruct s, s0; constructor.
-  - constructor.
-    (*i really wish add_list was forall3 something; i don't want to do induction here*)
-    revert xs0 H2 H5. induction H4; intros xs0 H2 H5.
-    + destruct xs0; [|discriminate H2]. constructor.
-    + destruct xs0; [discriminate H2|]. simpl in H2, H5. invert H5. invert H2.
-      simpl. constructor; auto.
-Qed.
 
 Lemma fold_right_pres {A B : Type} (f : B -> A -> A) l Q a :
   Q a ->
