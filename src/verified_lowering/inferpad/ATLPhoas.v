@@ -1,32 +1,26 @@
 From Stdlib Require Import Arith.Arith.
-From Stdlib Require Import Arith.EqNat.
-From Stdlib Require Import Bool.Bool.
-From Stdlib Require Import Reals.Reals. Import Rdefinitions. Import RIneq.
-From Stdlib Require Import ZArith.Zdiv.
+From Stdlib Require Import Reals.Reals.
 From Stdlib Require Import ZArith.Int.
 From Stdlib Require Import ZArith.Znat.
 From Stdlib Require Import Strings.String.
 From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
-From Stdlib Require Import Reals.Rpower.
 From Stdlib Require Import QArith.
+From Stdlib Require Import String.
 
 Import ListNotations.
 
-Set Warnings "-omega-is-deprecated,-deprecated".
-
 From ATL Require Import Common Map Sets FrapWithoutSets Div Tactics ATL.
 From Lower Require Import Zexpr Bexpr Array Range Sexpr ListMisc
-  Meshgrid VarGeneration Injective Constant InterpretReindexer
-  WellFormedEnvironment ATLDeep Result.
+  VarGeneration Constant ATLDeep Result.
 Notation S := Datatypes.S.
+
+(*hopefully this just affects this file*)
+Local Set Default Goal Selector "!".
 
 Open Scope list_scope.
 Open Scope nat_scope.
-
-(*where did this come from?  did i put it here?*)
-Set Default Proof Mode "Classic".
 
 Inductive type :=
 | tZ
@@ -81,9 +75,7 @@ Definition stringvar_Zbop o :=
 Definition alphabet_string := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".
 Definition alphabet := nodup ascii_dec (List.remove ascii_dec "?"%char (list_ascii_of_string alphabet_string)).
 
-Search no_dup. About no_dup. (*why is this a thing?*)
-Search NoDup. Search nodup. Check nodup. Search nodup. Search NoDup.
-(*is this in stdlib?*)
+(*TODO is this in stdlib / elsewehre? / where should i put it?*)
 Fixpoint to_radix r fuel n :=
   match fuel, n with
   | S fuel', S n' => n mod r :: to_radix r fuel' (n / r)
@@ -414,110 +406,110 @@ Definition fvar_type var (ts : list type) n :=
 
 Section well_formed.
   Context (var1 var2 : type -> Type).
-Record ctx_elt2 :=
-  { ctx_elt_t : type; ctx_elt_p1 : var1 ctx_elt_t; ctx_elt_p2 : var2 ctx_elt_t }.
+  Record ctx_elt2 :=
+    { ctx_elt_t : type; ctx_elt_p1 : var1 ctx_elt_t; ctx_elt_p2 : var2 ctx_elt_t }.
 
-Inductive wf_Zexpr (ctx : list ctx_elt2) : pZexpr (var1 tZ) -> pZexpr (var2 tZ) -> Prop :=
-| wf_ZBop o x1 x2 y1 y2 :
-  wf_Zexpr _ x1 x2 ->
-  wf_Zexpr _ y1 y2 ->
-  wf_Zexpr _ (ZBop o x1 y1) (ZBop o x2 y2)
-| wf_ZVar v1 v2 :
-  List.In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
-  wf_Zexpr _ (ZVar v1) (ZVar v2)
-| wf_ZZ0 :
-  wf_Zexpr _ ZZ0 ZZ0
-| wf_ZZpos p :
-  wf_Zexpr _ (ZZpos p) (ZZpos p)
-| wf_ZZneg p :
-  wf_Zexpr _ (ZZneg p) (ZZneg p)
-| wf_ZZ_of_nat n :
-  wf_Zexpr _ (ZZ_of_nat n) (ZZ_of_nat n)
-| wf_ZZopp x1 x2 :
-  wf_Zexpr _ x1 x2 ->
-  wf_Zexpr _ (ZZopp x1) (ZZopp x2).
+  Inductive wf_Zexpr (ctx : list ctx_elt2) : pZexpr (var1 tZ) -> pZexpr (var2 tZ) -> Prop :=
+  | wf_ZBop o x1 x2 y1 y2 :
+    wf_Zexpr _ x1 x2 ->
+    wf_Zexpr _ y1 y2 ->
+    wf_Zexpr _ (ZBop o x1 y1) (ZBop o x2 y2)
+  | wf_ZVar v1 v2 :
+    List.In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
+    wf_Zexpr _ (ZVar v1) (ZVar v2)
+  | wf_ZZ0 :
+    wf_Zexpr _ ZZ0 ZZ0
+  | wf_ZZpos p :
+    wf_Zexpr _ (ZZpos p) (ZZpos p)
+  | wf_ZZneg p :
+    wf_Zexpr _ (ZZneg p) (ZZneg p)
+  | wf_ZZ_of_nat n :
+    wf_Zexpr _ (ZZ_of_nat n) (ZZ_of_nat n)
+  | wf_ZZopp x1 x2 :
+    wf_Zexpr _ x1 x2 ->
+    wf_Zexpr _ (ZZopp x1) (ZZopp x2).
 
-Inductive wf_Bexpr (ctx : list ctx_elt2) : pBexpr (var1 tZ) -> pBexpr (var2 tZ) -> Prop :=
-| wf_BAnd x1 x2 y1 y2 :
-  wf_Bexpr _ x1 x2 ->
-  wf_Bexpr _ y1 y2 ->
-  wf_Bexpr _ (BAnd x1 y1) (BAnd x2 y2)
-| wf_BBop o x1 x2 y1 y2 :
-  wf_Zexpr ctx x1 x2 ->
-  wf_Zexpr ctx y1 y2 ->
-  wf_Bexpr _ (BBop o x1 y1) (BBop o x2 y2)
-.
+  Inductive wf_Bexpr (ctx : list ctx_elt2) : pBexpr (var1 tZ) -> pBexpr (var2 tZ) -> Prop :=
+  | wf_BAnd x1 x2 y1 y2 :
+    wf_Bexpr _ x1 x2 ->
+    wf_Bexpr _ y1 y2 ->
+    wf_Bexpr _ (BAnd x1 y1) (BAnd x2 y2)
+  | wf_BBop o x1 x2 y1 y2 :
+    wf_Zexpr ctx x1 x2 ->
+    wf_Zexpr ctx y1 y2 ->
+    wf_Bexpr _ (BBop o x1 y1) (BBop o x2 y2)
+  .
 
-Inductive wf_ATLexpr : list ctx_elt2 -> forall n, pATLexpr var1 n -> pATLexpr var2 n -> Prop :=
-| wf_Gen ctx n lo1 lo2 hi1 hi2 body1 body2 :
-  wf_Zexpr ctx lo1 lo2 ->
-  wf_Zexpr ctx hi1 hi2 ->
-  (forall x1 x2, wf_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) n (body1 x1) (body2 x2)) ->
-  wf_ATLexpr ctx _ (Gen lo1 hi1 body1) (Gen lo2 hi2 body2)
-| wf_Sum ctx n lo1 lo2 hi1 hi2 body1 body2 :
-  wf_Zexpr ctx lo1 lo2 ->
-  wf_Zexpr ctx hi1 hi2 ->
-  (forall x1 x2, wf_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) n (body1 x1) (body2 x2)) ->
-  wf_ATLexpr ctx _ (Sum lo1 hi1 body1) (Sum lo2 hi2 body2)
-| wf_Guard ctx n b1 x1 b2 x2 :
-  wf_Bexpr ctx b1 b2 ->
-  wf_ATLexpr ctx n x1 x2 ->
-  wf_ATLexpr ctx _ (Guard b1 x1) (Guard b2 x2)
-| wf_Lbind ctx n m x1 x2 f1 f2 :
-  wf_ATLexpr ctx n x1 x2 ->
-  (forall x1' x2', wf_ATLexpr ({| ctx_elt_p1 := x1'; ctx_elt_p2 := x2' |} :: ctx) m (f1 x1') (f2 x2')) ->
-  wf_ATLexpr ctx _ (Lbind x1 f1) (Lbind x2 f2)
-| wf_Concat ctx n x1 x2 y1 y2 :
-  wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx (S n) y1 y2 ->
-  wf_ATLexpr ctx _ (Concat x1 y1) (Concat x2 y2)
-| wf_Flatten ctx n x1 x2 :
-  wf_ATLexpr ctx (S (S n)) x1 x2 ->
-  wf_ATLexpr ctx _ (Flatten x1) (Flatten x2)
-| wf_Split ctx n k1 k2 x1 x2 :
-  wf_Zexpr ctx k1 k2 ->
-  wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx _ (Split k1 x1) (Split k2 x2)
-| wf_Transpose ctx n x1 x2 :
-  wf_ATLexpr ctx (S (S n)) x1 x2 ->
-  wf_ATLexpr ctx _ (Transpose x1) (Transpose x2)
-| wf_Truncr ctx n k1 k2 x1 x2 :
-  wf_Zexpr ctx k1 k2 ->
-  wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx _ (Truncr k1 x1) (Truncr k2 x2)
-| wf_Truncl ctx n k1 k2 x1 x2 :
-  wf_Zexpr ctx k1 k2 ->
-  wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx _ (Truncl k1 x1) (Truncl k2 x2)
-| wf_Padl ctx n k x1 x2 :
-  wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx _ (Padl k x1) (Padl k x2)
-| wf_Padr ctx n k x1 x2 :
-  wf_ATLexpr ctx (S n) x1 x2 ->
-  wf_ATLexpr ctx _ (Padr k x1) (Padr k x2)
-| wf_Var ctx n v1 v2 :
-  List.In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
-  wf_ATLexpr ctx n (Var v1) (Var v2)
-| wf_Get ctx n x1 x2 idxs1 idxs2 :
-  wf_ATLexpr ctx n x1 x2 ->
-  Forall2 (wf_Zexpr ctx) idxs1 idxs2 ->
-  wf_ATLexpr ctx _ (Get x1 idxs1) (Get x2 idxs2)
-| wf_SBop ctx o x1 x2 y1 y2 :
-  wf_ATLexpr ctx _ x1 x2 ->
-  wf_ATLexpr ctx _ y1 y2 ->
-  wf_ATLexpr ctx _ (SBop o x1 y1) (SBop o x2 y2)
-| wf_SIZR ctx x1 x2 :
-  wf_Zexpr ctx x1 x2 ->
-  wf_ATLexpr ctx _ (SIZR x1) (SIZR x2)
-.
+  Inductive wf_ATLexpr : list ctx_elt2 -> forall n, pATLexpr var1 n -> pATLexpr var2 n -> Prop :=
+  | wf_Gen ctx n lo1 lo2 hi1 hi2 body1 body2 :
+    wf_Zexpr ctx lo1 lo2 ->
+    wf_Zexpr ctx hi1 hi2 ->
+    (forall x1 x2, wf_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) n (body1 x1) (body2 x2)) ->
+    wf_ATLexpr ctx _ (Gen lo1 hi1 body1) (Gen lo2 hi2 body2)
+  | wf_Sum ctx n lo1 lo2 hi1 hi2 body1 body2 :
+    wf_Zexpr ctx lo1 lo2 ->
+    wf_Zexpr ctx hi1 hi2 ->
+    (forall x1 x2, wf_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) n (body1 x1) (body2 x2)) ->
+    wf_ATLexpr ctx _ (Sum lo1 hi1 body1) (Sum lo2 hi2 body2)
+  | wf_Guard ctx n b1 x1 b2 x2 :
+    wf_Bexpr ctx b1 b2 ->
+    wf_ATLexpr ctx n x1 x2 ->
+    wf_ATLexpr ctx _ (Guard b1 x1) (Guard b2 x2)
+  | wf_Lbind ctx n m x1 x2 f1 f2 :
+    wf_ATLexpr ctx n x1 x2 ->
+    (forall x1' x2', wf_ATLexpr ({| ctx_elt_p1 := x1'; ctx_elt_p2 := x2' |} :: ctx) m (f1 x1') (f2 x2')) ->
+    wf_ATLexpr ctx _ (Lbind x1 f1) (Lbind x2 f2)
+  | wf_Concat ctx n x1 x2 y1 y2 :
+    wf_ATLexpr ctx (S n) x1 x2 ->
+    wf_ATLexpr ctx (S n) y1 y2 ->
+    wf_ATLexpr ctx _ (Concat x1 y1) (Concat x2 y2)
+  | wf_Flatten ctx n x1 x2 :
+    wf_ATLexpr ctx (S (S n)) x1 x2 ->
+    wf_ATLexpr ctx _ (Flatten x1) (Flatten x2)
+  | wf_Split ctx n k1 k2 x1 x2 :
+    wf_Zexpr ctx k1 k2 ->
+    wf_ATLexpr ctx (S n) x1 x2 ->
+    wf_ATLexpr ctx _ (Split k1 x1) (Split k2 x2)
+  | wf_Transpose ctx n x1 x2 :
+    wf_ATLexpr ctx (S (S n)) x1 x2 ->
+    wf_ATLexpr ctx _ (Transpose x1) (Transpose x2)
+  | wf_Truncr ctx n k1 k2 x1 x2 :
+    wf_Zexpr ctx k1 k2 ->
+    wf_ATLexpr ctx (S n) x1 x2 ->
+    wf_ATLexpr ctx _ (Truncr k1 x1) (Truncr k2 x2)
+  | wf_Truncl ctx n k1 k2 x1 x2 :
+    wf_Zexpr ctx k1 k2 ->
+    wf_ATLexpr ctx (S n) x1 x2 ->
+    wf_ATLexpr ctx _ (Truncl k1 x1) (Truncl k2 x2)
+  | wf_Padl ctx n k x1 x2 :
+    wf_ATLexpr ctx (S n) x1 x2 ->
+    wf_ATLexpr ctx _ (Padl k x1) (Padl k x2)
+  | wf_Padr ctx n k x1 x2 :
+    wf_ATLexpr ctx (S n) x1 x2 ->
+    wf_ATLexpr ctx _ (Padr k x1) (Padr k x2)
+  | wf_Var ctx n v1 v2 :
+    List.In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
+    wf_ATLexpr ctx n (Var v1) (Var v2)
+  | wf_Get ctx n x1 x2 idxs1 idxs2 :
+    wf_ATLexpr ctx n x1 x2 ->
+    Forall2 (wf_Zexpr ctx) idxs1 idxs2 ->
+    wf_ATLexpr ctx _ (Get x1 idxs1) (Get x2 idxs2)
+  | wf_SBop ctx o x1 x2 y1 y2 :
+    wf_ATLexpr ctx _ x1 x2 ->
+    wf_ATLexpr ctx _ y1 y2 ->
+    wf_ATLexpr ctx _ (SBop o x1 y1) (SBop o x2 y2)
+  | wf_SIZR ctx x1 x2 :
+    wf_Zexpr ctx x1 x2 ->
+    wf_ATLexpr ctx _ (SIZR x1) (SIZR x2)
+  .
 
-Inductive wf_fvar_ATLexpr : list ctx_elt2 -> forall ts n, fvar_pATLexpr var1 ts n -> fvar_pATLexpr var2 ts n -> Prop :=
-| wf_no_fvar ctx n e1 e2 :
-  wf_ATLexpr ctx n e1 e2 ->
-  wf_fvar_ATLexpr ctx [] n e1 e2
-| wf_with_fvar ctx t ts n e1 e2 :
-  (forall x1 x2, wf_fvar_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) ts n (e1 x1) (e2 x2)) ->
-  wf_fvar_ATLexpr ctx (t :: ts) n e1 e2.
+  Inductive wf_fvar_ATLexpr : list ctx_elt2 -> forall ts n, fvar_pATLexpr var1 ts n -> fvar_pATLexpr var2 ts n -> Prop :=
+  | wf_no_fvar ctx n e1 e2 :
+    wf_ATLexpr ctx n e1 e2 ->
+    wf_fvar_ATLexpr ctx [] n e1 e2
+  | wf_with_fvar ctx t ts n e1 e2 :
+    (forall x1 x2, wf_fvar_ATLexpr ({| ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) ts n (e1 x1) (e2 x2)) ->
+    wf_fvar_ATLexpr ctx (t :: ts) n e1 e2.
 End well_formed.
 
 Definition fvar_pATLExpr ts n := forall var, fvar_pATLexpr var ts n.
@@ -553,26 +545,6 @@ Fixpoint interp_fvar_pATLexpr ts n (e : fvar_pATLexpr interp_type_tagged ts n) :
   | tZ :: ts' => fun e => fun x => interp_fvar_pATLexpr ts' n (e (argvarZ x))
   | _ :: ts' => fun e => fun x => interp_fvar_pATLexpr ts' n (e x)
   end e.
-
-(*https://github.com/mit-plv/coqutil/blob/master/src/coqutil/Datatypes/List.v*)
-Definition list_eqb {A} (aeqb : A -> A -> bool) (x y : list A) : bool :=
-  ((length x =? length y)%nat && forallb (fun xy => aeqb (fst xy) (snd xy)) (combine x y)).
-
-Lemma list_eqb_spec A (aeqb : A -> _) :
-  (forall x y, aeqb x y = true <-> x = y) ->
-  (forall l1 l2, list_eqb aeqb l1 l2 = true <-> l1 = l2).
-Proof.
-  intros H l1. induction l1; intros l2; destruct l2; simpl.
-  - split; reflexivity.
-  - cbv [list_eqb]. simpl. split; congruence.
-  - cbv [list_eqb]. simpl. split; congruence.
-  - cbv [list_eqb]. simpl. split; intros H'.
-    + apply andb_prop in H'. destruct H' as [H'1 H'2]. apply andb_prop in H'2.
-      destruct H'2 as [H'2 H'3]. apply H in H'2. subst. f_equal. apply IHl1.
-      cbv [list_eqb]. rewrite H'1, H'3. reflexivity.
-    + invs'. assert (H': l2 = l2) by reflexivity. apply IHl1 in H'.
-      eassert (H'': _ = _) by reflexivity. apply H in H''. rewrite H''. simpl. apply H'.
-Qed.
 
 Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> option Z) (e : pATLexpr var n) : option (list nat) :=
   match e with
@@ -771,7 +743,7 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       | Var y =>
           let r := eval_get' y (map interp_pZexpr idxs) in
           Result.S
-            (* why :( *)
+            (* why is this not just r *)
             match r with
             | Result.SS _ => r
             | Result.SX => Result.SS 0%R
@@ -845,7 +817,7 @@ Fixpoint unnatify {var n} (ctx : list (ctx_elt var)) (e : pATLexpr (fun _ => nat
   | Truncl k x => Truncl (unnatify_Z ctx k) (unnatify ctx x)
   | Padl k x => Padl k (unnatify ctx x)
   | Padr k x => Padr k (unnatify ctx x)
-  (*i do not understand why need @Var _ n here*)
+  (*i do not understand why we need to write @Var _ n here*)
   | @Var _ n v => match nth_error (rev ctx) v with
                  | Some {| ctx_elt_t0 := t; ctx_elt0 := x |} =>
                      match t return var t -> pATLexpr var n with
@@ -930,9 +902,6 @@ Proof.
   intros H. rewrite H. cbv [Wf_fvar_ATLExpr]. intros. apply wf_fvar_unnatify.
 Qed.
 
-Local Notation "[[ x , y ]] <- a ; f" := (match a with Some (x, y) => f | None => None end)
-                                           (right associativity, at level 70).
-
 Fixpoint stringvar_S {n} (e : pATLexpr (fun _ => tagged_string) n) : option Sexpr :=
   match e with
   | SBop o x y =>
@@ -961,52 +930,81 @@ Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => tagged_strin
               ATLDeep.Gen (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
       | None => None
       end
-| Sum lo hi body =>
-    [[name', body']] <- stringvar_ATLexpr (S name) (body (itervarstr (nat_to_string name)));
-Some (name',
-    ATLDeep.Sum (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
+  | Sum lo hi body =>
+      match stringvar_ATLexpr (S name) (body (itervarstr (nat_to_string name))) with
+      | Some (name', body') =>
+          Some (name',
+              ATLDeep.Sum (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
+      | None => None
+      end
 | Guard b e1 =>
-    [[name', body']] <- stringvar_ATLexpr name e1;
-Some (name',
-    ATLDeep.Guard (stringvar_B b) body')
-| Lbind x f =>
-    [[name', x']] <- stringvar_ATLexpr (S name) x;
-[[name'', fx']] <- stringvar_ATLexpr name' (f (itervarstr (nat_to_string name)));
-Some (name'',
-    ATLDeep.Lbind (nat_to_string name) x' fx')
-| Concat e1 e2 =>
-    [[name', e1']] <- stringvar_ATLexpr name e1;
-[[name'', e2']] <- stringvar_ATLexpr name' e2;
-Some (name'',
-    ATLDeep.Concat e1' e2')
-| Flatten e1 =>
-    [[name', e1']] <- stringvar_ATLexpr name e1;
-Some (name',
-    ATLDeep.Flatten e1')
-| Split k e1 =>
-    [[name', e1']] <- stringvar_ATLexpr name e1;
-Some (name',
-    ATLDeep.Split (stringvar_Z k) e1')
-| Transpose e1 =>
-    [[name', e1']] <- stringvar_ATLexpr name e1;
-Some (name',
-    ATLDeep.Transpose e1')
+    match stringvar_ATLexpr name e1 with
+    | Some (name', body') =>
+        Some (name', ATLDeep.Guard (stringvar_B b) body')
+    | None => None
+    end
+  | Lbind x f =>
+      match stringvar_ATLexpr (S name) x with
+      | Some (name', x') =>
+          match stringvar_ATLexpr name' (f (itervarstr (nat_to_string name))) with
+          | Some (name'', fx') =>
+              Some (name'', ATLDeep.Lbind (nat_to_string name) x' fx')
+          | None => None
+          end
+      | None => None
+      end
+  | Concat e1 e2 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', e1') =>
+          match stringvar_ATLexpr name' e2 with
+          | Some (name'', e2') =>
+              Some (name'', ATLDeep.Concat e1' e2')
+          | None => None
+          end
+      | None => None
+      end
+  | Flatten e1 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', e1') =>
+          Some (name', ATLDeep.Flatten e1')
+      | None => None
+      end
+  | Split k e1 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', e1') =>
+          Some (name', ATLDeep.Split (stringvar_Z k) e1')
+      | None => None
+      end
+  | Transpose e1 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', e1') =>
+          Some (name', ATLDeep.Transpose e1')
+      | None => None
+      end
 | Truncr k e1 =>
-    [[name', e1']] <- stringvar_ATLexpr name e1;
-Some (name',
-    ATLDeep.Truncr (stringvar_Z k) e1')
-| Truncl k e1 =>
-    [[name', e1']] <- stringvar_ATLexpr name e1;
-Some (name',
-    ATLDeep.Truncl (stringvar_Z k) e1')
-| Padl k e1 =>
-    [[name', e1']] <- stringvar_ATLexpr name e1;
-Some (name',
-    ATLDeep.Padl (Zexpr.ZLit (Z.of_nat k)) e1')
+    match stringvar_ATLexpr name e1 with
+    | Some (name', e1') =>
+        Some (name', ATLDeep.Truncr (stringvar_Z k) e1')
+    | None => None
+    end
+  | Truncl k e1 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', e1') =>
+          Some (name', ATLDeep.Truncl (stringvar_Z k) e1')
+      | None => None
+      end
+  | Padl k e1 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', e1') =>
+          Some (name', ATLDeep.Padl (Zexpr.ZLit (Z.of_nat k)) e1')
+      | None => None
+      end
 | Padr k e1 =>
-    [[name', e1']] <- stringvar_ATLexpr name e1;
-Some (name',
-    ATLDeep.Padr (Zexpr.ZLit (Z.of_nat k)) e1')
+    match stringvar_ATLexpr name e1 with
+    | Some (name', e1') =>
+        Some (name', ATLDeep.Padr (Zexpr.ZLit (Z.of_nat k)) e1')
+    | None => None
+    end
 | Get _ _ | SBop _ _ _ | SIZR _ =>
                            match stringvar_S e with
                            | Some s => Some (name, ATLDeep.Scalar s)
@@ -1747,8 +1745,8 @@ Proof.
        constructor; eauto. }
   rewrite split_zrange with (mid := (Z.of_nat i / Z.of_nat (length (x :: xs0)))%Z).
   2: { split.
-       - apply Z_div_nonneg_nonneg; lia.
-       - cbn [length]. apply Zdiv_lt_upper_bound; lia. }
+       - apply Zdiv.Z_div_nonneg_nonneg; lia.
+       - cbn [length]. apply Zdiv.Zdiv_lt_upper_bound; lia. }
   rewrite map_app. rewrite fold_right_bin_fold_left. rewrite fold_left_app.
   do 2 rewrite <- fold_right_bin_fold_left.
   rewrite fold_right_id with (x := scalar_mul 0 _); cycle 1.
@@ -2018,9 +2016,9 @@ Qed.
 Hint Constructors result_has_shape' : core.
 Hint Resolve result_has_shape'_sum_with_shape : core.
 Hint Resolve result_has_shape_gen_pad result_has_shape_flatten result_has_shape_split_result result_has_shape_transpose_result result_has_shape_rev result_has_shape_repeat result_has_shape_truncl_list result_has_shape_app result_has_shape_concat : core.
-Hint Extern 7 (result_has_shape _ _) => apply result_has_shape'_iff.
-Hint Extern 7 (result_has_shape' _ _) => apply result_has_shape'_iff.
-Search sizes_consistent.
+Hint Extern 7 (result_has_shape _ _) => apply result_has_shape'_iff : core.
+Hint Extern 7 (result_has_shape' _ _) => apply result_has_shape'_iff : core.
+
 Lemma sound_sizeof_result_has_shape n var1 ctx e0 dummy1 sizeof_var sz (e : pATLexpr _ n) :
   wf_ATLexpr var1 interp_type_result ctx n e0 e ->
   sizeof_var (dummy1 tZ) = None ->
@@ -2056,7 +2054,7 @@ Proof.
     eauto; auto 10.
   - constructor.
     + rewrite zrange_seq.
-      do 2 rewrite map_length. rewrite seq_length.
+      do 2 rewrite length_map. rewrite length_seq.
       reflexivity.
     + apply Forall_map. apply Forall_forall. intros x _. eapply H2.
       -- eauto.
@@ -2076,9 +2074,9 @@ Proof.
   apply Nat.ltb_ge in E. lia.
 Qed.
 
-Hint Extern 5 (_ <= _)%nat => lia.
-Hint Extern 5 (_ <= _ < _)%nat => lia.
-Hint Extern 5 (_ < _)%nat => lia.
+Hint Extern 5 (_ <= _)%nat => lia : core.
+Hint Extern 5 (_ <= _ < _)%nat => lia : core.
+Hint Extern 5 (_ < _)%nat => lia : core.
 
 Lemma name_gets_bigger n (e : pATLexpr _ n) name name' e_string :
   stringvar_ATLexpr name e = Some (name', e_string) ->
@@ -2479,7 +2477,7 @@ Proof.
   revert sz. induction n; intros sz.
   - simpl. auto.
   - simpl. destruct sz; try contradiction. intros H; invs'; subst; simpl; auto.
-    rewrite map_length. split; [reflexivity|].
+    rewrite length_map. split; [reflexivity|].
     rewrite Forall_Forall' in *. apply Forall_map. eapply Forall_impl; eauto.
 Qed.
 
@@ -3049,8 +3047,7 @@ Proof.
       -- apply sound_sizeof_nz in Hsz. assumption.
     + assumption.
     + cbv [sum_with_sz].
-      rewrite fold_right_map with (f := tensor_of_result) (g2 := @bin (dim_n n) _) (P := fun x => result_has_shape' sz x).
-      f_equal.
+      rewrite fold_right_map with (f := tensor_of_result) (g2 := @bin (dim_n n) _) (P := fun x => result_has_shape' sz x); [f_equal|..].
       -- erewrite <- H2; cycle 1.
          ++ constructor; eauto. simpl. reflexivity.
          ++ prove_sound_sizeof.

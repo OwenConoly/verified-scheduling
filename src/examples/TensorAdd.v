@@ -40,13 +40,13 @@ Qed.
 Section Add.
   Variables (A B C D : Z) (m1 m2 : (list (list (list (list R))))).
   Derive add_split SuchThat
-         ((0 < A)%Z ->
-          (0 < B)%Z ->
-          (0 < C)%Z ->
-          (0 < D)%Z ->
+         (0 < A ->
+          0 < B ->
+          0 < C ->
+          0 < D ->
           consistent m1 (Z.to_nat A,(Z.to_nat B,(Z.to_nat C,(Z.to_nat D,tt)))) ->
           consistent m2 (Z.to_nat A,(Z.to_nat B,(Z.to_nat C,(Z.to_nat D,tt)))) ->
-          add A B C D m1 m2 = add_split) As matmultiled.
+          add A B C D m1 m2 = add_split)%Z As matmultiled.
   Proof.
     reschedule.
 

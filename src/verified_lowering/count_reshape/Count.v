@@ -201,7 +201,6 @@ Goal True.
   print_counts scatter_full_string "scatter".
 Abort.
 
-Search im2col. Print im2col.
 (*TODO: obviously wrong*)
 Definition im2col_args :=
   [Z_arg "B";
