@@ -81,15 +81,15 @@ Section two_to_part.
   Proof.
     reschedule.
 
-    progress rw^ @split_gen upto (N + 2)%Z at 1%Z.
+    rw^ @split_gen upto (N + 2)%Z at 1%Z.
 
-    progress rw^ @split_genr upto (N + 2)%Z at (N + 1)%Z.
+    rw^ @split_genr upto (N + 2)%Z at (N + 1)%Z.
 
     etransitivity.
     apply tlet_eq_bound.
     apply concat_eq_r.
-    progress rw^ split_gen upto M at 1%Z.
-    progress rw^ @split_genr upto M at (M - 1)%Z.
+    rw^ split_gen upto M at 1%Z.
+    rw^ @split_genr upto M at (M - 1)%Z.
     reflexivity.
 
     simpl_guard.
@@ -306,166 +306,165 @@ Section total_tiled.
   Proof.
     reschedule.
 
-    progress wrapid^ @transpose_transpose_id around
+    wrapid^ @transpose_transpose_id around
                                     (GEN [ 1 <= _ < (n-1) ] _).
-    progress rw @distrib_gen_concat.
-    progress rw @distrib_gen_concat.
+    rw @distrib_gen_concat.
+    rw @distrib_gen_concat.
 
-    progress wrapid @flatten_trunc_tile_id around
+    wrapid @flatten_trunc_tile_id around
            (GEN [ _ <= _ < n-1 ] GEN [ 1 <= _ < m-1] _)
       with (Z.to_nat n_k).
 
-    progress inline tile.
-    progress rw @get_genr_some.
-    progress rw @gp_genr_iverson.
+    inline tile.
+    rw @get_genr_some.
+    rw @gp_genr_iverson.
     rewrite Z2Nat.id by lia.
-    progress wrapid @transpose_transpose_id around (GEN [ _ < n_k ] _).
-    progress rw @unfold_inner_transpose.
-    progress rw^ @consistent_length.
-    progress rw^ @consistent_length.
-    progress rw^ Z2Nat.inj_sub.
+    wrapid @transpose_transpose_id around (GEN [ _ < n_k ] _).
+    rw @unfold_inner_transpose.
+    rw^ @consistent_length.
+    rw^ @consistent_length.
+    rw^ Z2Nat.inj_sub.
     rewrite Z2Nat.id by lia.
-    progress replace (Z.to_nat 1) with 1 by reflexivity.
-    Check @get_gen_some.
-    progress rw @get_gen_some.
-    progress rw @get_genr_some.
-    progress wrapid @flatten_trunc_tile_id around (GEN [ _ < m - 1 - 1] _)
+    replace (Z.to_nat 1) with 1 by reflexivity.
+    rw @get_gen_some.
+    rw @get_genr_some.
+    wrapid @flatten_trunc_tile_id around (GEN [ _ < m - 1 - 1] _)
       with (Z.to_nat m_k).
-    progress inline tile.
-    progress rw @get_gen_some.
-    progress rw^ @gp_gen_iverson.
+    inline tile.
+    rw @get_gen_some.
+    rw^ @gp_gen_iverson.
 
-    progress repeat rw^ (Z.add_comm 1%Z).
-    progress repeat rw^ Z.add_simpl_r.
+    repeat rw^ (Z.add_comm 1%Z).
+    repeat rw^ Z.add_simpl_r.
     remember ((x1::xs1)::xs) as l.
 
-    progress rw^ ceil_floor_mod.
-    progress rw^ (ceil_floor_mod (m-1-1)).
+    rw^ ceil_floor_mod.
+    rw^ (ceil_floor_mod (m-1-1)).
 
-    progress rw^ @split_gen_plus.
-    progress rw^ @split_gen_plus.
+    rw^ @split_gen_plus.
+    rw^ @split_gen_plus.
 
-    progress simpl_guard.
-    progress simpl_guard.
+    simpl_guard.
+    simpl_guard.
 
     rewrite Z2Nat.id by lia.
-    progress rw @lbind_helper for
+    rw @lbind_helper for
        (fun x =>
           x
             <+> ((_ _[_*n_k + _ +1; _*m_k + _]) <+> _ <+> _)
             <+> _).
-    progress rw @ll_gen.
-    progress rw @ll_gen.
+    rw @ll_gen.
+    rw @ll_gen.
 
-    progress wrapid^ @transpose_transpose_id around (GEN [ _ < m_k ] _).
-    progress rw^ @tlet_f_bound_body.
-    progress rw unfold_transpose around (GEN [ _ < _ ] _).
-    progress rw @get_gen_some.
-    progress rw @get_gen_some.
-    progress rw @transpose_get_get.
+    wrapid^ @transpose_transpose_id around (GEN [ _ < m_k ] _).
+    rw^ @tlet_f_bound_body.
+    rw unfold_transpose around (GEN [ _ < _ ] _).
+    rw @get_gen_some.
+    rw @get_gen_some.
+    rw @transpose_get_get.
 
     rewrite Z2Nat.id by lia.
-    progress wrapid^ @trunc_r_pad_r_id around (GEN [ _ < n_k ] _)
+    wrapid^ @trunc_r_pad_r_id around (GEN [ _ < n_k ] _)
       with 2.
-    progress rw^ @tlet_f_bound_body.
-    progress inline pad_r.
-    progress rw^ @get_gen_some.
-    progress inline trunc_r.
-    progress rw @get_gen_some.
-    progress rw @lbind_helper for (fun x => |[ _ <? n_k ]| x).
-    progress rw @ll_gen.
-    progress rw @let_let_flip.
-    progress rw @get_gen_some.
-    progress rw @gp_iverson.
+    rw^ @tlet_f_bound_body.
+    inline pad_r.
+    rw^ @get_gen_some.
+    inline trunc_r.
+    rw @get_gen_some.
+    rw @lbind_helper for (fun x => |[ _ <? n_k ]| x).
+    rw @ll_gen.
+    rw @let_let_flip.
+    rw @get_gen_some.
+    rw @gp_iverson.
 
-    progress rw @lbind_helper for
+    rw @lbind_helper for
        (fun x  => (|[ _ <? n_k]| _)
                     <+> x
                     <+> (_ <+> _ <+> _)).
-    progress rw @ll_gen.
-    progress rw @ll_gen.
-    progress wrapid^ @transpose_transpose_id around
+    rw @ll_gen.
+    rw @ll_gen.
+    wrapid^ @transpose_transpose_id around
                                     (GEN [ _ < m_k ] GEN [ _ < _ ] _).
-    progress rw^ @tlet_f_bound_body.
-    progress rw unfold_transpose around (GEN [ _ < _ ] _).
-    progress rw @get_gen_some.
-    progress rw @get_gen_some.
-    progress rw @transpose_get_get.
+    rw^ @tlet_f_bound_body.
+    rw unfold_transpose around (GEN [ _ < _ ] _).
+    rw @get_gen_some.
+    rw @get_gen_some.
+    rw @transpose_get_get.
 
     do 2 rewrite Z2Nat.id by lia.
-    progress wrapid^ @trunc_l_pad_l_id around
+    wrapid^ @trunc_l_pad_l_id around
                               (GEN [ _ < n_k]
                                    GEN [ _ < m_k ] _) with 1.
-    progress rw^ @tlet_f_bound_body.
-    progress inline pad_l.
-    progress rw^ @get_gen_some.
-    progress inline trunc_l.
-    progress rw minus_plus.
-    progress rw @get_gen_some. simpl.
-    progress rw^ Z.add_sub_assoc.
-    progress rw^ Z.sub_add.
+    rw^ @tlet_f_bound_body.
+    inline pad_l.
+    rw^ @get_gen_some.
+    inline trunc_l.
+    rw minus_plus.
+    rw @get_gen_some. simpl.
+    rw^ Z.add_sub_assoc.
+    rw^ Z.sub_add.
 
     do 2 rewrite Nat2Z.inj_add.
-    progress rw Z2Nat.id.
-    progress rw Z2Nat.id.
-    progress wrapid @trunc_r_pad_r_id around (GEN [ _ < n_k+1 ]
+    rw Z2Nat.id.
+    rw Z2Nat.id.
+    wrapid @trunc_r_pad_r_id around (GEN [ _ < n_k+1 ]
                                     |[ 1 <=? _ ]| GEN [ _ < m_k ] _)
       with 1.
-    progress rw^ @tlet_f_bound_body.
-    progress inline pad_r.
-    progress rw^ @get_gen_some.
-    progress inline trunc_r.
-    progress rw @get_gen_some.
-    progress rw^ @lbind_helper for (fun x => |[ 1 <=? _ ]| x).
-    progress rw @ll_iverson_.
-    progress rw @ll_gen.
-    progress rw @let_let_flip.
+    rw^ @tlet_f_bound_body.
+    inline pad_r.
+    rw^ @get_gen_some.
+    inline trunc_r.
+    rw @get_gen_some.
+    rw^ @lbind_helper for (fun x => |[ 1 <=? _ ]| x).
+    rw @ll_iverson_.
+    rw @ll_gen.
+    rw @let_let_flip.
     rewrite Nat2Z.inj_add, Z2Nat.inj_add, Nat2Z.inj_add by lia.
     do 4 progress rw Z2Nat.id.
-    progress change (Z.of_nat 1) with 1%Z.
-    progress change (Z.of_nat 2) with 2%Z.
+    change (Z.of_nat 1) with 1%Z.
+    change (Z.of_nat 2) with 2%Z.
     rewrite <- Z.add_assoc. simpl.
-    progress rw^ @let_let_same.
-    progress rw @get_gen_some.
-    progress rw @gp_iverson.
-    progress rw @lbind_helper for
+    rw^ @let_let_same.
+    rw @get_gen_some.
+    rw @gp_iverson.
+    rw @lbind_helper for
        (fun x => (|[ _ ]| _)
                    <+> (|[ _ <? (n_k+1) ]| _)
                    <+> x).
-    progress rw @ll_gen.
-    progress rw @ll_gen.
-    progress wrapid^ @transpose_transpose_id around
+    rw @ll_gen.
+    rw @ll_gen.
+    wrapid^ @transpose_transpose_id around
                                     (GEN [ _ < m_k ] _).
-    progress rw^ @tlet_f_bound_body.
-    progress rw unfold_transpose around (GEN [ _ < _ ] _).
-    progress rw^ @get_gen_some.
-    progress rw^ @get_gen_some.
-    progress rw @transpose_get_get.
+    rw^ @tlet_f_bound_body.
+    rw unfold_transpose around (GEN [ _ < _ ] _).
+    rw^ @get_gen_some.
+    rw^ @get_gen_some.
+    rw @transpose_get_get.
 
     repeat rw^<- (Zplus_assoc 1%Z 1%Z).
     simpl.
-    progress rw^ @gen_trunc upto (Z.to_nat n_k) at 2.
-    progress rw^ @tlet_f_bound_body.
-    progress rw^ Z.add_sub_assoc. simpl.
-    progress rw^ Z.sub_add.
-    progress inline trunc_l. simpl.
-    progress rw @get_gen_some.
-    progress rw minus_plus. simpl.
+    rw^ @gen_trunc upto (Z.to_nat n_k) at 2.
+    rw^ @tlet_f_bound_body.
+    rw^ Z.add_sub_assoc. simpl.
+    rw^ Z.sub_add.
+    inline trunc_l. simpl.
+    rw @get_gen_some.
+    rw minus_plus. simpl.
     rewrite Nat2Z.inj_add.
     rewrite Z2Nat.id by lia.
     change (Z.of_nat 2) with 2%Z.
-    progress rw^ @let_let_same.
+    rw^ @let_let_same.
 
     simpl_guard.
     simpl_guard.
 
-    progress wrapid @transpose_transpose_id around (GEN [ _ < m_k ] _).
-    progress rw @unfold_inner_transpose.
-    progress rw^ @consistent_length.
-    progress rw^ @consistent_length.
+    wrapid @transpose_transpose_id around (GEN [ _ < m_k ] _).
+    rw @unfold_inner_transpose.
+    rw^ @consistent_length.
+    rw^ @consistent_length.
     do 2 rw Z2Nat.id.
-    progress rw @get_gen_some.
-    progress rw @get_gen_some.
+    rw @get_gen_some.
+    rw @get_gen_some.
 
     erewrite flatten_trunc_flatten_truncr.
     2: { consistent_shape; try reflexivity; try lia.
@@ -864,17 +863,17 @@ Section fuse_twostage.
   Proof.
     reschedule.
 
-    progress inline let_binding.
+    inline let_binding.
 
-    progress rw @get_gen_some.
-    progress rw @get_gen_some.
-    progress rw @get_gen_some.
-    progress rw @get_gen_some.
-    progress rw @get_gen_some.
-    progress rw @get_gen_some.
+    rw @get_gen_some.
+    rw @get_gen_some.
+    rw @get_gen_some.
+    rw @get_gen_some.
+    rw @get_gen_some.
+    rw @get_gen_some.
 
-    progress rw^ Z.add_simpl_r.
-    progress rw^<- Z.add_sub_assoc.
+    rw^ Z.add_simpl_r.
+    rw^<- Z.add_sub_assoc.
     simpl.
 
     simpl_guard.
