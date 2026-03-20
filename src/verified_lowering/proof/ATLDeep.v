@@ -280,7 +280,7 @@ Inductive size_of v : ATLexpr -> list nat -> Prop :=
 | SizeOfPadl : forall k kz e m sh,
     eval_Zexpr v k kz ->
     size_of _ e (m :: sh) ->
-    size_of _ (Padl k e) (m + Z.to_nat kz :: sh)
+    size_of _ (Padl k e) (Z.to_nat kz + m :: sh)
 | SizeOfScalar : forall s,
     size_of _ (Scalar s) [].
 Local Hint Constructors eval_Zexpr eval_Bexpr eval_Sexpr size_of.

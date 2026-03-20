@@ -2411,7 +2411,7 @@ Qed.
 Theorem consistent_pad_r {X} `{TensorElem X} :
   forall (v : list X) n k s,
     consistent v (n,s) ->
-    consistent (pad_r k v) (k+n,s).
+    consistent (pad_r k v) (n+k,s).
 Proof.
   intros. unfold pad_r.
   apply consistent_gen. inversion H0. subst. simpl. lia.
@@ -2767,5 +2767,31 @@ Lemma tile_Tile {X} `{TensorElem X} :
   forall l n,
     tile l n = Tile l (Z.of_nat n).
 Proof. intros. unfold Tile. rewrite Nat2Z.id. eauto. Qed.
+
+Definition Padl {X} `{TensorElem X} k l :=
+  pad_l (Z.to_nat k) l.
+
+Lemma Padl_eq {X} `{TensorElem X} : forall k l1 l2,
+    l1 = l2 ->
+    Padl l1 k = Padl l2 k.
+Proof. intros. subst. eauto. Qed.
+
+Lemma pad_l_Padl {X} `{TensorElem X} :
+  forall n l,
+    pad_l n l = Padl (Z.of_nat n) l.
+Proof. intros. unfold Padl. rewrite Nat2Z.id. eauto. Qed.
+
+Definition Padr {X} `{TensorElem X} k l :=
+  pad_r (Z.to_nat k) l.
+
+Lemma Padr_eq {X} `{TensorElem X} : forall k l1 l2,
+    l1 = l2 ->
+    Padr l1 k = Padr l2 k.
+Proof. intros. subst. eauto. Qed.
+
+Lemma pad_r_Padr {X} `{TensorElem X} :
+  forall n l,
+    pad_r n l = Padr (Z.of_nat n) l.
+Proof. intros. unfold Padr. rewrite Nat2Z.id. eauto. Qed.
 
 Lemma minus_plus : forall n m : nat, n + m - n = m. Proof. lia. Qed.

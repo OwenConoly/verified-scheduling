@@ -383,8 +383,8 @@ Inductive pATLexpr { var : type -> Type } : nat -> Type :=
 | Transpose {n} : pATLexpr (S (S n)) -> pATLexpr (S (S n))
 | Truncr {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
 | Truncl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
-| Padr {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
-| Padl {n} : nat -> pATLexpr (S n) -> pATLexpr (S n)
+| Padr {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
+| Padl {n} : pZexpr (var tZ) -> pATLexpr (S n) -> pATLexpr (S n)
 | Var {n} : var (tensor_n n) -> pATLexpr n
 | Get {n} : pATLexpr n -> list (pZexpr (var tZ)) -> pATLexpr O
 | SBop : Sbop -> pATLexpr O -> pATLexpr O -> pATLexpr O
@@ -481,12 +481,14 @@ Section well_formed.
     wf_Zexpr ctx k1 k2 ->
     wf_ATLexpr ctx (S n) x1 x2 ->
     wf_ATLexpr ctx _ (Truncl k1 x1) (Truncl k2 x2)
-  | wf_Padl ctx n k x1 x2 :
+  | wf_Padl ctx n k1 k2 x1 x2 :
+    wf_Zexpr ctx k1 k2 ->
     wf_ATLexpr ctx (S n) x1 x2 ->
-    wf_ATLexpr ctx _ (Padl k x1) (Padl k x2)
-  | wf_Padr ctx n k x1 x2 :
+    wf_ATLexpr ctx _ (Padl k1 x1) (Padl k2 x2)
+  | wf_Padr ctx n k1 k2 x1 x2 :
+    wf_Zexpr ctx k1 k2 ->
     wf_ATLexpr ctx (S n) x1 x2 ->
-    wf_ATLexpr ctx _ (Padr k x1) (Padr k x2)
+    wf_ATLexpr ctx _ (Padr k1 x1) (Padr k2 x2)
   | wf_Var ctx n v1 v2 :
     List.In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx ->
     wf_ATLexpr ctx n (Var v1) (Var v2)
@@ -531,8 +533,8 @@ Fixpoint interp_pATLexpr {n} (e : pATLexpr interp_type_tagged n) : interp_type (
   | Transpose x => transpose (interp_pATLexpr x)
   | Truncr k x => Common.Truncr (interp_pZexpr k) (interp_pATLexpr x)
   | Truncl k x => Common.Truncl (interp_pZexpr k) (interp_pATLexpr x)
-  | Padl k x => pad_l k (interp_pATLexpr x)
-  | Padr k x => pad_r k (interp_pATLexpr x)
+  | Padl k x => Common.Padl (interp_pZexpr k) (interp_pATLexpr x)
+  | Padr k x => Common.Padr (interp_pZexpr k) (interp_pATLexpr x)
   | Var x => x
   | Get x idxs => gget_R (interp_pATLexpr x) (map interp_pZexpr idxs)
   | SBop o x y => interp_Sbop o (interp_pATLexpr x) (interp_pATLexpr y)
@@ -617,12 +619,22 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
     end
   | Padr n e =>
     match sound_sizeof dummy sizeof_var e with
-    | Some (m :: rest) => Some (m + n :: rest)
+    | Some (m :: rest) =>
+        match sizeof_pZexpr sizeof_var n with
+        | Some n =>
+            Some (m + Z.to_nat n :: rest)
+        | None => None
+        end
     | _ => None
     end
   | Padl n e =>
     match sound_sizeof dummy sizeof_var e with
-    | Some (m :: rest) => Some (n + m :: rest)
+    | Some (m :: rest) =>
+        match sizeof_pZexpr sizeof_var n with
+        | Some n =>
+            Some (Z.to_nat n + m :: rest)
+        | None => None
+        end
     | _ => None
     end
   | @Var _ n _ =>
@@ -723,12 +735,12 @@ Fixpoint result_of_pATLexpr {n} (e : pATLexpr interp_type_result n) : Result.res
       end
   | Padl k x =>
       match result_of_pATLexpr x, sizeof dummy_result sizeof_Z x with
-      | V xs, _ :: sh => V (gen_pad_list (k :: sh) ++ xs)
+      | V xs, _ :: sh => V (gen_pad_list (Z.to_nat (interp_pZexpr k) :: sh) ++ xs)
       | _, _ => V []
       end
   | Padr k x =>
       match result_of_pATLexpr x, sizeof dummy_result sizeof_Z x with
-      | V xs, _ :: sh => V (xs ++ gen_pad_list (k :: sh))
+      | V xs, _ :: sh => V (xs ++ gen_pad_list (Z.to_nat (interp_pZexpr k) :: sh))
       | _, _ => V []
       end
   | Var x =>
@@ -815,8 +827,8 @@ Fixpoint unnatify {var n} (ctx : list (ctx_elt var)) (e : pATLexpr (fun _ => nat
   | Transpose x => Transpose (unnatify ctx x)
   | Truncr k x => Truncr (unnatify_Z ctx k) (unnatify ctx x)
   | Truncl k x => Truncl (unnatify_Z ctx k) (unnatify ctx x)
-  | Padl k x => Padl k (unnatify ctx x)
-  | Padr k x => Padr k (unnatify ctx x)
+  | Padl k x => Padl (unnatify_Z ctx k) (unnatify ctx x)
+  | Padr k x => Padr (unnatify_Z ctx k) (unnatify ctx x)
   (*i do not understand why we need to write @Var _ n here*)
   | @Var _ n v => match nth_error (rev ctx) v with
                  | Some {| ctx_elt_t0 := t; ctx_elt0 := x |} =>
@@ -996,13 +1008,13 @@ Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => tagged_strin
   | Padl k e1 =>
       match stringvar_ATLexpr name e1 with
       | Some (name', e1') =>
-          Some (name', ATLDeep.Padl (Zexpr.ZLit (Z.of_nat k)) e1')
+          Some (name', ATLDeep.Padl (stringvar_Z k) e1')
       | None => None
       end
 | Padr k e1 =>
     match stringvar_ATLexpr name e1 with
     | Some (name', e1') =>
-        Some (name', ATLDeep.Padr (Zexpr.ZLit (Z.of_nat k)) e1')
+        Some (name', ATLDeep.Padr (stringvar_Z k) e1')
     | None => None
     end
 | Get _ _ | SBop _ _ _ | SIZR _ =>
@@ -1232,6 +1244,7 @@ Proof.
     destruct H1; reflexivity.
 Qed.
 
+(*TODO delete this?*)
 Lemma inv_wf_ATLexpr {var1 var2} ctx n e1 e2 :
   wf_ATLexpr var1 var2 ctx n e1 e2 ->
   match e1 in pATLexpr _ n0 return pATLexpr var2 n0 -> Prop with
@@ -1305,16 +1318,18 @@ Lemma inv_wf_ATLexpr {var1 var2} ctx n e1 e2 :
           wf_Zexpr var1 var2 ctx k1 k2  /\
             wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
             e2 = Truncl k2 x2
-  | Padl k x1 =>
+  | Padl k1 x1 =>
       fun e2 =>
-        exists x2,
+        exists k2 x2,
+          wf_Zexpr var1 var2 ctx k1 k2  /\
           wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Padl k x2
-  | Padr k x1 =>
+            e2 = Padl k2 x2
+  | Padr k1 x1 =>
       fun e2 =>
-        exists x2,
+        exists k2 x2,
+          wf_Zexpr var1 var2 ctx k1 k2  /\
           wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Padr k x2
+            e2 = Padr k2 x2
   | Var v1 =>
       fun e2 =>
         exists v2,
@@ -1449,6 +1464,8 @@ Proof.
     eapply H2. 3: eassumption. 1: eauto. prove_sound_sizeof.
   - constructor; eauto.
     eapply H1. 3: eassumption. 1: eauto. prove_sound_sizeof.
+  - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
+  - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
   - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
   - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
   - constructor; eauto. eapply sizeof_pZexpr_eval_Zexpr; eassumption.
@@ -2992,7 +3009,8 @@ Proof.
     eapply H'; eauto.
   - apply consistent_truncr; eauto with consistent.
   - apply consistent_truncl; eauto with consistent.
-  - rewrite Nat.add_comm. eauto with consistent.
+  - apply consistent_pad_l; eauto with consistent.
+  - apply consistent_pad_r; eauto with consistent.
     Unshelve. all: exact (dummy_result _).
 Qed.
 
@@ -3217,8 +3235,9 @@ Proof.
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr. cbv [sizeof].
     eassert (sound_sizeof _ _ _ = Some _) as -> by prove_sound_sizeof.
-    simpl. erewrite pad_l_is_app_pad; eauto.
-    + rewrite map_app, map_repeat. reflexivity.
+    simpl. cbv [Common.Padl]. erewrite pad_l_is_app_pad; eauto.
+    + rewrite map_app, map_repeat. erewrite <- Zexprs_corresp_same by eassumption.
+      reflexivity.
     + invert E'. cbn [tensor_has_size']. rewrite length_map. split; [reflexivity|].
       apply Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
       intros. apply tensor_of_result_size; auto. apply sound_sizeof_gives_dim in E.
@@ -3229,8 +3248,9 @@ Proof.
     pose proof E as E''. apply sound_sizeof_nz in E''.
     rewrite <- IHwf_ATLexpr. cbv [sizeof].
     eassert (sound_sizeof _ _ _ = Some _) as -> by prove_sound_sizeof.
-    simpl. erewrite pad_r_is_app_pad; eauto.
-    + rewrite map_app, map_repeat. reflexivity.
+    simpl. cbv [Common.Padr]. erewrite pad_r_is_app_pad; eauto.
+    + rewrite map_app, map_repeat. erewrite <- Zexprs_corresp_same by eassumption.
+      reflexivity.
     + invert E'. cbn [tensor_has_size']. rewrite length_map. split; [reflexivity|].
       apply Forall_Forall'. apply Forall_map. eapply Forall_impl; [|eassumption].
       intros. apply tensor_of_result_size; auto. apply sound_sizeof_gives_dim in E.
@@ -3497,37 +3517,35 @@ Proof.
         end.
     + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; assumption.
     + eauto.
-  - pose proof E1 as E1'.
-    apply name_gets_bigger in E1'.
+  - pose proof E2 as E2'.
+    apply name_gets_bigger in E2'.
     pose proof E as E'.
     eapply sound_sizeof_result_has_shape in E'; eauto; [].
     invert E'.
     cbv [sizeof].
     erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarstr (nat_to_string 0)). 1: rewrite E.
     all: eauto.
-    replace k with (Z.to_nat (Z.of_nat k)) by lia.
     econstructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H
         end.
-    + simpl. f_equal. lia.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; assumption.
     + eapply sound_sizeof_size_of; eauto; simpl; auto.
       intros x ? ?. destruct x; congruence || auto.
     + eauto.
-  - pose proof E1 as E1'.
-    apply name_gets_bigger in E1'.
+  - pose proof E2 as E2'.
+    apply name_gets_bigger in E2'.
     pose proof E as E'.
     eapply sound_sizeof_result_has_shape in E'; eauto; [].
     invert E'.
     cbv [sizeof].
     erewrite <- sound_sizeof_wf with (dummy1 := fun _ => itervarstr (nat_to_string 0)). 1: rewrite E.
     all: eauto.
-    replace k with (Z.to_nat (Z.of_nat k)) by lia.
     econstructor;
       try match goal with
         | H: V _ = _ |- _ => rewrite H
         end.
-    + simpl. f_equal. lia.
+    + apply eval_Zexpr_Z_eval_Zexpr. apply stringvar_Z_correct; assumption.
     + eapply sound_sizeof_size_of; eauto; simpl; auto.
       intros x ? ?. destruct x; congruence || auto.
     + eauto.
