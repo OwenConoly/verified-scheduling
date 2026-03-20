@@ -10,8 +10,6 @@ From Stdlib Require Import ZArith.Zdiv.
 From Stdlib Require Import ZArith.Int.
 From Stdlib Require Import ZArith.Znat.
 
-Set Warnings "-omega-is-deprecated,-deprecated".
-
 Import ListNotations.
 
 From ATL Require Import ATL Tactics Div Common CommonTactics.
@@ -100,7 +98,7 @@ Goal forall X (H : TensorElem X) N M (v : list (list R)) s,
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,s)) ->
-    blur_tiles_guarded N M v 4 4 = @nil _.
+    blur_tiles_guarded v N M 4 4 = @nil _.
 Proof.
   intros. autounfold with examples.
   (*TODO what is this doing?  did i break it?*)

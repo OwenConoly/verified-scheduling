@@ -856,7 +856,7 @@ Hint Unfold blur_tiles_guarded : examples.
 
 Section fuse_twostage.
   Variables (X : Set) (H : TensorElem X)
-            (v : list (list X)) (m n k : Z) (s : @shape X _).
+            (m n k : Z) (v : list (list X)) (s : @shape X _).
   Derive blurimmediate SuchThat
          (0 < k -> 0 < m -> 0 < n -> consistent v (Z.to_nat n,(Z.to_nat m,s)) ->
           blurtwostage n m v = blurimmediate)%Z As twostage_immediate.
@@ -986,8 +986,8 @@ flatten_trunc (Z.to_nat n)
            (|[ i * k + n' <? n ]| x _[ n']))).
 Proof. reflexivity. Qed.
 
-Goal forall v m n,
-    blurimmediate v m n =
+Goal forall m n v,
+    blurimmediate m n v =
     GEN [ i < n ]
         GEN [ i0 < m ]
         (|[ 0 <=? i - 1 ]|
