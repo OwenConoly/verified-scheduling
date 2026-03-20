@@ -71,7 +71,7 @@ Definition blurtwostage {X} `{TensorElem X}
 Hint Unfold blurtwostage : examples.
 
 Section two_to_part.
-  Variables (X : Type) (H : TensorElem X) (N M : Z)
+  Variables (X : Set) (H : TensorElem X) (N M : Z)
             (v : list (list X)) (s : @shape X _).
   Derive blurtwostage_partition SuchThat
          (2 < M ->
