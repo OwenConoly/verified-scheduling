@@ -856,7 +856,7 @@ Hint Unfold blur_tiles_guarded : examples.
 
 Section fuse_twostage.
   Variables (X : Set) (H : TensorElem X)
-            (n m k : Z) (v : list (list X)) (s : @shape X _).
+            (v : list (list X)) (n m k : Z) (s : @shape X _).
   Derive blurimmediate SuchThat
          (0 < k -> 0 < m -> 0 < n -> consistent v (Z.to_nat n,(Z.to_nat m,s)) ->
           blurtwostage n m v = blurimmediate)%Z As twostage_immediate.
