@@ -291,10 +291,10 @@ Qed.
 
 Section total_tiled.
   Variables (X : Set) (H : TensorElem X)
-            (s : @shape X _) (n m : Z) (v : list (list X)) (n_k m_k : Z).
+            (v : list (list X)) (s : @shape X _) (n m : Z) (n_k m_k : Z).
   Derive blur_tiles_guarded SuchThat
       (2 < n ->
-       2 < m ->
+      2 < m ->
       1 < n_k ->
       1 < m_k ->
       n_k < n - 2 ->
