@@ -150,12 +150,13 @@ Ltac print_shallows' l t :=
           idtac ",(" a ":" A ")"; print_shallows' l t
       end
   end.
+
 Ltac print_shallows :=
   match type of shallows with
   | ?t => let l := eval cbv [shallows] in shallows in
            print_shallows' l t
   end.
-Goal True. print_shallows. Abort.
+Goal True. (*print_shallows.*) Abort.
 
 Ltac pattern_shallows x :=
   pattern interp_type
@@ -399,14 +400,6 @@ Lemma spec_of_ext ts n name sz e_string f1 f2 :
   spec_of ts n name sz e_string f1 ->
   spec_of ts n name sz e_string f2.
 Proof. intros. eapply spec_of'_ext; eassumption. Qed.
-
-(* Ltac normalize_spec_of := *)
-(*   lazy[dim_n]; *)
-(*   match goal with *)
-(*   | |- spec_of _ _ _ _ _ ?p => *)
-(*       eassert (p = _) as -> by *)
-(*         (repeat (apply functional_extensionality; intro); normalize; reflexivity) *)
-(*   end. *)
 
 Ltac normalize_spec_of :=
   lazy[dim_n];
