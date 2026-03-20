@@ -986,8 +986,8 @@ flatten_trunc (Z.to_nat n)
            (|[ i * k + n' <? n ]| x _[ n']))).
 Proof. reflexivity. Qed.
 
-Goal forall n m v,
-    blurimmediate n m v =
+Goal forall v m n,
+    blurimmediate v m n =
     GEN [ i < n ]
         GEN [ i0 < m ]
         (|[ 0 <=? i - 1 ]|
