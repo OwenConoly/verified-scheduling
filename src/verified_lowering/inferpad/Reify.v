@@ -1,30 +1,22 @@
 From Stdlib Require Import Arith.Arith.
-From Stdlib Require Import Arith.EqNat.
-From Stdlib Require Import Bool.Bool.
-From Stdlib Require Import Reals.Reals. Import Rdefinitions. Import RIneq.
+From Stdlib Require Import Reals.Reals.
 From Stdlib Require Import ZArith.Zdiv.
 From Stdlib Require Import ZArith.Int.
 From Stdlib Require Import ZArith.Znat.
-From Stdlib Require Import Strings.String.
 From Stdlib Require Import Logic.FunctionalExtensionality.
+From Stdlib Require Import Strings.String.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
-From Stdlib Require Import Reals.Rpower.
 From Stdlib Require Import QArith.
 
 Import ListNotations.
 
-Set Warnings "-omega-is-deprecated,-deprecated".
-
-From Codegen Require Import IdentParsing NatToString IntToString Normalize CodeGen.
-From Lower Require Import ATLDeep Sexpr Zexpr Bexpr.
+From Codegen Require Import Normalize.
+From Lower Require Import ATLDeep Sexpr Zexpr Bexpr ListMisc.
 From ATL Require Import ATL Common CommonTactics Div Map.
 From Inferpad Require Import ATLPhoas.
 
 Open Scope string_scope.
-
-(*where did this come from?  did i put it here?*)
-Set Default Proof Mode "Classic".
 
 Definition pExpr_type var (t : type) : Type :=
   match t with
@@ -49,11 +41,11 @@ Definition tile_n n := @Tile (dim_n n) _.
 Definition bin_n n := @bin (dim_n n) _.
 Definition let_nm n m := @let_binding (dim_n n) (dim_n m).
 
-(*surely these notations are already available somewhere?*)
+(*surely het-list notations are already available somewhere?*)
 (*surely this notation is stupid enough that it's not being used for naything else*)
-Notation "[> <]" := tt (format "[> <]").
-Notation "[> x <]" := (x, tt).
-Notation "[> x ; y ; .. ; z <]" := ((x, (y, .. (z, tt) ..))).
+Local Notation "[> <]" := tt (format "[> <]").
+Local Notation "[> x <]" := (x, tt).
+Local Notation "[> x ; y ; .. ; z <]" := ((x, (y, .. (z, tt) ..))).
 
 Definition pairs_to_reify :=
   [>
@@ -260,15 +252,6 @@ Ltac make_types_reifiable_in x :=
   repeat change (@gget_R ?n (@get _ _ ?v ?idx) ?idxs) with (@gget_R (S n) v (idx :: idxs)) in x;
   change Z with (interp_type tZ) in x;
   cbv [gen sum] in x;
-  (*i do not understand why i wrote the following code.  also, it sometimes loops*)
-
-  (* (*Z's are not allowed to be used as constants; *)
-  (*   in particular, they cannot be used to define nats*) *)
-  (* (*the following is OK, because things inside Z.to_nat must *always* be constants*) *)
-  (* repeat match goal with *)
-  (*   | x := context[(Z.to_nat ?y)] |- _ => *)
-  (*       let k := fresh "k" in set (k := Z.to_nat y) *)
-  (*   end; *)
 
   repeat change (@genr (interp_type (tensor_n ?n)) _) with (gen_n n) in x;
   repeat change (@sumr (interp_type (tensor_n ?n)) _) with (sum_n n) in x;
@@ -346,50 +329,6 @@ Ltac do_arith :=
     | |- _ => lia
     | |- _ = _ => reflexivity
     end.
-
-Fixpoint nodupb {T : Type} (eqb : T -> T -> bool) l :=
-  match l with
-  | x :: l' => if existsb (eqb x) l' then false else nodupb eqb l'
-  | [] => true
-  end.
-
-(*gemini does something*)
-Lemma existsb_false_implies : forall {A : Type} (f : A -> bool) (l : list A),
-  existsb f l = false -> forall x, In x l -> f x = false.
-Proof.
-  intros A f l H_exists x H_in.
-
-  (* We branch on whether f x evaluates to true or false *)
-  destruct (f x) eqn:H_eval.
-
-  - (* If f x = true, it implies existsb f l = true, which contradicts H_exists *)
-    assert (H_true : existsb f l = true).
-    { apply existsb_exists. exists x. auto. }
-    congruence.
-
-  - (* If f x = false, we are done! *)
-    reflexivity.
-Qed.
-
-Lemma nodupb_correct T (eqb : T -> _) l :
-  (forall x, eqb x x = true) ->
-  nodupb eqb l = true ->
-  NoDup l.
-Proof.
-  intros Heqb H. induction l; simpl in *.
-  - constructor.
-  - destruct (existsb _ _) eqn:E; try congruence. constructor; auto.
-    intro.
-    eapply existsb_false_implies in E; eauto. rewrite Heqb in E. congruence.
-Qed.
-
-Lemma nodupb_string_correct l :
-  nodupb String.eqb l = true ->
-  NoDup l.
-Proof.
-  intros. eapply nodupb_correct; [|eassumption].
-  intros. Search String.eqb. apply String.eqb_refl.
-Qed.
 
 Lemma forallb_not_prefix_correct l :
   forallb (fun x => negb (prefix "var_" x)) l = true ->
@@ -507,18 +446,6 @@ Ltac prove_stringy_spec :=
   end;
   prove_spec_of.
 
-(* Ltac R := *)
-(*   let foo := fresh "foo" in *)
-(*   let _ := match goal with *)
-(*              _ => *)
-(*                intros; *)
-(*                autounfold with examples; *)
-(*                Reify_lhs foo *)
-(*            end in *)
-(*       let x := eval cbv [foo] in foo in *)
-(*         let y := eval simpl in x in *)
-(*           y. *)
-
 Ltac infer_ts' t :=
   match t with
   | pExpr_type _ ?t0 -> ?t' =>
@@ -526,6 +453,7 @@ Ltac infer_ts' t :=
       constr:(@cons ATLPhoas.type t0 ts0)
   | _ => constr:(@nil ATLPhoas.type)
   end.
+
 Ltac infer_ts x :=
   let x' := constr:(x (fun _ => (unit : Type))) in
   match type of x' with

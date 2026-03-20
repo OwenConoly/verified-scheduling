@@ -1307,3 +1307,41 @@ Proof.
     + invert H'. assert (H': l2 = l2) by reflexivity. apply IHl1 in H'.
       eassert (H'': _ = _) by reflexivity. apply H in H''. rewrite H''. simpl. apply H'.
 Qed.
+
+Fixpoint nodupb {T : Type} (eqb : T -> T -> bool) l :=
+  match l with
+  | x :: l' => if existsb (eqb x) l' then false else nodupb eqb l'
+  | [] => true
+  end.
+
+Lemma existsb_false_implies : forall {A : Type} (f : A -> bool) (l : list A),
+  existsb f l = false -> forall x, In x l -> f x = false.
+Proof.
+  intros A f l H_exists x H_in.
+  destruct (f x) eqn:H_eval.
+  - assert (H_true : existsb f l = true).
+    { apply existsb_exists. exists x. auto. }
+    congruence.
+  - reflexivity.
+Qed.
+
+Lemma nodupb_correct T (eqb : T -> _) l :
+  (forall x, eqb x x = true) ->
+  nodupb eqb l = true ->
+  NoDup l.
+Proof.
+  intros Heqb H. induction l; simpl in *.
+  - constructor.
+  - destruct (existsb _ _) eqn:E; try congruence. constructor; auto.
+    intro.
+    eapply existsb_false_implies in E; eauto.
+    rewrite Heqb in E. congruence.
+Qed.
+
+Lemma nodupb_string_correct l :
+  nodupb String.eqb l = true ->
+  NoDup l.
+Proof.
+  intros. eapply nodupb_correct; [|eassumption].
+  intros. apply String.eqb_refl.
+Qed.
