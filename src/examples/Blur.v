@@ -290,7 +290,7 @@ Proof.
 Qed.
 
 Section total_tiled.
-  Variables (X : Type) (H : TensorElem X)
+  Variables (X : Set) (H : TensorElem X)
             (s : @shape X _) (n m : Z) (v : list (list X)) (n_k m_k : Z).
   Derive blur_tiles_guarded SuchThat
       (2 < n ->
@@ -855,7 +855,7 @@ End total_tiled.
 Hint Unfold blur_tiles_guarded : examples.
 
 Section fuse_twostage.
-  Variables (X : Type) (H : TensorElem X)
+  Variables (X : Set) (H : TensorElem X)
             (n m k : Z) (v : list (list X)) (s : @shape X _).
   Derive blurimmediate SuchThat
          (0 < k -> 0 < m -> 0 < n -> consistent v (Z.to_nat n,(Z.to_nat m,s)) ->
