@@ -6,3 +6,6 @@ src/clib/*
 *.aux
 .lia.cache
 **Makefile*coq*
+src/verified_lowering/stringify/test/
+src/verified_lowering/stringify/lib/
+src/verified_lowering/count_reshape/out.csv
