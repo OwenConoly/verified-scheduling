@@ -322,7 +322,7 @@ Goal forall (v : list (list R)) M N,
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
-    blurimmediate N M v = blur_tiles_guarded N M v 64 64.
+    blurimmediate N M v = blur_tiles_guarded 64 64 N M v.
 Proof.
   let s := Leq constr:("blurim") constr:("blurtiles") constr:("2000") in idtac_list s.
 Abort.
@@ -487,7 +487,7 @@ Goal forall (v : list (list R)) M N,
     (0 < N)%Z ->
     (0 < M)%Z ->
     consistent v (Z.to_nat N,(Z.to_nat M,tt)) ->
-    blur_tiles_guarded N M v 64 64 = blurimmediate N M v.
+    blur_tiles_guarded 64 64 N M v = blurimmediate N M v.
 Proof.
   let s := Ltime constr:("blurtiles") constr:("2000") constr:("10") in idtac_list s.
 Abort.

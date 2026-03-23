@@ -230,12 +230,12 @@ Proof.
 Qed.
 
 Definition blur_args :=
-  [Z_arg "M";
-   Z_arg "N";
+  [Z_arg "N";
+   Z_arg "M";
    T_arg "v" [ZVar "N"; ZVar "M"]].
 
 Definition blur_precond :=
-  fun M N (_ : dim_n 2) => (0 < M /\ 0 < N)%Z.
+  fun N M (_ : dim_n 2) => (0 < M /\ 0 < N)%Z.
 
 Derive blurimmediate_string in
   (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blurimmediate_string blur_precond blurimmediate)
@@ -245,13 +245,13 @@ Proof. cbv [blurimmediate blur_precond]. prove_stringy_spec. Qed.
 Derive blurtwostage_string in
   (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blurtwostage_string blur_precond blurtwostage)
     as blurtwostage_string_correct.
-Proof. cbv [blurtwostage blur_precond]. prove_stringy_spec. apply andb_prop in H3. fwd. Qed.
+Proof. cbv [blurtwostage blur_precond]. prove_stringy_spec. Qed.
 
 Definition blur_precond' :=
   fun N M (_ : dim_n 2) => (2 < N /\ 2 < M)%Z.
 
 Derive blur_tiles_guarded4_string in
-  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded4_string blur_precond' (fun n m v => blur_tiles_guarded n m v 4 4))
+  (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blur_tiles_guarded4_string blur_precond' (blur_tiles_guarded 4 4))
     as blur_tiles_guarded4_string_correct.
 Proof.
   cbv [blur_tiles_guarded blur_precond']. prove_stringy_spec.
@@ -264,7 +264,7 @@ Definition args5 :=
 Derive string_prog in
   (stringy_spec_of [tensor_n 2] 2 args5 string_prog (fun _ => True) (fun l => tlet y := l in y))
     as string_prog_correct.
-Proof. Fail first [prove_stringy_spec | fail]. (*is this supposed to work?*) Abort.
+Proof. Fail first [prove_stringy_spec | fail]. (*TODO is this supposed to work?*) Abort.
 
 Definition fusion_args :=
   [Z_arg "n";

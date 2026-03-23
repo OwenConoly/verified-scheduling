@@ -71,7 +71,7 @@ Definition blurtwostage {X} `{TensorElem X}
 Hint Unfold blurtwostage : examples.
 
 Section two_to_part.
-  Variables (X : Set) (H : TensorElem X) (M N : Z)
+  Variables (X : Set) (H : TensorElem X) (N M : Z)
             (v : list (list X)) (s : @shape X _).
   Derive blurtwostage_partition SuchThat
          (2 < M ->
@@ -291,7 +291,7 @@ Qed.
 
 Section total_tiled.
   Variables (X : Set) (H : TensorElem X)
-            (v : list (list X)) (s : @shape X _) (n m : Z) (n_k m_k : Z).
+            (n_k m_k : Z) (n m : Z) (v : list (list X)) (s : @shape X _).
   Derive blur_tiles_guarded SuchThat
       (2 < n ->
       2 < m ->
@@ -856,7 +856,7 @@ Hint Unfold blur_tiles_guarded : examples.
 
 Section fuse_twostage.
   Variables (X : Set) (H : TensorElem X)
-            (m n k : Z) (v : list (list X)) (s : @shape X _).
+            (n m k : Z) (v : list (list X)) (s : @shape X _).
   Derive blurimmediate SuchThat
          (0 < k -> 0 < m -> 0 < n -> consistent v (Z.to_nat n,(Z.to_nat m,s)) ->
           blurtwostage n m v = blurimmediate)%Z As twostage_immediate.
@@ -986,8 +986,8 @@ flatten_trunc (Z.to_nat n)
            (|[ i * k + n' <? n ]| x _[ n']))).
 Proof. reflexivity. Qed.
 
-Goal forall m n v,
-    blurimmediate m n v =
+Goal forall n m v,
+    blurimmediate n m v =
     GEN [ i < n ]
         GEN [ i0 < m ]
         (|[ 0 <=? i - 1 ]|
@@ -1001,8 +1001,8 @@ Goal forall m n v,
                              (|[ i0 + 1 <? m ]| v _[ i + 1; i0 + 1])).
 Proof. reflexivity. Qed.
 
-Goal forall v M N,
-    blurtwostage_partition M N v =
+Goal forall N M v,
+    blurtwostage_partition N M v =
 tlet blurx'
 := (GEN [ i < 1 ]
     GEN [ i0 < M ]
