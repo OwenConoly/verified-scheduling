@@ -945,7 +945,8 @@ Proof.
     econstructor; eauto; try lia. eapply IHsummands; eauto.
     2: { simpl. rewrite Hlo. reflexivity. }
     { lia. }
-    intros i' Hi'. specialize (Hbody i' ltac:(lia)). destruct Hbody as (?&?&?). intuition.
+    intros i' Hi'. specialize (Hbody i' ltac:(lia)).
+    destruct Hbody as (?&?&?). intuition.
     replace (Z.to_nat (i' - loz)) with (Datatypes.S (Z.to_nat (i' - (loz + 1)))) in * by lia.
     simpl in H6. apply H6.
 Qed.
