@@ -10,13 +10,10 @@ From Stdlib Require Import Strings.String.
 From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
-From Stdlib Require Import Reals.Rpower.
 
 Import ListNotations.
 
-Set Warnings "-omega-is-deprecated,-deprecated".
-
-From Inferpad Require Import Reify ReifyExamples ATLPhoas.
+From Inferpad Require Import Reify ReifyExamples ATLPhoas TensorToResult.
 From ATL Require Import Div ATL.
 From Examples Require Import Blur TensorAdd Im2col Convolution GatherScatter
   Matmul.

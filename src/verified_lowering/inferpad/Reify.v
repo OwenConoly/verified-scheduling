@@ -14,7 +14,7 @@ Import ListNotations.
 From Codegen Require Import Normalize.
 From Lower Require Import ATLDeep Sexpr Zexpr Bexpr ListMisc.
 From ATL Require Import ATL Common CommonTactics Div Map.
-From Inferpad Require Import ATLPhoas.
+From Inferpad Require Import ATLPhoas TensorToResult NatToString.
 
 Open Scope string_scope.
 
@@ -267,6 +267,8 @@ Ltac make_types_reifiable_in x :=
   change (@bin (interp_type (tensor_n O)) _) with Rplus in x.
 
 Ltac Reify0 x name :=
+  let y := fresh "y" in
+  let z := fresh "z" in
   pose (y := x);
   pattern_shallows y;
   let rx :=
@@ -275,10 +277,12 @@ Ltac Reify0 x name :=
     end in
   pose (z := rx);
   let w := constr:(fun var => apply_to_all var (z (pExpr_type var))) in
-  let w := eval cbv [apply_to_all z] in w in pose (name := w);
-                                        subst y; subst z; simpl.
+  let w := (eval cbv [apply_to_all z] in w) in
+  pose (name := w);
+  subst y; subst z; simpl.
 
 Ltac Reify x name :=
+  let h := fresh "h" in
   pose (h := x);
   lazy [Z.to_nat PosDef.Pos.to_nat PosDef.Pos.iter_op Nat.add PosDef.Pos.of_succ_nat PosDef.Pos.succ] in h;
   make_types_reifiable_in h;
@@ -388,7 +392,8 @@ Lemma spec_of'_ext ts n names sz e_string f1 f2 v ec :
   spec_of' ts n names sz e_string f2 v ec.
 Proof.
   revert names sz v ec.
-  induction ts as [|t ?]; simpl; intros names sz v ec H1 H2 H3; try destruct t; destruct sz, names; try contradiction.
+  induction ts as [|t ?]; simpl; intros names sz v ec H1 H2 H3;
+    try destruct t; destruct sz, names; try contradiction.
   - cbv [spec_of spec_of'] in *. intros. rewrite <- H3 by assumption. auto.
   - intros. eapply IHts; eauto.
   - invs'. intros. eapply IHts; eauto.
@@ -462,19 +467,22 @@ Ltac Reify_lhs :=
   let ret := eval cbv[name] in name in
     let ts := infer_ts ret in
     let ret := constr:((fun var => varify var ts _ (ret var))) in
-    let ret := eval simpl in ret in
-      let ret := constr:(@ATLPhoas.stringvar_fvar_ATLexpr ts _ (map (fun x => "arg" ++ x) (map ATLPhoas.nat_to_string (seq O (length ts)))) (ret _)) in
-      let ret := eval compute in ret in
-        let ret := match ret with
-                   | Some ?ret => ret
-                   end in
-        ret.
+    let ret := (eval simpl in ret) in
+    let ret := constr:(@ATLPhoas.stringvar_fvar_ATLexpr ts _ (map (fun x => "arg" ++ x) (map nat_to_string (seq O (length ts)))) (ret _)) in
+    let ret := (eval compute in ret) in
+    let ret := match ret with
+               | Some ?ret => ret
+               end in
+    ret.
 
 Ltac R :=
   let _ := match goal with _ => autounfold with examples end in
-      (* normalize does not work here.
-         the goal does not have the right shape (easy problem to fix),
-         and it does not have the appropriate hypotheses (hard problem to fix) *)
+      (*The idea is that the 'R' tactic should allow for convenient non-verified
+        reification.  However, the 'R' tactic only works when the target expression
+        is already normalized.
+        The problem is that the 'normalize' in the following line does not work;
+        the goal does not have the right shape (easy problem to fix),
+        and it does not have the appropriate hypotheses (hard problem to fix) *)
   (* let _ := match goal with _ => normalize end in *)
   let ast := Reify_lhs in
   ast.

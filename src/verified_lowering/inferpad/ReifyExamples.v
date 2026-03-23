@@ -11,7 +11,7 @@ Import ListNotations.
 From ATL Require Import ATL Tactics Common CommonTactics Div Reshape Map.
 From Codegen Require Import IdentParsing NatToString IntToString CodeGen Normalize CheckSafe.
 From Examples Require Import GatherScatter Convolution Im2col Blur TensorAdd Matmul.
-From Inferpad Require Import Reify ATLPhoas.
+From Inferpad Require Import Reify ATLPhoas TensorToResult.
 From Lower Require Import Zexpr ATLDeep Bexpr Sexpr ATLDeep.
 
 Open Scope string_scope.
