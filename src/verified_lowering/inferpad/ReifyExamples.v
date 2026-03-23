@@ -245,7 +245,7 @@ Proof. cbv [blurimmediate blur_precond]. prove_stringy_spec. Qed.
 Derive blurtwostage_string in
   (stringy_spec_of [tZ; tZ; tensor_n 2] 2 blur_args blurtwostage_string blur_precond blurtwostage)
     as blurtwostage_string_correct.
-Proof. cbv [blurtwostage blur_precond]. prove_stringy_spec. apply andb_prop in H3. Qed.
+Proof. cbv [blurtwostage blur_precond]. prove_stringy_spec. apply andb_prop in H3. fwd. Qed.
 
 Definition blur_precond' :=
   fun N M (_ : dim_n 2) => (2 < N /\ 2 < M)%Z.

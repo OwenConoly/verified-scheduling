@@ -71,7 +71,7 @@ Definition blurtwostage {X} `{TensorElem X}
 Hint Unfold blurtwostage : examples.
 
 Section two_to_part.
-  Variables (X : Set) (H : TensorElem X) (N M : Z)
+  Variables (X : Set) (H : TensorElem X) (M N : Z)
             (v : list (list X)) (s : @shape X _).
   Derive blurtwostage_partition SuchThat
          (2 < M ->
@@ -1002,7 +1002,7 @@ Goal forall m n v,
 Proof. reflexivity. Qed.
 
 Goal forall v M N,
-    blurtwostage_partition N M v =
+    blurtwostage_partition M N v =
 tlet blurx'
 := (GEN [ i < 1 ]
     GEN [ i0 < M ]
