@@ -97,7 +97,9 @@ Proof.
   - apply nth_error_None in E. lia.
 Qed.
 
-Compute (to_radix 2 5 5).
+(* Compute (to_radix 2 5 5). *)
+(* = [1; 0; 1] *)
+(*   : list nat *)
 
 Definition nat_to_string n :=
   ("var_" ++ string_of_list_ascii (encode (ascii_of_nat O) alphabet (to_radix (length alphabet) n n)))%string.

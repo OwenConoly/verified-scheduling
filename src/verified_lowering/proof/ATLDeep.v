@@ -1,6 +1,4 @@
 From Stdlib Require Import Arith.Arith.
-From Stdlib Require Import Arith.EqNat.
-From Stdlib Require Import Arith.PeanoNat. Import Nat.
 From Stdlib Require Import Bool.Bool.
 From Stdlib Require Import Reals.Reals. Import Rdefinitions. Import RIneq.
 From Stdlib Require Import ZArith.Zdiv.
@@ -834,7 +832,7 @@ Proof.
   induction H; intros lo_ H'; invert H'.
   - exists loz, hiz, nil. simpl. intuition lia.
   - clear IHeval_expr1.
-    specialize (IHeval_expr2 _ ltac:(reflexivity)). (*why is eq_refl not eq_refl*)
+    specialize (IHeval_expr2 _ eq_refl).
     destruct IHeval_expr2 as (loz_&hiz_&l_&Hl_&Hlen&Hloz&Hhiz&IH2).
     rewrite H0 in Hhiz. invert Hhiz. invert Hl_.
     simpl in Hloz. rewrite H in Hloz. invert Hloz.
@@ -885,9 +883,9 @@ Inductive fold_right_rel {A B : Type} (R : B -> A -> A -> Prop) : (A -> Prop) ->
 Hint Constructors fold_right_rel : core.
 
 Definition add_list_result sh :=
-  fold_right_rel add_result (Logic.eq (gen_pad sh)).
+  fold_right_rel add_result (eq (gen_pad sh)).
 
-Lemma invert_eval_sum' v ctx i lo hi body r :
+Lemma invert_eval_sum v ctx i lo hi body r :
   eval_expr v ctx (Sum i lo hi body) r ->
   exists loz hiz summands sz,
     size_of v body sz /\
@@ -907,7 +905,7 @@ Proof.
   induction H; intros lo_ H'; invert H'.
   2: { exists loz, hiz, nil, sz. simpl. intuition auto; try lia.
        constructor. eauto. }
-  clear IHeval_expr1. specialize (IHeval_expr2 _ Logic.eq_refl).
+  clear IHeval_expr1. specialize (IHeval_expr2 _ eq_refl).
   destruct IHeval_expr2 as (loz'&hiz'&summands'&sz'&Hsz'&Hlen&Hloz'&Hhiz'&Hsummands'&IH).
   simpl in Hloz'. rewrite H0 in Hhiz'. invert Hhiz'. rewrite H in Hloz'. invert Hloz'.
   exists loz, hiz', (r :: summands'), sz'. intuition.
