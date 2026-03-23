@@ -6,7 +6,7 @@ From Stdlib Require Import ZArith.Int.
 From Stdlib Require Import ZArith.Znat.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
-  
+
 From Stdlib Require Import Logic.FunctionalExtensionality.
 
 Set Warnings "-deprecate-hint-without-locality,-deprecated".
@@ -52,7 +52,7 @@ Fixpoint eval_Zexpr_Z (v : valuation) (e : Zexpr) : option Z :=
       match eval_Zexpr_Z v x, eval_Zexpr_Z v y with
       | Some xz, Some yz => Some (xz-yz)%Z
       | _,_ => None
-      end      
+      end
   | ZTimes x y =>
       match eval_Zexpr_Z v x, eval_Zexpr_Z v y with
       | Some xz, Some yz => Some (xz*yz)%Z
@@ -62,7 +62,7 @@ Fixpoint eval_Zexpr_Z (v : valuation) (e : Zexpr) : option Z :=
       match eval_Zexpr_Z v x, eval_Zexpr_Z v y with
       | Some xz, Some yz => Some (xz/yz)%Z
       | _,_ => None
-      end      
+      end
   | ZDivc x y =>
       match eval_Zexpr_Z v x, eval_Zexpr_Z v y with
       | Some xz, Some yz => Some (xz//yz)%Z
@@ -72,10 +72,10 @@ Fixpoint eval_Zexpr_Z (v : valuation) (e : Zexpr) : option Z :=
       match eval_Zexpr_Z v x, eval_Zexpr_Z v y with
       | Some xz, Some yz => Some (xz mod yz)%Z
       | _,_ => None
-      end              
+      end
   | ZLit z => Some z
   | ZVar var => v $? var
-  end.      
+  end.
 
 Inductive eval_Zexpr (v : valuation) : Zexpr -> Z -> Prop :=
 | EvalZPlus : forall x y xz yz,
@@ -144,7 +144,7 @@ Proof.
         reflexivity.
       * simpl. rewrite IHl. reflexivity.
 Qed.
-        
+
 Definition app_no_dups (l1 l2 : list var) : list var :=
   app l1 (filter (fun v => negb (in_bool l1 v)) l2).
 
@@ -203,7 +203,7 @@ Hint Unfold eq_Z_index_list : core.
 Definition eq_Z_tuple_index_list (l1 l2 : list (Zexpr * Zexpr)) :=
   eq_Z_index_list (map fst l1) (map fst l2) /\
     eq_Z_index_list (map snd l1) (map snd l2).
-  
+
 Ltac invsZ :=
   repeat
     match goal with
@@ -575,7 +575,7 @@ Proof.
 Qed.
 
 Lemma eq_zexpr_fold_accum {X} : forall (f : Zexpr -> X -> Zexpr) l z1 z2,
-    eq_zexpr z1 z2 ->    
+    eq_zexpr z1 z2 ->
     (forall x1 x2 a, eq_zexpr x1 x2 -> eq_zexpr (f x1 a) (f x2 a)) ->
     eq_zexpr (fold_left f l z1) (fold_left f l z2).
 Proof.
@@ -602,7 +602,7 @@ Fixpoint partially_eval_Zexpr (v : valuation) (e : Zexpr) : Zexpr :=
                 | Some val => ZLit val
                 | _ => e
                 end
-  end.      
+  end.
 
 Fixpoint subst_var_in_Zexpr (v : var) (z : Z) (e : Zexpr) : Zexpr :=
   match e with
@@ -616,7 +616,7 @@ Fixpoint subst_var_in_Zexpr (v : var) (z : Z) (e : Zexpr) : Zexpr :=
   | ZVar var => if var ==v v
                 then ZLit z
                 else e
-  end.      
+  end.
 
 Definition subst_var_in_Z_tup var z t :=
   (subst_var_in_Zexpr var z (fst t), subst_var_in_Zexpr var z (snd t)).
@@ -726,9 +726,9 @@ Proof.
               simpl. cases (f x). simpl. rewrite andb_true_r. reflexivity.
               simpl. reflexivity.
            ++ rewrite filter_app.
-              f_equal. simpl. rewrite Heq2. 
+              f_equal. simpl. rewrite Heq2.
               repeat rewrite filter_filter.
-              f_equal. 
+              f_equal.
               eapply functional_extensionality. intros.
               rewrite in_bool_filter.
               cases (a =? x).
@@ -808,7 +808,7 @@ Proof.
               ** eapply String.eqb_eq in Heq3. subst. rewrite Heq.
                  simpl. reflexivity.
               ** simpl. reflexivity.
-Qed.              
+Qed.
 
 Lemma vars_of_Zexpr_subst_var_in_Zexpr : forall e v z,
     vars_of_Zexpr (subst_var_in_Zexpr v z e) =
@@ -997,7 +997,7 @@ Proof.
   eapply eq_zexpr_fold_accum.
   apply eq_zexpr_flatten_shape_index.
   rewrite <- eq_Z_index_list_cons.
-  propositional. 
+  propositional.
   rewrite <- eq_Z_index_list_cons.
   propositional.
   intros.
@@ -1117,7 +1117,7 @@ Proof.
   cases (a0 =? a). eapply String.eqb_eq in Heq0. subst. propositional.
   reflexivity.
 Qed.
-  
+
 Lemma eq_zexpr_partially_eval_subst_var_in_Zexpr :
   forall e a z v,
     v $? a = Some z ->
@@ -1138,7 +1138,7 @@ Proof.
   cases (x ==v a); subst; try rewrite H; auto;
     cases (v $? x); simpl in *; rewrite Heq; auto.
 Qed.
-  
+
 Lemma eq_zexpr_eval_Zexpr : forall z1 z2,
     eq_zexpr z1 z2 ->
     forall v z,
@@ -1149,7 +1149,7 @@ Proof.
 Qed.
 
 Lemma eval_Zexpr_partially_eval_Zexpr_not_in_valuation :
-  forall e a l, 
+  forall e a l,
     vars_of_Zexpr e = a::l ->
     forall v v0 z,
     eval_Zexpr v0 (partially_eval_Zexpr v e) z ->
@@ -1184,7 +1184,7 @@ Lemma subst_var_in_Zexpr_partially_eval_Zexpr_comm : forall e a x v,
 Proof.
   induct e; intros; simpl in *;
     try rewrite IHe1, IHe2; auto.
-  cases (x ==v a). 
+  cases (x ==v a).
   - subst. rewrite H. simpl in *.
     cases (a ==v a); firstorder.
   - simpl. cases (v $? x); simpl.
@@ -1209,7 +1209,7 @@ Lemma eq_zexpr_partially_eval_Zexpr_helper : forall l z1 z2,
       eq_zexpr (partially_eval_Zexpr v z1) (partially_eval_Zexpr v z2).
 Proof.
   unfold eq_zexpr in *.
-  assert True as H by propositional. 
+  assert True as H by propositional.
   induction l; propositional.
   - cases z1; simpl in *; invsZ; try symmetry in H0;
       try eapply app_no_dups_empty_args in H0; invert1 H0;
@@ -1250,7 +1250,7 @@ Proof.
         eapply eval_Zexpr_subst_var_in_Zexpr.
         eapply eval_Zexpr_subst_var_in_Zexpr in H6.
         eapply H2. auto.
-      } 
+      }
       eapply H7 in H6. clear H7. 2: auto. invert H6.
       eapply eq_zexpr_eval_Zexpr.
       2: { eapply eq_zexpr_partially_eval_subst_var_in_Zexpr.
@@ -1293,7 +1293,7 @@ Proof.
       rewrite <- subst_var_in_Zexpr_partially_eval_Zexpr_comm by auto.
       eapply eval_Zexpr_subst_var_in_Zexpr.
       rewrite add_id by auto.
-      auto.      
+      auto.
   - rewrite <- H0 in *.
     cases (v $? a).
     + specialize (IHl (subst_var_in_Zexpr a z0 z1)
@@ -1379,7 +1379,7 @@ Proof.
       eapply eq_zexpr_subst_var_in_Zexpr in H1.
       unfold eq_zexpr in H1.
       invert H1.
-      eapply H6. eauto. 
+      eapply H6. eauto.
       assert (eq_zexpr z1 z2).
       unfold eq_zexpr. propositional.
       eapply eq_zexpr_subst_var_in_Zexpr in H1.
@@ -1455,10 +1455,10 @@ Proof.
   induction l1; intros; cases l2; simpl in *; try lia.
   - constructor.
   - invert H0. invert H.
-    constructor. simpl in *.    
+    constructor. simpl in *.
     eapply eq_zexpr_partially_eval_Zexpr.
     auto. eauto.
-Qed.        
+Qed.
 
 Lemma partially_eval_Zexpr_empty_valuation : forall v z,
     eval_Zexpr_Z v z = eval_Zexpr_Z $0 (partially_eval_Zexpr v z).
@@ -1529,7 +1529,7 @@ Proof.
   - invert H. econstructor. auto. eapply H0. auto.
   - invert H. econstructor. auto. eapply H0. auto.
   - simpl. rewrite H1. reflexivity.
-Qed.  
+Qed.
 
 Lemma eq_zexpr_mul_l : forall a b c,
     eq_zexpr b c ->
@@ -1539,7 +1539,7 @@ Proof.
   - invert H. econstructor. eapply H0. auto. auto.
   - invert H. econstructor. eapply H0. auto. auto.
   - simpl. rewrite H1. reflexivity.
-Qed.  
+Qed.
 
 Lemma eq_zexpr_fold_left_ZTimes_accum : forall dims acc1 acc2,
     eq_zexpr acc1 acc2 ->
@@ -1562,7 +1562,7 @@ Proof.
   - invert H. econstructor. eapply H0. auto. auto.
   - invert H. econstructor. eapply H0. auto. auto.
   - simpl. rewrite H1. reflexivity.
-Qed.  
+Qed.
 
 Lemma eq_zexpr_mul_fold_left_times : forall dims i z,
     eq_zexpr (i * fold_left ZTimes dims z)%z
@@ -1581,7 +1581,7 @@ Lemma eq_zexpr_flatten_shape_index_cons :
   forall vars i n dims,
     length dims = length vars ->
     eq_zexpr (flatten_shape_index (n::dims) (i::vars))
-      (ZPlus (fold_left ZTimes dims i) 
+      (ZPlus (fold_left ZTimes dims i)
          (flatten_shape_index dims vars)).
 Proof.
   intros. simpl.
@@ -1591,9 +1591,9 @@ Proof.
   apply eq_zexpr_fold_left_ZTimes_accum.
   apply eq_zexpr_comm.
   apply eq_zexpr_mul_1_r.
-Qed.    
+Qed.
 
-Lemma eq_Z_tuple_index_list_empty : 
+Lemma eq_Z_tuple_index_list_empty :
   eq_Z_tuple_index_list [] [].
 Proof.
   unfold eq_Z_tuple_index_list. unfold eq_Z_index_list.
@@ -1666,23 +1666,23 @@ Proof.
   - eapply eq_zexpr_transitivity.
     eapply eq_zexpr_add; eassumption.
     unfold eq_zexpr; propositional. invert H1. invert H4. invert H6. eauto.
-    invert H1. eauto. 
+    invert H1. eauto.
   - eapply eq_zexpr_transitivity.
     eapply eq_zexpr_sub; eassumption.
     unfold eq_zexpr; propositional. invert H1. invert H4. invert H6. eauto.
-    invert H1. eauto. 
+    invert H1. eauto.
   - eapply eq_zexpr_transitivity.
     eapply eq_zexpr_mul; eassumption.
     unfold eq_zexpr; propositional. invert H1. invert H4. invert H6. eauto.
-    invert H1. eauto. 
+    invert H1. eauto.
   - eapply eq_zexpr_transitivity.
     eapply eq_zexpr_div; eassumption.
     unfold eq_zexpr; propositional. invert H1. invert H4. invert H6. eauto.
-    invert H1. eauto. 
+    invert H1. eauto.
   - eapply eq_zexpr_transitivity.
     eapply eq_zexpr_divc; eassumption.
     unfold eq_zexpr; propositional. invert H1. invert H4. invert H6. eauto.
-    invert H1. eauto. 
+    invert H1. eauto.
   - eapply eq_zexpr_transitivity.
     eapply eq_zexpr_mod; eassumption.
     unfold eq_zexpr; propositional. invert H1. invert H4. invert H6. eauto.
@@ -1752,7 +1752,7 @@ Proof.
   cbv [eq_Z_index_list]. intros l1 l2 l3 H1. revert l3.
   induction H1; invert 1; eauto using eq_zexpr_transitivity.
 Qed.
-  
+
 Lemma eq_Z_tuple_index_list_transitivity :
   forall l1 l2 l3,
     eq_Z_tuple_index_list l1 l2 ->
@@ -1765,7 +1765,7 @@ Proof.
 Qed.
 
 Lemma eq_Z_index_list_sym : forall l1 l2,
-    eq_Z_index_list l1 l2 ->    
+    eq_Z_index_list l1 l2 ->
     eq_Z_index_list l2 l1.
 Proof.
   induct l1; intros; cases l2; auto;
@@ -1775,10 +1775,10 @@ Proof.
   rewrite <- eq_Z_index_list_cons.
   propositional.
   eauto. eapply eq_zexpr_comm. eassumption.
-Qed.    
+Qed.
 
 Lemma eq_Z_tuple_index_list_sym : forall l1 l2,
-    eq_Z_tuple_index_list l1 l2 ->    
+    eq_Z_tuple_index_list l1 l2 ->
     eq_Z_tuple_index_list l2 l1.
 Proof.
   unfold eq_Z_tuple_index_list.
@@ -1909,7 +1909,7 @@ Lemma partially_eval_Zexpr_flatten_shape_index : forall l1 l2 v,
  Proof.
    induct l1; intros; cases l2; try reflexivity; [].
    simpl. rewrite IHl1. f_equal. f_equal.
-   apply partially_eval_Zexpr_fold_left_ZTimes. 
+   apply partially_eval_Zexpr_fold_left_ZTimes.
 Qed.
 
 Fixpoint flatten (sh : list Z) (i : list Z) :=
@@ -1950,7 +1950,7 @@ Proof.
 Qed.
 
 Lemma subst_var_in_Zexpr_flatten_index :
-  forall var k index, 
+  forall var k index,
     subst_var_in_Zexpr var k (flatten_index index) =
       flatten_index (map (subst_var_in_Z_tup var k) index).
 Proof.
@@ -1969,7 +1969,7 @@ Lemma subst_var_in_Z_tup_partially_eval_Z_tup_comm : forall e a x v,
 Proof.
   unfold subst_var_in_Z_tup. unfold partially_eval_Z_tup.
   intros. simpl.
-  repeat rewrite subst_var_in_Zexpr_partially_eval_Zexpr_comm.  
+  repeat rewrite subst_var_in_Zexpr_partially_eval_Zexpr_comm.
   reflexivity.
   eapply None_dom_lookup. auto.
   eapply None_dom_lookup. auto.
@@ -2097,7 +2097,7 @@ Proof.
       rewrite subst_var_in_Zexpr_partially_eval_Zexpr_comm.
       rewrite IHvars. reflexivity. auto.
       eapply None_dom_lookup. auto.
-Qed.    
+Qed.
 
 Lemma fold_left_subst_var_in_Zexpr_flatten_index :
   forall tups e,
@@ -2143,9 +2143,9 @@ Proof.
     eapply IHl1. auto.
   - simpl in *. invert H0.
     rewrite String.eqb_refl in H. simpl in *. discriminate.
-    eapply IHl1. 2: eassumption. 
+    eapply IHl1. 2: eassumption.
     eapply orb_false_iff in H. propositional.
-Qed.    
+Qed.
 
 Lemma combine_eq_id : forall l,
     Forall (fun t => eq_zexpr (fst t) (snd t))
@@ -2159,8 +2159,8 @@ Lemma index_to_function_alt_vars_cons :
     ~ var \in dom v ->
     index_to_function_alt
       (map (partially_eval_Z_tup v)
-           (reindexer l)) (var::vars) (k :: x) = 
-      index_to_function_alt        
+           (reindexer l)) (var::vars) (k :: x) =
+      index_to_function_alt
         (map (partially_eval_Z_tup v)
              (map (fun e => (subst_var_in_Z_tup var k e))
                   (reindexer l))) vars x.
@@ -2246,7 +2246,7 @@ Proof.
   - invert H. invert H0.
   - rewrite <- eq_Z_tuple_index_list_cons in H. propositional.
     simpl. cases a. cases p.
-    f_equal. 
+    f_equal.
     unfold eq_Z_tup in H0. invert H0. simpl in *.
     unfold eq_zexpr in H, H2.
     propositional. rewrite H3, H4. reflexivity.
@@ -2257,14 +2257,14 @@ Lemma map_fold_left_subst_var_in_Z_tup_reindexer :
     (forall (var : var) (k : Z) (l : list (Zexpr * Zexpr)),
        (var \in vars_of_reindexer (reindexer []) -> False) ->
        map (subst_var_in_Z_tup var k) (reindexer l) =
-       reindexer (map (subst_var_in_Z_tup var k) l)) ->    
+       reindexer (map (subst_var_in_Z_tup var k) l)) ->
     (Forall (fun var => ~ var \in vars_of_reindexer (reindexer [])) vars) ->
     map
       (fun y =>
          fold_left
            (fun a t0 => subst_var_in_Z_tup (fst t0) (snd t0) a)
            (combine vars x) y)
-      (reindexer l) = 
+      (reindexer l) =
       (reindexer (map
                     (fun y =>
                        fold_left
@@ -2280,7 +2280,7 @@ Proof.
     erewrite IHvars. reflexivity. eassumption.
     invert H0. auto. invert H0. auto.
 Qed.
- 
+
 Lemma length_eval_Zexprlist : forall l1 l2 v,
     eval_Zexprlist v l1 l2 ->
     length l1 = length l2.
@@ -2458,7 +2458,7 @@ Lemma eq_Z_tup_fold_left_subst_var_in_Z_tup : forall l1 vars idx,
     (fold_left
        (fun a t0 =>
           subst_var_in_Z_tup (fst t0) (snd t0) a)
-       (combine vars idx) l1) = l1. 
+       (combine vars idx) l1) = l1.
 Proof.
   induction vars; intros; simpl in *.
   - auto.
@@ -2476,7 +2476,7 @@ Proof.
       unfold not. intros.
       eapply Forall_forall in H1. 2: apply H0. simpl in *.
       propositional.
-Qed.      
+Qed.
 
 Lemma constant_filter_negb_in_bool : forall l1 l2,
     constant l1 \cup
@@ -2571,7 +2571,7 @@ Lemma eval_empty_eq_zexpr x xz :
   eval_Zexpr $0 x xz ->
   eq_zexpr x (| xz |)%z.
 Proof.
-  intros H. cbv [eq_zexpr]. 
+  intros H. cbv [eq_zexpr].
   - split.
     + intros v z. split; intros H'.
       -- eapply eval_Zexpr_includes_valuation in H. 2: apply empty_includes.
@@ -2579,7 +2579,7 @@ Proof.
       -- invert H'. eapply eval_Zexpr_includes_valuation. 1: eassumption.
          apply empty_includes.
     + simpl. eapply eval_Zexpr_vars_empty. eassumption.
-Qed.      
+Qed.
 
 Lemma eval_Zexpr_forall_vars_of_Zexpr : forall e v ez,
   eval_Zexpr v e ez ->
@@ -2603,7 +2603,7 @@ Proof.
   apply includes_add_new.
   apply None_dom_lookup.
   assumption.
-Qed.    
+Qed.
 
 Lemma eq_zexpr_literal_subst_var_in_Zexpr : forall x xz v k,
     eq_zexpr x (|xz|)%z ->
@@ -2615,7 +2615,7 @@ Proof.
   rewrite subst_var_in_Zexpr_id. eapply H0 in H. eauto.
   rewrite H1. sets.
   rewrite vars_of_Zexpr_subst_var_in_Zexpr. rewrite H1. reflexivity.
-Qed.    
+Qed.
 
 Lemma eval_Zexprlist_includes_valuation : forall v l lz v',
     eval_Zexprlist v l lz ->
@@ -2636,7 +2636,7 @@ Lemma vars_of_Zexpr_empty_eval_Zexpr_literal :
   forall e,
     vars_of_Zexpr e = [] ->
     exists x,
-    forall v,      
+    forall v,
     eval_Zexpr v e x.
 Proof.
   induct e; simpl in *; intros; try eapply app_no_dups_empty_args in H;
@@ -2821,7 +2821,7 @@ Proof.
     pose proof (H v). pose proof (H $0). eq_eval_Z.
     eapply eval_Zexpr_Z_eval_Zexpr in H3. unfold eval_Zexpr_Z_total in *.
     rewrite H3 in *. invert H1.
-    cases (Z.to_nat x). simpl. lia. 
+    cases (Z.to_nat x). simpl. lia.
     simpl. lia.
   - simpl in *. invert H. invert H5.
     specialize (IHesh1 (ZTimes z a)).
@@ -2960,7 +2960,7 @@ Qed.
 Lemma eq_zexpr_fold_left_subst_var_in_Zexpr :
   forall x x0 z1 z2 ,
   eq_zexpr z1 z2 ->
-  eq_zexpr 
+  eq_zexpr
     (fold_left
        (fun (z3 : Zexpr) (tup : var * Z) =>
           subst_var_in_Zexpr (fst tup) (snd tup) z3) (combine x x0) z1)
@@ -3038,7 +3038,7 @@ Lemma map_eval_Zexpr_Z_tup_total_map_partially_eval_Z_tup :
   forall l v,
   map (eval_Zexpr_Z_tup_total $0)
       (map (partially_eval_Z_tup v) l) = map (eval_Zexpr_Z_tup_total v) l.
-Proof.  
+Proof.
   induct l; intros.
   - reflexivity.
   - simpl. f_equal.
@@ -3054,15 +3054,15 @@ Lemma map_eval_Zexpr_Z_tup_total_map_fold_left_subst_var_in_Z_tup :
            (fun tup : Zexpr * Zexpr =>
               (fold_left
                  (fun (z5 : Zexpr * Zexpr) (tup0 : var * Z) =>
-                    subst_var_in_Z_tup (fst tup0) (snd tup0) z5) 
+                    subst_var_in_Z_tup (fst tup0) (snd tup0) z5)
                  (combine x x0) tup)) index1) =
       map (eval_Zexpr_Z_tup_total $0)
           (map
              (fun tup : Zexpr * Zexpr =>
                 (fold_left
                    (fun (z5 : Zexpr * Zexpr) (tup0 : var * Z) =>
-                      subst_var_in_Z_tup (fst tup0) (snd tup0) z5) 
-                   (combine x x0) tup)) index2). 
+                      subst_var_in_Z_tup (fst tup0) (snd tup0) z5)
+                   (combine x x0) tup)) index2).
 Proof.
   intros.
   induct index1; cases index2.
@@ -3071,13 +3071,13 @@ Proof.
   - invert H. invert H0.
   - repeat rewrite map_cons.
     f_equal.
-    2: { eapply IHindex1. 
+    2: { eapply IHindex1.
          eapply eq_Z_tuple_index_list_cons in H. propositional. }
     eapply eq_Z_tuple_index_list_cons in H. invs.
     unfold eval_Zexpr_Z_tup_total.
     eq_match_discriminee.
     cases a. cases p. simpl in *.
-    eapply (eq_zexpr_fold_left_subst_var_in_Z_tup x x0) in H0.   
+    eapply (eq_zexpr_fold_left_subst_var_in_Z_tup x x0) in H0.
     unfold eval_Zexpr_Z_tup. simpl.
     unfold eq_Z_tup in H0. invs.
     repeat rewrite fst_fold_left_subst_var_in_Z_tup in *.
@@ -3254,7 +3254,7 @@ Lemma join_add_l {X Y} m1 k v (m2 : fmap X Y) :
   m1 $+ (k, v) $++ m2 = m1 $++ (m2 $+ (k, v)).
 Proof.
   intros Hk.
-  apply fmap_ext. intros k0. Search ((_ $++ _) $? _).
+  apply fmap_ext. intros k0.
   assert (k0 \in dom m1 \/ ~k0 \in dom m1) as [H|H] by sets.
   - rewrite lookup_join1; cycle 1.
     { rewrite dom_add. sets. }
@@ -3297,7 +3297,7 @@ Proof.
     invert H. rewrite lookup_empty in *. discriminate.
   - rewrite H1. econstructor.
 Qed.
-    
+
 Lemma eval_Zexprlist_map_match_snd_map_eval_Zexpr_Z_tup_total :
   forall v l,
     eval_Zexprlist $0 (map (partially_eval_Zexpr v) (map snd l))
@@ -3339,7 +3339,7 @@ Lemma eval_Zexprlist_map_match_fst_map_eval_Zexpr_Z_tup_total :
 Proof.
   induct l; intros.
   - reflexivity.
-  - simpl in *. invert H. invert H0. 
+  - simpl in *. invert H. invert H0.
     cases a. simpl in *.
     unfold eval_Zexpr_Z_tup_total. unfold eval_Zexpr_Z_tup. simpl.
     erewrite -> eval_Zexpr_partially_eval_Zexpr in H4, H3.
