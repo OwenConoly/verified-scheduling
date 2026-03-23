@@ -293,7 +293,7 @@ Proof.
       rewrite (union_comm (constant [a])).
       rewrite <- union_assoc.
       reflexivity.
-Qed.      
+Qed.
 
 Lemma constant_cup_subseteq_eliminate {X} : forall (a : X) l1 l2,
     no_dup l1 ->
@@ -330,7 +330,7 @@ Proof.
     + rewrite constant_cons.
       assert (~ a \in constant (List.remove H x l)).
       eauto. sets.
-Qed.    
+Qed.
 
 Lemma no_dup_remove {X} : forall (x : X) l H,
     no_dup l ->
@@ -345,7 +345,7 @@ Proof.
       invert H0.
       eapply not_In_remove. auto.
       rewrite <- In_iff_in. auto.
-Qed.      
+Qed.
 
 Lemma length_remove {X} : forall X0 l1 (a : X),
     a \in constant l1 ->
@@ -441,7 +441,6 @@ Proof.
   propositional. simpl in H1. sets.
 Qed.
 
-(*idk where to put this*)
 Ltac cups_empty :=
   repeat match goal with
     | H: constant _ = constant [] |- _ => eapply constant_not_empty in H; [contradiction | solve[inversion 1]]
