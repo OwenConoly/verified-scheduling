@@ -434,7 +434,7 @@ Lemma constant_not_empty {X} : forall (l : list X),
     constant l = constant [] ->
     False.
 Proof.
-  intros.
+  intros l H H0.
   erewrite <- sets_equal in H0.
   cases l. propositional.
   specialize (H0 x).
