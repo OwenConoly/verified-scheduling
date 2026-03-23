@@ -373,14 +373,6 @@ Proof.
       eapply H. eauto.
 Qed.
 
-Lemma map_Z_of_nat_inj l1 l2 :
-  map Z.of_nat l1 = map Z.of_nat l2 ->
-  l1 = l2.
-Proof.
-  revert l2. induction l1; intros l2; destruct l2; simpl; try congruence.
-  invert 1. f_equal; [lia|]. auto.
-Qed.
-
 Lemma contexts_agree_result_has_shape :
   forall ec st h sh,
     contexts_agree ec st h sh ->

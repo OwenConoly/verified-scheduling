@@ -800,6 +800,14 @@ Proof.
     simpl. rewrite Z2Nat.id by lia. f_equal. eauto.
 Qed.
 
+Lemma map_Z_of_nat_inj l1 l2 :
+  map Z.of_nat l1 = map Z.of_nat l2 ->
+  l1 = l2.
+Proof.
+  revert l2. induction l1; intros l2; destruct l2; simpl; try congruence.
+  invert 1. f_equal; [lia|]. auto.
+Qed.
+
 Lemma truncl_list_empty {X} : forall k,
     skipn k (@nil X) = [].
 Proof. apply skipn_nil. Qed.
