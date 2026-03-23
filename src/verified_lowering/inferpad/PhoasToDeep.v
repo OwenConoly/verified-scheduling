@@ -673,7 +673,7 @@ Proof.
       | H: V _ = _ |- _ => rewrite H
       end.
     + eauto.
-    + eapply IHwf_ATLexpr2. 4: eassumption. all: eauto. intros ? H''. Search ctx.
+    + eapply IHwf_ATLexpr2. 4: eassumption. all: eauto. intros ? H''.
       apply Hctx2 in H''. lia.
   - pose proof E2 as E2'.
     apply name_gets_bigger in E2'.

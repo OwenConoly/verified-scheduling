@@ -179,7 +179,7 @@ Lemma get_out_of_bounds_id {X} `{TensorElem X} (x : list X) i n sh y :
   y <+> scalar_mul 0 (get x i) = y.
 Proof.
   intros Hx Hy H'. apply get_out_of_bounds in H'. destruct H' as [H'|H'].
-  - intros. rewrite H'. Search scalar_mul null. rewrite mul_0_null. apply H.
+  - intros. rewrite H'. rewrite mul_0_null. apply H.
   - intros. destruct H' as (?&H'p1&H'p2). rewrite H'p2.
     rewrite bin_comm. eapply bin_mul_0_id; eauto.
     apply tensor_consistent_forall_consistent in Hx.
