@@ -6,3 +6,6 @@ src/clib/*
 *.aux
 .lia.cache
 **Makefile*coq*
+**.c
+**.o
+**.h
