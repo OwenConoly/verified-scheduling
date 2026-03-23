@@ -998,3 +998,12 @@ Proof.
   rewrite get_is_nth_error by (simpl; lia).
   f_equal; try lia. f_equal. lia.
 Qed.
+
+Lemma nth_error_zrange_is_Some min max n :
+  n < Z.to_nat (max - min) ->
+  nth_error (zrange min max) n = Some (min + Z.of_nat n)%Z.
+Proof.
+  intros H. rewrite zrange_seq. rewrite nth_error_map.
+  rewrite nth_error_seq. destruct (_ <? _)%nat eqn:E; try reflexivity.
+  apply Nat.ltb_ge in E. lia.
+Qed.

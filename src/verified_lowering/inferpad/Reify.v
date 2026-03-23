@@ -14,7 +14,7 @@ Import ListNotations.
 From Codegen Require Import Normalize.
 From Lower Require Import ATLDeep Sexpr Zexpr Bexpr ListMisc.
 From ATL Require Import ATL Common CommonTactics Div Map.
-From Inferpad Require Import ATLPhoas TensorToResult NatToString.
+From Inferpad Require Import ATLSpecs ATLPhoas TensorToResult NatToString.
 
 Open Scope string_scope.
 
@@ -65,7 +65,7 @@ Definition pairs_to_reify :=
      : pair_to_reify (fun var => forall n, var tZ -> var tZ -> (var tZ -> var (tensor_n n)) -> var (tensor_n n));
    (let_nm, fun var => (fun n m x f => @Lbind var n m x (fun x0 => f (@Var var n x0))))
      : pair_to_reify (fun var => forall n m, var (tensor_n n) -> (var (tensor_n n) -> var (tensor_n m)) -> var (tensor_n m));
-   (@gget_R, fun var => @Get var)
+   (@get_R, fun var => @Get var)
      : pair_to_reify (fun var => forall n, var (tensor_n n) -> list (var tZ) -> var (tensor_n O));
    (iverson_n, fun var => @Guard var)
      : pair_to_reify (fun var => forall n, var tB -> var (tensor_n n) -> var (tensor_n n));
@@ -185,7 +185,7 @@ Ltac pattern_shallows x :=
  interp_type (tensor_n n) ->
  (interp_type (tensor_n n) -> interp_type (tensor_n m)) -> interp_type (tensor_n m))
 )
-,( @gget_R :
+,( @get_R :
 (forall n : nat,
  interp_type (tensor_n n) -> list (interp_type tZ) -> interp_type (tensor_n 0))
 )
@@ -249,8 +249,8 @@ Ltac make_types_reifiable_in x :=
   change RTensorElem with (dim_n_TensorElem O) in x;
   repeat change (@TensorTensorElem _ (dim_n_TensorElem ?n)) with
     (dim_n_TensorElem (S n)) in x;
-  repeat change (@get _ _ ?v ?i) with (@gget_R (S O) v [i]) in x;
-  repeat change (@gget_R ?n (@get _ _ ?v ?idx) ?idxs) with (@gget_R (S n) v (idx :: idxs)) in x;
+  repeat change (@get _ _ ?v ?i) with (@get_R (S O) v [i]) in x;
+  repeat change (@get_R ?n (@get _ _ ?v ?idx) ?idxs) with (@get_R (S n) v (idx :: idxs)) in x;
   change Z with (interp_type tZ) in x;
   cbv [gen sum] in x;
 
@@ -309,7 +309,7 @@ Ltac prove_spec_of0 :=
       let e' := fresh "e'" in
       Reify shallow_expr e';
       refine (spec_of_correct _ _ _ (fun var => varify var ts _ (e' var)) _ _ _ _ _ _ _ _ _ _ _);
-      [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop gget_R map interp_pZexpr Var' e']; reflexivity | .. ];
+      [ lazy[interp_fvar_pATLexpr varify interp_pATLexpr interp_Sbop get_R map interp_pZexpr Var' e']; reflexivity | .. ];
       cycle -1; [ repeat match goal with
                     | x := _ : _ |- context[?x] => subst x
                     end; simpl; reflexivity | .. ]
@@ -468,7 +468,7 @@ Ltac Reify_lhs :=
     let ts := infer_ts ret in
     let ret := constr:((fun var => varify var ts _ (ret var))) in
     let ret := (eval simpl in ret) in
-    let ret := constr:(@ATLPhoas.stringvar_fvar_ATLexpr ts _ (map (fun x => "arg" ++ x) (map nat_to_string (seq O (length ts)))) (ret _)) in
+    let ret := constr:(@stringvar_fvar_ATLexpr ts _ (map (fun x => "arg" ++ x) (map nat_to_string (seq O (length ts)))) (ret _)) in
     let ret := (eval compute in ret) in
     let ret := match ret with
                | Some ?ret => ret

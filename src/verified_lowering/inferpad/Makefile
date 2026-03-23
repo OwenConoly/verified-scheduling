@@ -1,4 +1,4 @@
-MODULES := Reify ReifyExamples InferPad ATLPhoas TensorToResult NatToString
+MODULES := Reify ReifyExamples InferPad ATLPhoas TensorToResult NatToString PhoasToDeep ATLSpecs
 VS      := $(MODULES:%=%.v)
 
 .PHONY: coq clean

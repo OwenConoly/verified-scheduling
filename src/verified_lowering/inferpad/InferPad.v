@@ -16,7 +16,7 @@ Import ListNotations.
 
 From ATL Require Import ATL Map Sets FrapWithoutSets Div Tactics Common CommonTactics.
 From Examples Require Import TensorAdd Matmul GatherScatter Im2col Convolution Blur.
-From Inferpad Require Import Reify ReifyExamples ATLPhoas.
+From Inferpad Require Import Reify ReifyExamples ATLPhoas ATLSpecs.
 From Lower Require Import Zexpr Bexpr Array Range Sexpr Result ListMisc Meshgrid VarGeneration Constant ATLDeep Pad.
 
 Open Scope string_scope.

@@ -7,9 +7,7 @@ From Stdlib Require Import ZArith.Zdiv.
 From Stdlib Require Import ZArith.Int.
 From Stdlib Require Import ZArith.Znat.
 From Stdlib Require Import Strings.String.
-From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import micromega.Lia.
-From Stdlib Require Import micromega.Zify.
 From Stdlib Require Import Lists.List.
 
 Import ListNotations.
@@ -21,6 +19,7 @@ From ATL Require Import ATL Tactics Common CommonTactics Div Reshape Map.
 From Codegen Require Import IdentParsing NatToString IntToString CodeGen Normalize CheckSafe.
 From Examples Require Import GatherScatter Convolution Im2col Blur TensorAdd Matmul.
 From Inferpad Require Import Reify.
+From Inferpad Require Import ReifyExamples ATLPhoas ATLSpecs.
 From Lower Require Import Zexpr ATLDeep Bexpr Sexpr.
 From Stringify Require Import Stringify.
 
@@ -29,10 +28,6 @@ Open Scope string_scope.
 Set Default Proof Mode "Classic".
 
 Definition SENTINEL := "!!!".
-
-From Inferpad Require Import ReifyExamples.
-From Inferpad Require Import ATLPhoas.
-From Lower Require Import ATLDeep.
 
 Definition arg_to_str (x : arg_spec) :=
   match x with
