@@ -1,4 +1,4 @@
-MODULES := Reify ReifyExamples InferPad ATLPhoas
+MODULES := Reify ReifyExamples InferPad ATLPhoas TensorToResult
 VS      := $(MODULES:%=%.v)
 
 .PHONY: coq clean

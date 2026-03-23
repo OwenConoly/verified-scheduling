@@ -1,13 +1,6 @@
-From Stdlib Require Import Arith.Arith.
-From Stdlib Require Import Arith.EqNat.
-From Stdlib Require Import Arith.PeanoNat. Import Nat.
-From Stdlib Require Import Bool.Bool.
 From Stdlib Require Import Reals.Reals. Import Rdefinitions. Import RIneq.
-From Stdlib Require Import ZArith.Zdiv.
-From Stdlib Require Import ZArith.Int.
 From Stdlib Require Import ZArith.Znat.
 From Stdlib Require Import Strings.String.
-From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import micromega.Zify.
 From Stdlib Require Import Lists.List.
