@@ -77,7 +77,7 @@ Fixpoint Forall' {X} (P : X -> Prop) l :=
 
 Lemma Forall_Forall' {X} (P : X -> _) l :
   Forall' P l <->
-  Forall P l.
+    Forall P l.
 Proof.
   split.
   - induction l; simpl in *; intros; invs'; eauto.
@@ -341,16 +341,16 @@ Qed.
 
 Lemma nth_error_concat {A} (l : list (list A)) n i :
   Forall (fun x => length x = n) l ->
-      nth_error (List.concat l) i =
-        match nth_error l (i / n) with
-        | Some l' => nth_error l' (i mod n)
-        | None => None
-        end.
+  nth_error (List.concat l) i =
+    match nth_error l (i / n) with
+    | Some l' => nth_error l' (i mod n)
+    | None => None
+    end.
 Proof.
   destruct n.
   { intros.
     destruct (nth_error _ _) eqn:E1.
-    - apply nth_error_In in E1. Search In List.concat. apply in_concat in E1.
+    - apply nth_error_In in E1. apply in_concat in E1.
       destruct E1 as (l'&H1&H2). rewrite Forall_forall in H.
       apply H in H1. destruct l'; try discriminate. contradiction.
     - destruct (nth_error _ (_ / _)) eqn:E2; [|reflexivity].
@@ -431,17 +431,17 @@ Proof.
         constructor; eauto. constructor; eauto.
       - reflexivity. }
     eapply bin_mul_0_id.
-      - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
-        constructor; eauto. constructor; eauto.
-      - apply consistent_mul. apply consistent_sumr. 1: lia.
-        intros. apply consistent_iverson.
-        eapply consistent_get. eapply consistent_get. subst.
-        constructor; eauto. constructor; eauto.
-      - reflexivity. }
+    - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
+      constructor; eauto. constructor; eauto.
+    - apply consistent_mul. apply consistent_sumr. 1: lia.
+      intros. apply consistent_iverson.
+      eapply consistent_get. eapply consistent_get. subst.
+      constructor; eauto. constructor; eauto.
+    - reflexivity. }
   rewrite zrange_is_cons; cycle 1.
   { assert (i < S (length xs0) * S (length xs)) as Hi' by lia.
     apply Nat.Div0.div_lt_upper_bound in Hi'. cbn [length].
-    Search (Z.of_nat _ / Z.of_nat _)%Z. rewrite <- Nat2Z.inj_div. lia. }
+    rewrite <- Nat2Z.inj_div. lia. }
   cbn [map fold_right]. rewrite fold_right_id; cycle 1.
   { apply Forall_map. rewrite zrange_seq. apply Forall_map.
     apply Forall_forall. intros j Hj. apply in_seq in Hj.
@@ -475,13 +475,13 @@ Proof.
         constructor; eauto. constructor; eauto.
       - reflexivity. }
     eapply bin_mul_0_id.
-      - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
-        constructor; eauto. constructor; eauto.
-      - apply consistent_mul. apply consistent_sumr. 1: lia.
-        intros. apply consistent_iverson.
-        eapply consistent_get. eapply consistent_get. subst.
-        constructor; eauto. constructor; eauto.
-      - reflexivity. }
+    - apply consistent_iverson. eapply consistent_get. eapply consistent_get. subst.
+      constructor; eauto. constructor; eauto.
+    - apply consistent_mul. apply consistent_sumr. 1: lia.
+      intros. apply consistent_iverson.
+      eapply consistent_get. eapply consistent_get. subst.
+      constructor; eauto. constructor; eauto.
+    - reflexivity. }
   erewrite sumr_is_fold_right_map_zero; try lia.
   2: { intros. apply consistent_iverson. eapply consistent_get. eapply consistent_get.
        subst. constructor; eauto. constructor; eauto. }
@@ -493,19 +493,19 @@ Proof.
   do 2 rewrite <- fold_right_bin_fold_left.
   rewrite fold_right_id with (x := scalar_mul 0 _); cycle 1.
   { apply Forall_map. rewrite zrange_seq. apply Forall_map.
-      apply Forall_forall. intros k Hk. apply in_seq in Hk.
-      replace (_ =? _)%Z with false; cycle 1.
-      { symmetry. apply Z.eqb_neq. cbn [length] in *. Fail lia.
-        match goal with
-        | |- ?a <> ?b => enough (b < a)%Z by lia
-        end.
-        repeat rewrite Nat.add_0_l in *. repeat rewrite Z.add_0_l in *.
-        remember ((length xs)) as l1.
-        remember (length xs0) as l2.
-        remember (_ + _)%Z.
-        rewrite <- (div_mod_eq (Z.of_nat i) (Z.of_nat (S l2))) by lia.
-        subst. lia. }
-      unfold iverson at 1. eapply bin_mul_0_id.
+    apply Forall_forall. intros k Hk. apply in_seq in Hk.
+    replace (_ =? _)%Z with false; cycle 1.
+    { symmetry. apply Z.eqb_neq. cbn [length] in *. Fail lia.
+      match goal with
+      | |- ?a <> ?b => enough (b < a)%Z by lia
+      end.
+      repeat rewrite Nat.add_0_l in *. repeat rewrite Z.add_0_l in *.
+      remember ((length xs)) as l1.
+      remember (length xs0) as l2.
+      remember (_ + _)%Z.
+      rewrite <- (div_mod_eq (Z.of_nat i) (Z.of_nat (S l2))) by lia.
+      subst. lia. }
+    unfold iverson at 1. eapply bin_mul_0_id.
     - eapply consistent_get. eapply consistent_get. subst.
       constructor; eauto. constructor; eauto.
     - apply consistent_mul. apply consistent_iverson.
@@ -530,13 +530,13 @@ Proof.
       end.
       rewrite <- (div_mod_eq (Z.of_nat i) (Z.of_nat (S l2))) by lia.
       lia. }
-      unfold iverson at 1. eapply bin_mul_0_id.
-      - eapply consistent_get. eapply consistent_get. subst.
-        constructor; eauto. constructor; eauto.
-      - apply consistent_mul. apply consistent_iverson.
-        eapply consistent_get. eapply consistent_get. subst.
-        constructor; eauto. constructor; eauto.
-      - reflexivity. }
+    unfold iverson at 1. eapply bin_mul_0_id.
+    - eapply consistent_get. eapply consistent_get. subst.
+      constructor; eauto. constructor; eauto.
+    - apply consistent_mul. apply consistent_iverson.
+      eapply consistent_get. eapply consistent_get. subst.
+      constructor; eauto. constructor; eauto.
+    - reflexivity. }
   replace (_ =? _)%Z with true; cycle 1.
   { symmetry. apply Z.eqb_eq. cbn [length] in *.
     remember ((length xs)) as l1.
@@ -728,7 +728,7 @@ Lemma tensor_add_is_map2_bin n (xs ys : dim_n (S n)) :
 Proof.
   revert ys. induction xs; intros ys Hlen; destruct ys as [|y ys]; try discriminate.
   - reflexivity.
-  - simpl in Hlen. Search tensor_add. rewrite tensor_add_step by lia.
+  - simpl in Hlen. rewrite tensor_add_step by lia.
     simpl. f_equal. apply IHxs. lia.
 Qed.
 
@@ -778,7 +778,7 @@ Proof.
   replace (Z.to_nat _) with (length v //n k).
   2: { rewrite Z.sub_0_r. rewrite znat_id_distr. f_equal; lia. }
   rewrite map_map. apply map_ext_in. intros i Hi. apply in_seq in Hi.
-  rewrite genr_is_map. Check map_nth_seq.
+  rewrite genr_is_map.
   erewrite (map_nth_seq _ (firstn _ _)).
   assert (k = 0 \/ k <> 0) as [Hk|Hk] by lia.
   { subst. simpl. reflexivity. }
@@ -796,10 +796,10 @@ Proof.
   - apply Z.ltb_nlt in E. cbv [iverson]. rewrite nth_error_app2 by lia.
     rewrite nth_error_repeat.
     2: { (*gross*)
-         pose proof split_result_length_helper as H'.
-         specialize (H' _ k i v (match n with | S _ => [] | O => 0%R end) ltac:(lia) ltac:(lia)).
-         rewrite length_firstn, length_skipn, length_app, repeat_length in H'.
-         lia. }
+      pose proof split_result_length_helper as H'.
+      specialize (H' _ k i v (match n with | S _ => [] | O => 0%R end) ltac:(lia) ltac:(lia)).
+      rewrite length_firstn, length_skipn, length_app, repeat_length in H'.
+      lia. }
     destruct v.
     { simpl in Hm. exfalso. auto. }
     rewrite get_znlt_null by assumption.

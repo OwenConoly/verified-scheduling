@@ -7,14 +7,14 @@ From Stdlib Require Import Logic.FunctionalExtensionality.
 From Stdlib Require Import Lists.List.
 From Stdlib Require Import micromega.Lia.
 From Stdlib Require Import QArith.
-From Stdlib Require Import String.
 
 Import ListNotations.
 
 From ATL Require Import Common Map Sets FrapWithoutSets Div Tactics ATL.
 From Lower Require Import Zexpr Bexpr Array Range Sexpr ListMisc
   VarGeneration Constant ATLDeep Result.
-From Inferpad Require Import TensorToResult.
+From Inferpad Require Import NatToString TensorToResult.
+
 Notation S := Datatypes.S.
 
 Local Set Default Goal Selector "!".
@@ -65,160 +65,6 @@ Definition stringvar_Zbop o :=
   | ZDivc => Zexpr.ZDivc
   | ZMod => Zexpr.ZMod
   end.
-
-Definition alphabet_string := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".
-Definition alphabet := nodup ascii_dec (List.remove ascii_dec "?"%char (list_ascii_of_string alphabet_string)).
-
-(*TODO is this in stdlib / elsewehre? / where should i put it?*)
-Fixpoint to_radix r fuel n :=
-  match fuel, n with
-  | S fuel', S n' => n mod r :: to_radix r fuel' (n / r)
-  | O, _ => nil
-  | _, O => nil
-  end.
-
-Fixpoint from_radix r n :=
-  match n with
-  | n0 :: n' => n0 + r * from_radix r n'
-  | [] => O
-  end.
-
-Lemma from_radix_to_radix r fuel n :
-  n <= fuel ->
-  1 < r ->
-  from_radix r (to_radix r fuel n) = n.
-Proof.
-  intros Hn Hr. revert n Hn. induction fuel; intros n Hn.
-  - simpl. lia.
-  - simpl. destruct n; [reflexivity|].
-    remember (S n) as n' eqn:E. clear n E. simpl.
-    rewrite IHfuel.
-    + rewrite (Nat.div_mod_eq n' r) at 3. lia.
-    + rewrite (Nat.div_mod_eq n' r) in Hn.
-      remember (n' / r) as k eqn:Ek. clear Ek. assert (k + k <= r * k).
-      { destruct r; try lia. destruct r; lia. }
-      lia.
-Qed.
-
-Lemma to_radix_injective r n m :
-  1 < r ->
-  to_radix r n n = to_radix r m m ->
-  n = m.
-Proof.
-  intros ? H.
-  rewrite <- (from_radix_to_radix r n n) by lia.
-  rewrite <- (from_radix_to_radix r m m) by lia.
-  rewrite H.
-  reflexivity.
-Qed.
-
-Lemma to_radix_small r fuel n :
-  1 <= r ->
-  Forall (fun digit => digit < r) (to_radix r fuel n).
-Proof.
-  intros Hr. revert n. induction fuel; simpl; intros; destruct n; constructor; auto.
-  apply Nat.mod_upper_bound. lia.
-Qed.
-
-Definition encode {T} (default : T) (alphabet : list T) (n : list nat) :=
-  map (fun digit => nth_default default alphabet digit) n.
-
-Lemma encode_injective {T} n m default (alphabet : list T) :
-  NoDup alphabet ->
-  Forall (fun digit => digit < length alphabet) n ->
-  Forall (fun digit => digit < length alphabet) m ->
-  encode default alphabet n = encode default alphabet m ->
-  n = m.
-Proof.
-  intros Ha Hn. revert m. induction n; simpl; intros m Hm Hnm.
-  - destruct m; [|discriminate Hnm]. reflexivity.
-  - destruct m; [discriminate Hnm|]. simpl in Hnm.
-    cbv [nth_default] in Hnm. invert Hnm. invert Hn. invert Hm.
-    f_equal; eauto; []. clear IHn.
-    rewrite NoDup_nth_error in Ha. apply Ha; auto.
-    destruct (nth_error _ _) eqn:E; [|apply nth_error_None in E; lia].
-    clear E.
-    destruct (nth_error _ _) eqn:E; [|apply nth_error_None in E; lia].
-    clear E. subst. reflexivity.
-Qed.
-
-Lemma encode_In {T} n default (alphabet : list T) :
-  Forall (fun digit => digit < length alphabet) n ->
-  Forall (fun digit => In digit alphabet) (encode default alphabet n).
-Proof.
-  intros H. induction H; simpl; constructor; auto.
-  cbv [nth_default]. destruct (nth_error _ _) eqn:E.
-  - apply nth_error_In in E. apply E.
-  - apply nth_error_None in E. lia.
-Qed.
-
-Compute (to_radix 2 5 5).
-
-Definition nat_to_string n :=
-  ("var_" ++ string_of_list_ascii (encode (ascii_of_nat O) alphabet (to_radix (length alphabet) n n)))%string.
-
-Lemma alphabet_long : 2 <= length alphabet.
-Proof. vm_compute. lia. Qed.
-
-Lemma string_of_list_ascii_injective n m :
-  string_of_list_ascii n = string_of_list_ascii m ->
-  n = m.
-Proof.
-  intros H.
-  rewrite <- (list_ascii_of_string_of_list_ascii n).
-  rewrite <- (list_ascii_of_string_of_list_ascii m).
-  rewrite H.
-  reflexivity.
-Qed.
-
-Lemma nat_to_string_injective x y :
-  nat_to_string x = nat_to_string y ->
-  x = y.
-Proof.
-  cbv [nat_to_string]. intros H. apply string_app_l in H.
-  pose proof alphabet_long.
-  eapply to_radix_injective; cycle 1.
-  - eapply encode_injective; cycle -1.
-    + apply string_of_list_ascii_injective. eassumption.
-    + cbv [alphabet]. apply NoDup_nodup.
-    + apply to_radix_small. lia.
-    + apply to_radix_small. lia.
-  - lia.
-Qed.
-
-Lemma contains_substring_In c s :
-  contains_substring (String c EmptyString) s ->
-  In c (list_ascii_of_string s).
-Proof.
-  intros H. cbv [contains_substring] in H. destruct H as [n H].
-  revert n H. induction s; intros n H; simpl in H.
-  - destruct n; discriminate H.
-  - rewrite substring0 in H. destruct n; simpl in *.
-    + invert H. auto.
-    + eauto.
-Qed.
-
-Lemma nat_to_string_In x :
-  Forall (fun digit => In digit (list_ascii_of_string "var_") \/ In digit alphabet) (list_ascii_of_string (nat_to_string x)).
-Proof.
-  cbv [nat_to_string]. lazy [list_ascii_of_string append].
-  do 4 (constructor; [left; simpl; auto|]).
-  rewrite list_ascii_of_string_of_list_ascii.
-  eapply Forall_impl.
-  2: { apply encode_In. apply to_radix_small. pose proof alphabet_long. lia. }
-  cbv beta. auto.
-Qed.
-
-Opaque alphabet_string. (*Qed is slow otherwise, not sure why*)
-Lemma no_question_marks n :
-  ~ contains_substring "?" (nat_to_string n).
-Proof.
-  intros H. apply contains_substring_In in H.
-  eapply Forall_forall in H; [|apply nat_to_string_In]. cbv beta in H.
-  cbv [alphabet] in H. destruct H as [H|H].
-  - simpl in H. repeat (destruct H as [H|H]; [congruence|]). contradiction.
-  - apply nodup_In in H. apply in_remove in H. destruct H as (_&H). congruence.
-Qed.
 
 Variant tagged_Z := argvarZ (_ : Z) | itervarZ (_ : Z).
 Definition untag_Z x :=
@@ -541,9 +387,9 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
       | _, _, _ => None
       end
   | Sum lo hi body =>
-    sound_sizeof dummy sizeof_var (body (dummy _))
+      sound_sizeof dummy sizeof_var (body (dummy _))
   | Guard p body =>
-    sound_sizeof dummy sizeof_var body
+      sound_sizeof dummy sizeof_var body
   | Lbind e1 e2 =>
       match sound_sizeof dummy sizeof_var e1 with
       | Some _ => sound_sizeof dummy sizeof_var (e2 (dummy _))
@@ -559,65 +405,65 @@ Fixpoint sound_sizeof {var n} (dummy : forall t, var t) (sizeof_var : var tZ -> 
       | _, _ => None
       end
   | Flatten e =>
-    match sound_sizeof dummy sizeof_var e with
-    | Some (a :: b :: rest) => Some (a * b :: rest)
-    | _ => None
-    end
+      match sound_sizeof dummy sizeof_var e with
+      | Some (a :: b :: rest) => Some (a * b :: rest)
+      | _ => None
+      end
   | Split k e =>
-    match sound_sizeof dummy sizeof_var e with
-    | Some (a :: rest) =>
-        match sizeof_pZexpr sizeof_var k with
-        | Some k =>
-            if (0 <? Z.to_nat k)%nat then
-              Some (a //n (Z.to_nat k) :: Z.to_nat k :: rest)
-            else None
-        | None => None
-        end
-    | _ => None
-    end
+      match sound_sizeof dummy sizeof_var e with
+      | Some (a :: rest) =>
+          match sizeof_pZexpr sizeof_var k with
+          | Some k =>
+              if (0 <? Z.to_nat k)%nat then
+                Some (a //n (Z.to_nat k) :: Z.to_nat k :: rest)
+              else None
+          | None => None
+          end
+      | _ => None
+      end
   | Transpose e =>
-    match sound_sizeof dummy sizeof_var e with
-    | Some (a :: b :: rest) => Some (b :: a :: rest)
-    | _ => None
-    end
+      match sound_sizeof dummy sizeof_var e with
+      | Some (a :: b :: rest) => Some (b :: a :: rest)
+      | _ => None
+      end
   | Truncr n e | Truncl n e =>
-    match sound_sizeof dummy sizeof_var e with
-    | Some (m :: rest) =>
-        (*note: ATLDeep.size_of only requires n <=? m.
+                   match sound_sizeof dummy sizeof_var e with
+                   | Some (m :: rest) =>
+                       (*note: ATLDeep.size_of only requires n <=? m.
           here, we also check n <? m, because we want to
           guarantee that all tensors have nonzero length.
           this is because shallow ATL has weird semantics for zero-length tensors,
           which are incompatible with deep ATL semantics.
-         *)
-        match sizeof_pZexpr sizeof_var n with
-        | Some n =>
-            if (Z.to_nat n <? m)%nat then
-              Some (m - Z.to_nat n :: rest)
-            else None
-        | None => None
-        end
-    | _ => None
-    end
+                        *)
+                       match sizeof_pZexpr sizeof_var n with
+                       | Some n =>
+                           if (Z.to_nat n <? m)%nat then
+                             Some (m - Z.to_nat n :: rest)
+                           else None
+                       | None => None
+                       end
+                   | _ => None
+                   end
   | Padr n e =>
-    match sound_sizeof dummy sizeof_var e with
-    | Some (m :: rest) =>
-        match sizeof_pZexpr sizeof_var n with
-        | Some n =>
-            Some (m + Z.to_nat n :: rest)
-        | None => None
-        end
-    | _ => None
-    end
+      match sound_sizeof dummy sizeof_var e with
+      | Some (m :: rest) =>
+          match sizeof_pZexpr sizeof_var n with
+          | Some n =>
+              Some (m + Z.to_nat n :: rest)
+          | None => None
+          end
+      | _ => None
+      end
   | Padl n e =>
-    match sound_sizeof dummy sizeof_var e with
-    | Some (m :: rest) =>
-        match sizeof_pZexpr sizeof_var n with
-        | Some n =>
-            Some (Z.to_nat n + m :: rest)
-        | None => None
-        end
-    | _ => None
-    end
+      match sound_sizeof dummy sizeof_var e with
+      | Some (m :: rest) =>
+          match sizeof_pZexpr sizeof_var n with
+          | Some n =>
+              Some (Z.to_nat n + m :: rest)
+          | None => None
+          end
+      | _ => None
+      end
   | @Var _ n _ =>
       match n with
       | O => Some []
@@ -928,12 +774,12 @@ Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => tagged_strin
               ATLDeep.Sum (nat_to_string name) (stringvar_Z lo) (stringvar_Z hi) body')
       | None => None
       end
-| Guard b e1 =>
-    match stringvar_ATLexpr name e1 with
-    | Some (name', body') =>
-        Some (name', ATLDeep.Guard (stringvar_B b) body')
-    | None => None
-    end
+  | Guard b e1 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', body') =>
+          Some (name', ATLDeep.Guard (stringvar_B b) body')
+      | None => None
+      end
   | Lbind x f =>
       match stringvar_ATLexpr (S name) x with
       | Some (name', x') =>
@@ -972,12 +818,12 @@ Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => tagged_strin
           Some (name', ATLDeep.Transpose e1')
       | None => None
       end
-| Truncr k e1 =>
-    match stringvar_ATLexpr name e1 with
-    | Some (name', e1') =>
-        Some (name', ATLDeep.Truncr (stringvar_Z k) e1')
-    | None => None
-    end
+  | Truncr k e1 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', e1') =>
+          Some (name', ATLDeep.Truncr (stringvar_Z k) e1')
+      | None => None
+      end
   | Truncl k e1 =>
       match stringvar_ATLexpr name e1 with
       | Some (name', e1') =>
@@ -990,19 +836,19 @@ Fixpoint stringvar_ATLexpr {n} (name : nat) (e : pATLexpr (fun _ => tagged_strin
           Some (name', ATLDeep.Padl (stringvar_Z k) e1')
       | None => None
       end
-| Padr k e1 =>
-    match stringvar_ATLexpr name e1 with
-    | Some (name', e1') =>
-        Some (name', ATLDeep.Padr (stringvar_Z k) e1')
-    | None => None
-    end
-| Get _ _ | SBop _ _ _ | SIZR _ =>
-                           match stringvar_S e with
-                           | Some s => Some (name, ATLDeep.Scalar s)
-                           | None => None
-                           end
-| Var x => None
-end.
+  | Padr k e1 =>
+      match stringvar_ATLexpr name e1 with
+      | Some (name', e1') =>
+          Some (name', ATLDeep.Padr (stringvar_Z k) e1')
+      | None => None
+      end
+  | Get _ _ | SBop _ _ _ | SIZR _ =>
+                             match stringvar_S e with
+                             | Some s => Some (name, ATLDeep.Scalar s)
+                             | None => None
+                             end
+  | Var x => None
+  end.
 
 Fixpoint valuation_of (ctx : list (ctx_elt2 (fun _ => tagged_string) interp_type_result)) : valuation :=
   match ctx with
@@ -1184,11 +1030,11 @@ Lemma sizeof_pZexpr_eval_Zexpr e e' (sizeof_var : tagged_string -> _) v :
 Proof.
   revert e'. induction e; simpl; intros; eauto;
     try congruence; cbv [option_map] in *;
-  repeat match goal with
-  | H: context[match sizeof_pZexpr _ ?e with _ => _ end] |- _ =>
-      let E := fresh "E" in
-      destruct (sizeof_pZexpr _ e) eqn:E; simpl in *; [|congruence]
-         end;
+    repeat match goal with
+      | H: context[match sizeof_pZexpr _ ?e with _ => _ end] |- _ =>
+          let E := fresh "E" in
+          destruct (sizeof_pZexpr _ e) eqn:E; simpl in *; [|congruence]
+      end;
     invs';
     simpl in *;
     eauto.
@@ -1437,9 +1283,9 @@ Ltac invs'' := invs'; nts_inj; subst.
 Fixpoint idxs_in_bounds {n} (e : pATLexpr interp_type_result n) :=
   match e with
   | Gen lo hi body | Sum lo hi body =>
-      forall i,
-        (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
-        idxs_in_bounds (body (itervarZ i))
+                       forall i,
+                         (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
+                         idxs_in_bounds (body (itervarZ i))
   | Guard p body =>
       interp_pBexpr p = true ->
       idxs_in_bounds body
@@ -1492,9 +1338,9 @@ Definition dummy_result' t : interp_type_result' t :=
 Fixpoint idxs_in_bounds' {n} (e : pATLexpr interp_type_result' n) :=
   match e with
   | Gen lo hi body | Sum lo hi body =>
-      forall i,
-        (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
-        idxs_in_bounds' (body (itervarZ i))
+                       forall i,
+                         (interp_pZexpr lo <= i < interp_pZexpr hi)%Z ->
+                         idxs_in_bounds' (body (itervarZ i))
   | Guard p body =>
       interp_pBexpr p = true ->
       idxs_in_bounds' body
@@ -2175,9 +2021,9 @@ Lemma stringvar_ATLexpr_correct ctx sz n e_nat e_shal name name' e_string :
   (forall name'', In (nat_to_string name'') (map untagged_fst_ctx_elt ctx) -> name'' < name) ->
   stringvar_ATLexpr name e_nat = Some (name', e_string) ->
   sound_sizeof (fun _ => itervarstr (nat_to_string 0)) (fun x => match x with
-                                           | itervarstr _ => None
-                                           | argvarstr x0 => valuation_of ctx $? x0
-                                           end) e_nat = Some sz ->
+                                                           | itervarstr _ => None
+                                                           | argvarstr x0 => valuation_of ctx $? x0
+                                                           end) e_nat = Some sz ->
   idxs_in_bounds e_shal ->
   eval_expr (valuation_of ctx) (ec_of ctx) e_string (result_of_pATLexpr e_shal).
 Proof.
@@ -2310,7 +2156,7 @@ Proof.
     invert E.
     constructor;
       try match goal with
-      | H: V _ = _ |- _ => rewrite H
+        | H: V _ = _ |- _ => rewrite H
         end.
     + eauto.
     + eapply Forall_impl; [|eassumption]. invert 1; eauto.
@@ -2426,10 +2272,10 @@ Qed.
 Fixpoint stringvar_fvar_ATLexpr {ts n} names (e : fvar_pATLexpr (fun _ => tagged_string) ts n) : option ATLexpr :=
   match ts, names return fvar_pATLexpr _ ts _ -> _ with
   | [], [] => fun e =>
-           match stringvar_ATLexpr O e with
-           | Some (_, e_string) => Some e_string
-           | None => None
-           end
+               match stringvar_ATLexpr O e with
+               | Some (_, e_string) => Some e_string
+               | None => None
+               end
   | t :: ts', name :: names' => fun e =>
                                stringvar_fvar_ATLexpr names' (e (argvarstr name))
   | _, _ => fun _ => None
@@ -2445,9 +2291,9 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil P => fun e => P -> idxs_in_bounds e
   | tensor_n n :: ts', with_T_var sh sz => fun e =>
-        forall r,
-          result_has_shape' sh r ->
-          fvar_idxs_in_bounds sz (e r)
+                                           forall r,
+                                             result_has_shape' sh r ->
+                                             fvar_idxs_in_bounds sz (e r)
   | tZ :: ts', with_Z_var sz => fun e => forall r,
                                   fvar_idxs_in_bounds (sz r) (e (argvarZ r))
   | _, _ => fun _ => False
@@ -2457,7 +2303,7 @@ Fixpoint fvar_idxs_in_bounds' {ts n} (sizes : size_spec) (e : fvar_pATLexpr inte
   match ts, sizes return fvar_pATLexpr _ ts _ -> _ with
   | [], size_nil P => fun e => P -> idxs_in_bounds' e
   | tensor_n n :: ts', with_T_var sh sz => fun e =>
-        fvar_idxs_in_bounds' sz (e sh)
+                                           fvar_idxs_in_bounds' sz (e sh)
   | tZ :: ts', with_Z_var sz => fun e => forall r,
                                   fvar_idxs_in_bounds' (sz r) (e (argvarZ r))
   | _, _ => fun _ => False
@@ -2505,15 +2351,15 @@ Fixpoint fvar_sum_bounds_good {ts n} (sizes : size_spec) (e : fvar_pATLexpr inte
 Fixpoint res_spec_of' ts n names size (fd : ATLexpr) (fs : fvar_pATLexpr interp_type_result ts n) (v : fmap string Z) (ec : fmap string Result.result) :=
   match ts, size, names return ATLexpr -> fun_type interp_type_result ts _ -> _ with
   | [], size_nil P, [] => fun fd fs =>
-                       P ->
-                       eval_expr v ec fd (result_of_pATLexpr fs)
+                           P ->
+                           eval_expr v ec fd (result_of_pATLexpr fs)
   | tZ :: ts', with_Z_var size', name :: names' => fun fd fs =>
-                                   forall (x : Z),
-                                     res_spec_of' ts' n names' (size' x) fd (fs (argvarZ x)) (v $+ (name, x)) ec
+                                                  forall (x : Z),
+                                                    res_spec_of' ts' n names' (size' x) fd (fs (argvarZ x)) (v $+ (name, x)) ec
   | tensor_n m :: ts', with_T_var sh size', name :: names' => fun fd fs =>
-          forall (x : Result.result),
-            result_has_shape' sh x ->
-            res_spec_of' ts' n names' size' fd (fs x) v (ec $+ (name, x))
+                                                             forall (x : Result.result),
+                                                               result_has_shape' sh x ->
+                                                               res_spec_of' ts' n names' size' fd (fs x) v (ec $+ (name, x))
   | _, _, _ => fun _ _ => False
   end fd fs.
 
@@ -2522,17 +2368,17 @@ Definition res_spec_of ts n names size fd fs := res_spec_of' ts n names size fd 
 Fixpoint spec_of' ts n names size (fd : ATLexpr) (fs : fun_type interp_type ts (dim_n n)) (v : fmap string Z) (ec : fmap string Result.result) :=
   match ts, size, names return ATLexpr -> fun_type interp_type ts _ -> _ with
   | [], size_nil P, [] => fun fd fs =>
-                       P ->
-                       exists r,
-                         eval_expr v ec fd r /\
-                           tensor_of_result r = fs
+                           P ->
+                           exists r,
+                             eval_expr v ec fd r /\
+                               tensor_of_result r = fs
   | tZ :: ts', with_Z_var size', name :: names' => fun fd fs =>
-                                   forall (x : Z),
-                                     spec_of' ts' n names' (size' x) fd (fs x) (v $+ (name, x)) ec
+                                                  forall (x : Z),
+                                                    spec_of' ts' n names' (size' x) fd (fs x) (v $+ (name, x)) ec
   | tensor_n m :: ts', with_T_var sh size', name :: names' => fun fd fs =>
-                                              forall (x : Result.result),
-                                                result_has_shape' sh x ->
-                                                spec_of' ts' n names' size' fd (fs (tensor_of_result x)) v (ec $+ (name, x))
+                                                             forall (x : Result.result),
+                                                               result_has_shape' sh x ->
+                                                               spec_of' ts' n names' size' fd (fs (tensor_of_result x)) v (ec $+ (name, x))
   | _, _, _ => fun _ _ => False
   end fd fs.
 
@@ -2610,8 +2456,8 @@ Fixpoint compat ts n size (e_shal : fvar_pATLexpr interp_type_tagged ts n) (e_re
                        P ->
                        tensor_of_result (result_of_pATLexpr e_res) = interp_pATLexpr e_shal
   | tZ :: ts', with_Z_var size => fun e_shal e_res =>
-                                          forall x,
-                                            compat ts' _ (size x) (e_shal (argvarZ x)) (e_res (argvarZ x))
+                                  forall x,
+                                    compat ts' _ (size x) (e_shal (argvarZ x)) (e_res (argvarZ x))
   | tensor_n _ :: ts', with_T_var sh size => fun e_shal e_res =>
                                              forall x,
                                                result_has_shape' sh x ->
@@ -2703,12 +2549,12 @@ Qed.
 Fixpoint size_spec_of ts v P args :=
   match ts, args return fun_type interp_type ts _ -> _ with
   | tZ :: ts', Z_arg x :: args' => fun P =>
-      with_Z_var (fun x0 => size_spec_of ts' (v $+ (x, x0)) (P x0) args')
+                                  with_Z_var (fun x0 => size_spec_of ts' (v $+ (x, x0)) (P x0) args')
   | tensor_n _ :: ts', T_arg x sh :: args' => fun P =>
-      match eval_Zexprlist_Z v sh with
-      | Some sz => with_T_var (map Z.to_nat sz) (size_spec_of ts' v (P (dummy_shal (tensor_n _))) args')
-      | None => size_nil False
-      end
+                                             match eval_Zexprlist_Z v sh with
+                                             | Some sz => with_T_var (map Z.to_nat sz) (size_spec_of ts' v (P (dummy_shal (tensor_n _))) args')
+                                             | None => size_nil False
+                                             end
   | [], [] => fun P => size_nil P
   | _, _ => fun _ => size_nil False
   end P.
