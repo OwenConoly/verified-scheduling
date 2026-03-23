@@ -1018,7 +1018,7 @@ Proof.
       | H: _ |- _ => erewrite H by eauto
       end;
     try reflexivity.
-  - (*why*) erewrite (sound_sizeof_wf_Z _ _ _ _ _ hi1) by eauto. reflexivity.
+  - erewrite (sound_sizeof_wf_Z _ _ _ _ _ hi1) by eauto. reflexivity.
   - erewrite Forall2_length by eassumption. destruct (_ =? _)%nat; [|reflexivity].
     destruct H1; reflexivity.
 Qed.
