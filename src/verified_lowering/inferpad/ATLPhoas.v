@@ -327,12 +327,6 @@ Fixpoint interp_pBexpr (e : pBexpr tagged_Z) : bool :=
   | BAnd x y => interp_pBexpr x && interp_pBexpr y
   end.
 
-Fixpoint R_to_result n (x : dim_n n) : Result.result :=
-  match n return dim_n n -> Result.result with
-  | S n' => fun x => Result.V (map (R_to_result _) x)
-  | O => fun x => Result.S (Result.SS x)
-  end x.
-
 Variant Sbop := Mul | Add | Div | Sub.
 
 Definition interp_Sbop o x y :=
@@ -814,21 +808,22 @@ Fixpoint unnatify {var n} (ctx : list (ctx_elt var)) (e : pATLexpr (fun _ => nat
   | Padl k x => Padl (unnatify_Z ctx k) (unnatify ctx x)
   | Padr k x => Padr (unnatify_Z ctx k) (unnatify ctx x)
   (*i do not understand why we need to write @Var _ n here*)
-  | @Var _ n v => match nth_error (rev ctx) v with
-                 | Some {| ctx_elt_t0 := t; ctx_elt0 := x |} =>
-                     match t return var t -> pATLexpr var n with
-                     | tZ|tB => fun _ => @dummy var n
-                     | tensor_n m => fun x =>
-                                      match Nat.eq_dec n m with
-                                      | left pf =>
-                                          match pf in (_ = q) return var (tensor_n q) -> _ with
-                                          | Logic.eq_refl => fun x => @Var var n x
-                                          end x
-                                      | right _ => @dummy var n
-                    end
-                end x
-            | None => @dummy var n
-            end
+  | @Var _ n v =>
+      match nth_error (rev ctx) v with
+      | Some {| ctx_elt_t0 := t; ctx_elt0 := x |} =>
+          match t return var t -> pATLexpr var n with
+          | tZ|tB => fun _ => @dummy var n
+          | tensor_n m => fun x =>
+                           match Nat.eq_dec n m with
+                           | left pf =>
+                               match pf in (_ = q) return var (tensor_n q) -> _ with
+                               | Logic.eq_refl => fun x => @Var var n x
+                               end x
+                           | right _ => @dummy var n
+                           end
+          end x
+      | None => @dummy var n
+      end
   | Get x idxs => Get (unnatify ctx x) (map (unnatify_Z ctx) idxs)
   | SBop o x y => SBop o (unnatify ctx x) (unnatify ctx y)
   | SIZR x => SIZR (unnatify_Z ctx x)
@@ -1062,12 +1057,6 @@ Proof.
          split; [|eassumption]. simpl in *. assumption.
 Qed.
 
-Definition option_coalesce {T} (x : option (option T)) :=
-  match x with
-  | Some y => y
-  | None => None
-  end.
-
 Lemma valuation_of'_correct ctx x y :
   NoDup (map untagged_fst_ctx_elt ctx) ->
   List.In {| ctx_elt_t := tZ; ctx_elt_p1 := x; ctx_elt_p2 := y |} ctx ->
@@ -1138,11 +1127,6 @@ Proof.
     rewrite dom_add. sets.
 Qed.
 
-Fail Lemma mk_add_result_V x y z :
-  Forall3 Result.add_result x y ->
-  Result.add_result x y.
-(* :( *)
-
 Definition dummy_shal t : interp_type_tagged t :=
   match t with
   | tZ => itervarZ 0%Z
@@ -1193,119 +1177,6 @@ Proof.
     destruct H1; reflexivity.
 Qed.
 
-(*TODO delete this?*)
-Lemma inv_wf_ATLexpr {var1 var2} ctx n e1 e2 :
-  wf_ATLexpr var1 var2 ctx n e1 e2 ->
-  match e1 in pATLexpr _ n0 return pATLexpr var2 n0 -> Prop with
-  | Gen lo1 hi1 body1 =>
-      fun e2 =>
-        exists lo2 hi2 body2,
-          wf_Zexpr var1 var2 ctx lo1 lo2 /\
-            wf_Zexpr var1 var2 ctx hi1 hi2 /\
-            (forall x1 x2,
-                wf_ATLexpr var1 var2
-                  ({| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) _
-                  (body1 x1) (body2 x2)) /\
-            e2 = Gen lo2 hi2 body2
-  | Sum lo1 hi1 body1 =>
-      fun e2 =>
-        exists lo2 hi2 body2,
-          wf_Zexpr var1 var2 ctx lo1 lo2 /\
-            wf_Zexpr var1 var2 ctx hi1 hi2 /\
-            (forall x1 x2,
-                wf_ATLexpr var1 var2
-                  ({| ctx_elt_t := tZ; ctx_elt_p1 := x1; ctx_elt_p2 := x2 |} :: ctx) _
-                  (body1 x1) (body2 x2)) /\
-            e2 = Sum lo2 hi2 body2
-  | Guard b1 x1 =>
-      fun e2 =>
-        exists b2 x2,
-          wf_Bexpr var1 var2 ctx b1 b2 /\
-            wf_ATLexpr var1 var2 ctx _ x1 x2 /\
-            e2 = Guard b2 x2
-  | Lbind x1 f1 =>
-      fun e2 =>
-        exists x2 f2,
-          wf_ATLexpr var1 var2 ctx _ x1 x2 /\
-            (forall (x1' : var1 (tensor_n _)) (x2' : var2 (tensor_n _)),
-                wf_ATLexpr var1 var2
-                  ({| ctx_elt_t := tensor_n _; ctx_elt_p1 := x1'; ctx_elt_p2 := x2' |}
-                     :: ctx)
-                  _ (f1 x1') (f2 x2')) /\
-            e2 = Lbind x2 f2
-  | Concat x1 y1 =>
-      fun e2 =>
-        exists x2 y2,
-          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            wf_ATLexpr var1 var2 ctx (S _) y1 y2 /\
-            e2 = Concat x2 y2
-  | Flatten x1 =>
-      fun e2 =>
-        exists x2,
-          wf_ATLexpr var1 var2 ctx (S (S _)) x1 x2 /\
-            e2 = Flatten x2
-  | Split k1 x1 =>
-      fun e2 =>
-        exists k2 x2,
-          wf_Zexpr var1 var2 ctx k1 k2 /\
-            wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Split k2 x2
-  | Transpose x1 =>
-      fun e2 =>
-        exists x2,
-          wf_ATLexpr var1 var2 ctx (S (S _)) x1 x2 /\
-            e2 = Transpose x2
-  | Truncr k1 x1 =>
-      fun e2 =>
-        exists k2 x2,
-          wf_Zexpr var1 var2 ctx k1 k2  /\
-            wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Truncr k2 x2
-  | Truncl k1 x1 =>
-      fun e2 =>
-        exists k2 x2,
-          wf_Zexpr var1 var2 ctx k1 k2  /\
-            wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Truncl k2 x2
-  | Padl k1 x1 =>
-      fun e2 =>
-        exists k2 x2,
-          wf_Zexpr var1 var2 ctx k1 k2  /\
-          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Padl k2 x2
-  | Padr k1 x1 =>
-      fun e2 =>
-        exists k2 x2,
-          wf_Zexpr var1 var2 ctx k1 k2  /\
-          wf_ATLexpr var1 var2 ctx (S _) x1 x2 /\
-            e2 = Padr k2 x2
-  | Var v1 =>
-      fun e2 =>
-        exists v2,
-          In {| ctx_elt_p1 := v1; ctx_elt_p2 := v2 |} ctx /\
-            e2 = Var v2
-  | Get x1 idxs1 =>
-      fun e2 =>
-        exists x2 idxs2,
-          wf_ATLexpr var1 var2 ctx _ x1 x2 /\
-            Forall2 (wf_Zexpr var1 var2 ctx) idxs1 idxs2 /\
-            e2 = Get x2 idxs2
-  | SBop o x1 y1 =>
-      fun e2 =>
-        exists x2 y2,
-          wf_ATLexpr var1 var2 ctx 0 x1 x2 /\
-            wf_ATLexpr var1 var2 ctx 0 y1 y2 /\
-            e2 = SBop o x2 y2
-  | SIZR x1 =>
-      fun e2 =>
-        exists x2,
-          wf_Zexpr var1 var2 ctx x1 x2 /\
-            e2 = SIZR x2
-  end e2.
-Proof.
-  destruct 1; eauto 10.
-Qed.
-
 Lemma sizeof_pZexpr_eval_Zexpr e e' (sizeof_var : tagged_string -> _) v :
   sizeof_pZexpr sizeof_var e = Some e' ->
   (forall x y, sizeof_var x = Some y -> v $? (untag_string x) = Some y) ->
@@ -1331,36 +1202,6 @@ Ltac prove_sound_sizeof :=
     (erewrite <- sound_sizeof_wf; [|solve[eauto] | |]; [eassumption|solve[eauto]..]) ||
     (erewrite sound_sizeof_wf by eauto; erewrite <- sound_sizeof_wf; [|solve[eauto] | |]; [eassumption|solve[eauto]..]) ||
     (erewrite <- sound_sizeof_wf by eauto; erewrite sound_sizeof_wf; [|solve[eauto] | |]; [eassumption|solve[eauto]..]).
-
-Definition type_eq_dec (t1 t2 : type) : {t1 = t2} + {t1 <> t2}.
-Proof.
-  destruct t1, t2; try (left; reflexivity); try (right; congruence).
-  destruct (Nat.eq_dec n n0).
-  - subst. left. reflexivity.
-  - right. congruence.
-Defined.
-
-Definition zip_ctx_elts {var1 var2} (x1 : ctx_elt var1) (x2 : ctx_elt var2) : option (ctx_elt2 var1 var2) :=
-  match type_eq_dec x1.(ctx_elt_t0 _) x2.(ctx_elt_t0 _) with
-  | left pf => match pf in _ = X return var2 X -> _ with
-              | eq_refl => fun p2 => Some {| ctx_elt_p1 := x1.(ctx_elt0 _); ctx_elt_p2 := p2 |}
-              end x2.(ctx_elt0 _)
-  | right _ => None
-  end.
-
-Definition zip_ctxs {var1 var2} (ctx1 : list (ctx_elt var1)) (ctx2 : list (ctx_elt var2)) :=
-  flat_map (fun '(x1, x2) => match zip_ctx_elts x1 x2 with
-                          | Some x => [x]
-                          | None => []
-                          end)
-    (combine ctx1 ctx2).
-
-Definition mul_ctxs {var1 var2} (ctx1 : list (ctx_elt var1)) (ctx2 : list (ctx_elt var2)) :=
-  flat_map (fun '(x1, x2) => match zip_ctx_elts x1 x2 with
-                          | Some x => [x]
-                          | None => []
-                          end)
-    (list_prod ctx1 ctx2).
 
 Lemma sound_sizeof_size_of var2 (dummy2 : forall t, var2 t) n e_nat ctx sz e2 e_string name name' sizeof1 sizeof2 v :
   wf_ATLexpr (fun _ => tagged_string) var2 ctx n e_nat e2 ->
@@ -1541,12 +1382,16 @@ Lemma name_gets_bigger n (e : pATLexpr _ n) name name' e_string :
   stringvar_ATLexpr name e = Some (name', e_string) ->
   name <= name'.
 Proof.
-  revert name name' e_string. induction e;
-    simpl; intros name name' e_string He;
-    repeat (destruct_one_match_hyp; simpl in *; try congruence; []); invs';
+  revert name name' e_string.
+  induction e;
+    simpl;
+    intros name name' e_string He;
+    repeat (destruct_one_match_hyp; simpl in *; try congruence; []);
+    invs';
     repeat match goal with
       | H1: _, H2: stringvar_ATLexpr _ _ = _ |- _ => apply H1 in H2
-      end; lia || congruence.
+      end;
+    lia || congruence.
 Qed.
 
 Lemma vars_of_stringvar_ATLexpr n name (e : pATLexpr _ n) name' e_string :
@@ -1933,8 +1778,7 @@ Lemma invert_wf_var var1 var2 ctx n i1 x2 :
 Proof.
   intros H. remember (Var i1). destruct H; try congruence. eauto.
 Qed.
-Print res_tensor_corresp.
-Print sizes_consistent.
+
 Lemma res_tensor_corresp_sizes_consistent x :
   res_tensor_corresp x ->
   sizes_consistent sizeof_Z sizeof_Z x.
@@ -1946,7 +1790,6 @@ Lemma Forall_res_tensor_corresp_sizes_consistent xs :
 Proof. eauto using Forall_impl, res_tensor_corresp_sizes_consistent. Qed.
 Hint Resolve Forall_res_tensor_corresp_sizes_consistent : core.
 
-Print interp_type.
 Lemma blah :
   sizeof_Z (dummy_shal tZ) = sizeof_Z (dummy_result tZ).
 Proof. reflexivity. Qed.
@@ -1967,14 +1810,6 @@ Proof.
   apply Forall_Forall'. apply Forall_map. apply Forall_forall. intros x Hx.
   apply In_zrange in Hx. auto.
 Qed.
-
-Lemma tensor_has_size'_sumr n lo hi sz f :
-  (lo < hi)%Z ->
-  (forall i, (lo <= i < hi)%Z -> tensor_has_size' sz (f i)) ->
-  tensor_has_size' (n := n) sz (sumr lo hi f).
-Proof.
-  intros. erewrite sumr_is_fold_right_map. Search bin.
-Abort.
 
 Hint Resolve consistent_iverson consistent_concat consistent_transpose consistent_truncr consistent_truncl consistent_flatten consistent_pad_l consistent_pad_r : consistent.
 Lemma sound_sizeof_tensor_has_size n e_shal sz ctx e_res :
@@ -2615,9 +2450,6 @@ Fixpoint fvar_idxs_in_bounds {ts n} (sizes : size_spec) (e : fvar_pATLexpr inter
           fvar_idxs_in_bounds sz (e r)
   | tZ :: ts', with_Z_var sz => fun e => forall r,
                                   fvar_idxs_in_bounds (sz r) (e (argvarZ r))
-  (* | tB :: ts', with_B_var sz => *)
-  (*     (* fun e => forall r, fvar_idxs_in_bounds sz (e r)*) *)
-  (*     fun _ => False *)
   | _, _ => fun _ => False
   end e.
 
