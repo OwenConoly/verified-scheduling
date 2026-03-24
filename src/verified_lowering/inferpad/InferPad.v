@@ -129,7 +129,7 @@ Proof.
     assert (x0 <> x)%Z by lia.
     eapply Z.eqb_neq in H1. rewrite <- H1.
     econstructor; eapply eval_Zexpr_Z_eval_Zexpr; eauto.
-Qed.    
+Qed.
 
 Ltac is_unspec_nat n :=
   match n with
@@ -202,18 +202,14 @@ Ltac inner_dim e :=
   let inner_dim := eval compute in inner_dim in
   inner_dim.
 
-Ltac infer_size_of' :=
+Ltac infer_size_of :=
   repeat match goal with
-    | _ => progress (cbv [Z.div div_ceil] (*fine to unfold these, since they had better only be applied to literals, anyway*); simpl)
     | |- size_of _ _ _ => econstructor
     | |- eval_Zexpr _ _ _ => econstructor; eauto
     | |- _ = _ => reflexivity
     | |- _ :: _ = _ :: _ => f_equal
     | _ => lia
     end.
-
-Ltac infer_size_of :=
-  infer_size_of'.
 
 Ltac infer_pad left right :=
   match goal with
@@ -616,7 +612,7 @@ Proof.
   let ast := R in
   assert (exists pad, has_pad $0 $0 ast pad).
   { eexists. infer_pad 0%Z 0%Z. }
-Abort.  
+Abort.
 
 Goal forall B C K W RR (w : list (list (list R))) (x : list (list (list R))),
     (0 < B)%Z ->
@@ -630,7 +626,7 @@ Proof.
   let ast := R in
   assert (exists pad, has_pad $0 $0 ast pad).
   { eexists. infer_pad 0%Z 0%Z. }
-Abort.    
+Abort.
 
 Goal forall B C K W RR (w : list (list (list R))) (x : list (list (list R))),
     (0 < B)%Z ->
@@ -643,7 +639,7 @@ Proof.
   let ast := R in
   assert (exists pad, has_pad $0 $0 ast pad).
   { eexists. infer_pad 0%Z 0%Z. }
-Abort.    
+Abort.
 
 Goal forall (W C B K : Z) (x w : list (list (list R))) (RR : Z) (a b :nat),
     consistent w (a,(b,(Z.to_nat RR, tt))) ->
@@ -676,14 +672,14 @@ Proof.
   assert (exists pad, has_pad $0 $0 ast pad).
   { eexists. infer_pad 0%Z 0%Z. }
 Abort.
-  
+
 Goal forall (A B C : nat) (m1 m2 : (list (list R))) (k : Z),
     (0 < k)%Z ->
     0 < A ->
     0 < B ->
     0 < C ->
     consistent m1 (64,(64,tt)) ->
-    consistent m2 (64,(64,tt)) ->    
+    consistent m2 (64,(64,tt)) ->
     matmul_tiled_split 64 64 64 m1 m2 4 =
       matmul 64 64 64 m1 m2.
 Proof.
@@ -744,7 +740,7 @@ Proof.
   assert (exists pad, has_pad $0 $0 ast pad).
   { eexists. infer_pad 0%Z 0%Z. }
 Abort.
- 
+
 Goal forall N M (v : list (list R)),
     0 < N ->
     0 < M ->
@@ -760,7 +756,7 @@ Goal forall n m (l : list (list R)),
     1 < n ->
     1 < m ->
     consistent l (n,(m,tt)) ->
-    fusion_no_boundary n m l 
+    fusion_no_boundary n m l
     = @nil _.
 Proof.
   let ast := R in
@@ -768,7 +764,7 @@ Proof.
   { eexists. infer_pad 0%Z 0%Z. }
 Abort.
 
-Goal forall W R0 (x w : list R),    
+Goal forall W R0 (x w : list R),
     consistent w (Z.to_nat R0, tt) ->
     consistent x (Z.to_nat R0, tt) ->
     (0 < W)%Z ->
@@ -778,9 +774,9 @@ Proof.
   let ast := R in
   assert (exists pad, has_pad $0 $0 ast pad).
   { eexists. infer_pad 0%Z 0%Z. }
-Abort.      
+Abort.
 
-Goal forall W R0 (x w : list R),    
+Goal forall W R0 (x w : list R),
     consistent w (Z.to_nat R0, tt) ->
     consistent x (Z.to_nat R0, tt) ->
     (0 < W)%Z ->
@@ -806,7 +802,7 @@ Proof.
   let ast := R in
   assert (exists pad, has_pad $0 $0 ast pad).
   { eexists. infer_pad 0%Z 0%Z. }
-Abort.  
+Abort.
 
 Goal forall (A B C : nat) (m1 m2 : (list (list R))) (k : Z),
     (0 < k)%Z ->
@@ -830,7 +826,7 @@ Goal forall (A B C : nat) (m1 m2 : (list (list R))) (k : Z),
     0 < B ->
     0 < C ->
     consistent m1 (64,(64,tt)) ->
-    consistent m2 (64,(64,tt)) ->    
+    consistent m2 (64,(64,tt)) ->
     matmul_tiled 64 64 64 m1 m2 4 =
       matmul 64 64 64 m1 m2.
 Proof.

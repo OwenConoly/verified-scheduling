@@ -96,19 +96,13 @@ Proof.
   - invert H0. simpl. auto.
 Qed.
 
-(*surely this is implied by some other eval_get lemmas, but i don't see how right now*)
 Lemma eval_get_length v rs l r sz :
   eval_get v rs l r ->
   result_has_shape rs sz ->
   length l = length sz.
 Proof.
   intros H. revert sz. induction H; simpl; intros sz Hsz.
-  - (*definition of result_has_shape is mildly annoying *)
-    (*definition was like that because result induction principle was useless.
-      this is not a problem anymore, so would be nice to have a better definition of
-      result_has_shape*)
-    (*i suspect refactoring would be a huge amount of effort though*)
-    invert Hsz; simpl.
+  - invert Hsz; simpl.
     + rewrite nth_error_nil in H1. discriminate H1.
     + f_equal. apply IHeval_get. apply nth_error_In in H1. simpl in H1.
       destruct H1; subst.
@@ -135,8 +129,7 @@ Proof.
   - destruct rs as [?|rs].
     { eapply H1 in H. invs. invert H0. rewrite H3 in H2. simpl in H2. invert H2.
       rewrite H4 in H7. invert H7. cases r; reflexivity. }
-    apply H1 in H. (* <- magic*) invs. clear H1. rewrite H3 in H2.
-    Fail invert1 H4. (*...*)
+    apply H1 in H. invs. clear H1. rewrite H3 in H2.
     destruct x0 as [|n x0]; [invert1 H; invert H4; discriminate|].
     remember (n :: x0) as x2 eqn:E. clear E x0. rename x2 into x0.
     assert (length x0 = length l).
@@ -145,7 +138,7 @@ Proof.
     invert H2.
     rewrite map_fst_combine in H9 by assumption.
     rewrite map_snd_combine in H9 by assumption.
-    
+
     (* REVISIT *)
     assert (Some
       (array_add
@@ -156,7 +149,7 @@ Proof.
                (map Z.of_nat (filter_until x1 0)) $0)
             (V rs))) = Some l0).
     rewrite <- H6. assumption.
-    
+
     pose proof H0. eapply eval_get_eval_Zexprlist in H0. invs.
     eapply eval_Zexpr_Z_eval_Zexpr in H9.
     erewrite eval_Zexpr_Z_flatten_index_flatten in H9; eauto.
@@ -176,7 +169,7 @@ Proof.
     erewrite result_has_shape_result_shape_Z in H15 by eauto.
     pose proof forall_nonneg_exists_zero_or_forall_pos x1 as [H'|H'].
     + rewrite filter_until_0_id in H15 by assumption.
-      
+
       rewrite result_lookup_Z_tensor_to_array_delta in *.
       eapply eval_get_In_meshgrid in H5; eauto.
       erewrite result_has_shape_result_shape_Z in H5; eauto.
@@ -228,10 +221,10 @@ Proof.
       eapply result_has_shape_self; eauto.
   - eapply IHeval_Sexpr1 in H5; eauto.
     eapply IHeval_Sexpr2 in H9; eauto.
-    cases r1; cases r2; subst; simpl; auto. 
+    cases r1; cases r2; subst; simpl; auto.
   - eapply IHeval_Sexpr1 in H5; eauto.
     eapply IHeval_Sexpr2 in H9; eauto.
-    cases r1; cases r2; subst; simpl; auto. 
+    cases r1; cases r2; subst; simpl; auto.
   - eapply IHeval_Sexpr1 in H6; eauto.
     eapply IHeval_Sexpr2 in H10; eauto.
     cases r1; cases r2; subst; simpl; auto.
@@ -248,7 +241,7 @@ Lemma contexts_agree_add_heap : forall ec st h sh a val p,
     contexts_agree ec st (h $+ (p,array_add a val)) sh.
 Proof.
   unfold contexts_agree. propositional.
-  - eapply H in H3. invs. clear H.    
+  - eapply H in H3. invs. clear H.
     cases (x ==v p). subst. eapply lookup_Some_dom in H4. sets.
     rewrite lookup_add_ne by auto.
     eexists. eexists. split.
@@ -277,7 +270,7 @@ Proof.
     split. eassumption. reflexivity.
   - eapply H. eauto.
   - eapply H. eauto.
-Qed.    
+Qed.
 
 Lemma contexts_agree_add_in_stack :
   forall ec st h sh p val a,
@@ -290,8 +283,8 @@ Proof.
   unfold contexts_agree. propositional.
   - eapply H. auto.
   - cases (x ==v p).
-    + subst. eapply H. eauto. 
-    + subst. eapply H. eauto. 
+    + subst. eapply H. eauto.
+    + subst. eapply H. eauto.
   - cases (x ==v p).
     + subst. rewrite lookup_add_eq by auto.
       eapply lookup_Some_dom in H3. sets.
@@ -305,7 +298,7 @@ Lemma contexts_agree_alloc_stack : forall ec st x val h sh,
     contexts_agree ec (st $+ (x, val)) h sh.
 Proof.
   unfold contexts_agree. propositional.
-  - eapply H. eauto. 
+  - eapply H. eauto.
   - cases (x ==v x0). subst. rewrite H1 in *. discriminate.
     eapply H. eauto.
   - cases (x ==v x0). subst. rewrite H1 in *. discriminate.
@@ -342,7 +335,7 @@ Lemma contexts_agree_add_alloc_heap :
   ec $? x = None ->
   eval_Zexprlist $0 (z :: esh1) (map Z.of_nat esh1') ->
   result_has_shape (V l1) esh1' ->
-  fold_left Z.mul (map Z.of_nat (filter_until esh1' 0)) 1%Z = nz ->  
+  fold_left Z.mul (map Z.of_nat (filter_until esh1' 0)) 1%Z = nz ->
   contexts_agree (ec $+ (x, V l1)) st (h $+ (x,
           array_add (alloc_array (Z.to_nat nz) $0)
                     (tensor_to_array_delta
@@ -354,7 +347,7 @@ Proof.
   unfold contexts_agree. propositional.
   - cases (x ==v x0).
     + subst. rewrite lookup_add_eq in * by auto.
-      invs. 
+      invs.
       eexists. eexists.
       split. reflexivity.
       split. eauto.
@@ -382,14 +375,6 @@ Proof.
       eapply H. eauto.
 Qed.
 
-Lemma map_Z_of_nat_inj l1 l2 :
-  map Z.of_nat l1 = map Z.of_nat l2 ->
-  l1 = l2.
-Proof.
-  revert l2. induction l1; intros l2; destruct l2; simpl; try congruence.
-  invert 1. f_equal; [lia|]. auto.
-Qed.  
-
 Lemma contexts_agree_result_has_shape :
   forall ec st h sh,
     contexts_agree ec st h sh ->
@@ -409,4 +394,4 @@ Proof.
     eapply eval_Zexprlist_deterministic in H2; [|eapply H1].
     apply map_Z_of_nat_inj in H2. subst.
     assumption.
-Qed.    
+Qed.

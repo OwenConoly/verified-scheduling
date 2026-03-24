@@ -181,7 +181,7 @@ Proof.
     invert H1. propositional.
     eapply Forall_forall in H5. 2: eassumption.
     propositional.
-Qed.    
+Qed.
 
 Lemma length_concat {X} : forall (l : list (list X)) k,
     (Forall (fun x => length x = k) l) ->
@@ -226,7 +226,7 @@ Proof.
   - invert H.
   - invert H.
   - simpl in H. invert H. discriminate. eapply IHl1. eassumption.
-Qed.  
+Qed.
 
 Lemma In_cons_map_cons {X} : forall l (z : X) x k,
     In (z :: x) (map (fun x => k :: x) l) <->
@@ -362,7 +362,7 @@ Lemma forall_filter {X} : forall f l,
 Proof.
   induct l; intros.
   - econstructor.
-  - simpl. 
+  - simpl.
     cases (f a).
     + econstructor. auto. auto.
     + auto.
@@ -501,7 +501,7 @@ Proof.
   - simpl. cases l2.
     + reflexivity.
     + simpl. f_equal. eauto.
-Qed.  
+Qed.
 
 Lemma map_dom_eq {X} : forall (dom0 : list (list Z)) (f g : list Z -> X),
     (forall idx : list Z, In idx dom0 -> f idx = g idx) ->
@@ -710,7 +710,7 @@ Proof.
     + simpl. rewrite fold_left_mul_assoc. lia.
     + simpl. rewrite fold_left_mul_assoc. rewrite IHl. lia. eauto.
 Qed.
-  
+
 Lemma fold_left_mul_assoc_nat : forall l b a,
     fold_left mul l (b * a) = fold_left mul l b * a.
 Proof.
@@ -734,7 +734,7 @@ Fixpoint extract_Some {X} (l : list (option X)) :=
   | Some v:: xs => v:: extract_Some xs
   | None::xs => extract_Some xs
   | _ => []
-  end.                   
+  end.
 
 Lemma in_extract_Some {X} : forall (k : X) l,
     In (Some k) l <->
@@ -774,7 +774,15 @@ Proof.
   - reflexivity.
   - invert H.
     simpl. rewrite Z2Nat.id by lia. f_equal. eauto.
-Qed.    
+Qed.
+
+Lemma map_Z_of_nat_inj l1 l2 :
+  map Z.of_nat l1 = map Z.of_nat l2 ->
+  l1 = l2.
+Proof.
+  revert l2. induction l1; intros l2; destruct l2; simpl; try congruence.
+  invert 1. f_equal; [lia|]. auto.
+Qed.
 
 Fixpoint truncl_list {X} n (l : list X) :=
   match n with
@@ -901,7 +909,7 @@ Proof.
            simpl in Heq. invert Heq. auto.
         -- rewrite truncl_list_app in Heq.
            rewrite rev_app_distr in Heq.
-           simpl in Heq. invert Heq. auto. 
+           simpl in Heq. invert Heq. auto.
            rewrite length_rev. lia.
     + simpl. simpl length in H.
       rewrite truncl_list_app by (rewrite length_rev; lia).
@@ -931,7 +939,7 @@ Proof.
     simpl in *.
     rewrite IHk by lia.
     reflexivity.
-Qed.    
+Qed.
 
 Lemma truncl_list_repeat {X} : forall k (x : X) n,
     truncl_list k (repeat x n) = repeat x (n-k).
@@ -1089,7 +1097,7 @@ Proof.
         rewrite <- firstn_cons.
         rewrite skipn_firstn_comm.
         simpl. eauto.
-Qed.    
+Qed.
 
 Lemma skipn_skipn {X} : forall m n (l : list X),
     skipn n (skipn m l) = skipn (n + m) l.
@@ -1100,7 +1108,7 @@ Proof.
     rewrite skipn_cons.
     rewrite IHm.
     rewrite add_succ_r. reflexivity.
-Qed.    
+Qed.
 
 Lemma rev_skipn_rev_skipn {X} : forall m n (l : list X),
     rev (skipn n (rev (skipn m l))) =
@@ -1121,11 +1129,11 @@ Proof.
       simpl length in Heq.
       assert (length l - n = n0) by lia.
       replace l with (rev (rev l)) at 1.
-      2: rewrite rev_involutive; auto.      
+      2: rewrite rev_involutive; auto.
       rewrite firstn_rev.
       rewrite length_rev.
       f_equal. f_equal. f_equal. lia.
-Qed.    
+Qed.
 
 Lemma forall_skipn_le {X} : forall m (l : list X) n P,
     Forall P (skipn n l) ->
@@ -1163,7 +1171,7 @@ Proof.
       simpl. right. eauto.
 Qed.
 
-Lemma nth_error_rev {X} : 
+Lemma nth_error_rev {X} :
   forall (l : list X) n m,
     length l = m ->
     n < m ->
@@ -1186,7 +1194,7 @@ Proof.
       erewrite <- IHl.
       2: reflexivity. 2: lia.
       f_equal. lia.
-Qed.    
+Qed.
 
 Lemma nat_list_all_pos_or_exists_0 : forall l,
     Forall (fun x => 0 < x) l \/ Exists (fun x => x = 0) l.
@@ -1209,7 +1217,7 @@ Proof.
   - cases n. simpl in *. eauto.
     simpl in H.
     simpl. eapply IHl in H. propositional.
-Qed.    
+Qed.
 
 Lemma length_ge_filter_until : forall l,
     length l >= length (filter_until l 0).

@@ -22,7 +22,7 @@ Fixpoint mesh_grid sh : list (list Z) :=
   | x::xs => let rest := mesh_grid xs in
              let new_range := concat
                                 (map (fun k => repeat k (length rest))
-                                     (zrange 0%Z x)) in             
+                                     (zrange 0%Z x)) in
              map2 List.cons new_range (concat (repeat rest (Z.to_nat x)))
   end.
 
@@ -110,11 +110,11 @@ Proof.
         rewrite repeat_length. reflexivity.
         erewrite length_concat. rewrite repeat_length.
         reflexivity. eapply Forall_repeat. reflexivity. }
-    eapply in_app_or in H. 
+    eapply in_app_or in H.
     assert (x = Z.of_nat k \/ x < Z.of_nat k)%Z by lia. invert H2; invert H.
     + eapply not_In_cons_l1 in H2.
       eapply in_concat in H2.
-      firstorder. 
+      firstorder.
       eapply in_map_iff in H.
       firstorder. subst.
       eapply repeat_spec in H2. subst.
@@ -125,7 +125,7 @@ Proof.
       firstorder. invert H. auto.
     + eapply IHk;try eassumption. lia.
     + eapply not_In_cons_l2 in H2.
-      eapply in_concat in H2.      
+      eapply in_concat in H2.
       firstorder. subst. auto.
 Qed.
 
@@ -135,7 +135,7 @@ Lemma in_mesh_grid_cons_ :
       In x0 (mesh_grid xs) <->
       In (x::x0) (mesh_grid (Z.of_nat k::xs)).
 Proof.
-  induct k; propositional.  
+  induct k; propositional.
   - lia.
   - simpl in *. propositional.
   - simpl in *. propositional.
@@ -167,7 +167,7 @@ Proof.
   - simpl in H.
     eapply not_In_cons_l1 in H.
     eapply in_concat in H. firstorder.
-    eapply in_map_iff in H. firstorder. subst. 
+    eapply in_map_iff in H. firstorder. subst.
     eapply repeat_spec in H0. subst.
     unfold zrange in H1.
     eapply in_zrange'_upper_bound in H1. lia.
@@ -215,12 +215,12 @@ Proof.
   posnats. setoid_rewrite Nat2Z.id in H.
   eapply H; clear H.
   - eapply not_In_cons_l1 in H0.
-    eapply in_concat in H0. firstorder. 
+    eapply in_concat in H0. firstorder.
     eapply in_map_iff in H. firstorder. subst.
     eapply repeat_spec in H0. subst.
     unfold zrange in H1.
     pose proof (in_zrange'_lower_bound _ _ _ H1).
-    simpl in *. lia. 
+    simpl in *. lia.
     eapply in_map_iff in H. firstorder. subst.
     eapply repeat_spec in H0. subst.
     pose proof (in_zrange'_upper_bound _ _ _ H1).
@@ -230,7 +230,7 @@ Proof.
     eapply result_has_shape_result_shape_nat in H4. rewrite H4.
     eapply result_has_shape_result_shape_nat in H2. rewrite H2 in *. auto.
     eapply repeat_spec in H. subst.
-    eapply result_has_shape_result_shape_nat in H4. 
+    eapply result_has_shape_result_shape_nat in H4.
     invert H6. eapply result_has_shape_result_shape_nat in H2.
     rewrite H2 in *.
     rewrite H4 in *. auto.
@@ -306,7 +306,7 @@ Proof.
     2: { eapply Forall_repeat. reflexivity. }
     rewrite repeat_length. rewrite min_id.
     rewrite fold_left_mul_assoc. rewrite IHsh. lia. auto.
-Qed.    
+Qed.
 
 Lemma mesh_grid_shape_pos : forall sh args,
   In args (mesh_grid sh) ->
@@ -365,7 +365,7 @@ Proof.
   - simpl in *. lia.
   - simpl in * |-. rewrite fold_left_mul_assoc in *.
     pose proof (Z_div_mod x (fold_left Z.mul sh 1%Z)).
-    assert (fold_left Z.mul sh 1 > 0)%Z.    
+    assert (fold_left Z.mul sh 1 > 0)%Z.
     invert H1. lia.
     eapply H2 in H3. clear H2.
     destruct (Z.div_eucl x (fold_left Z.mul sh 1%Z)) eqn:ee.
@@ -409,7 +409,7 @@ Proof.
       eapply div_eucl_pos. 3: apply H.
       eapply mesh_grid_shape_pos in H5.
       eapply fold_left_mul_pos. auto. lia.
-      auto. 
+      auto.
       propositional.
       eapply div_eucl_bound in H0. auto. auto.
       auto.
@@ -430,7 +430,7 @@ Proof.
     rewrite fold_left_mul_assoc.
     apply In_zrange in H0.
     apply In_zrange.
-    invert H. 
+    invert H.
     split.
     * eapply Z.add_nonneg_nonneg.
         eapply Z.mul_nonneg_nonneg. auto.
@@ -529,7 +529,7 @@ Proof.
       simpl. rewrite map_constant_repeat.
       rewrite concat_repeat_empty.
       reflexivity.
-Qed.      
+Qed.
 
 Lemma mesh_grid_cons : forall x xs,
     mesh_grid (x::xs) =
@@ -557,7 +557,7 @@ Proof.
   rewrite map_map2.
   rewrite map2_f_l1 with (f:=fun a => (a+n)%Z).
   rewrite concat_map. rewrite map_map.
-  replace 
+  replace
     (fun x : Z =>
             map (fun a0 : Z => (a0 + n)%Z)
                 (repeat x (Datatypes.length (mesh_grid xs)))) with
@@ -587,7 +587,7 @@ Proof.
     rewrite length_map. rewrite length_zrange'.
     rewrite repeat_length. lia.
     rewrite map_id. reflexivity.
-Qed.    
+Qed.
 
 Lemma result_lookup_Z_concat_l : forall x x1 xs r1 r2 x2,
     result_has_shape (V r1) (x1 :: xs) ->
@@ -691,7 +691,7 @@ Lemma constant_map_flatten_zrange_gt_0 : forall l,
       (map (flatten l) (mesh_grid l)) =
       constant (zrange 0 (fold_left Z.mul l 1%Z)).
 Proof.
-  intros. apply sets_equal.  
+  intros. apply sets_equal.
   induct l; intros; split; intros.
   - simpl in *. auto.
   - simpl in *. auto.
@@ -703,7 +703,7 @@ Proof.
     eapply in_mesh_grid_flatten_in_range.
     eapply mesh_grid_shape_nonneg. eassumption.
     auto.
-  - eapply In_iff_in in H0.    
+  - eapply In_iff_in in H0.
     eapply In_iff_in. erewrite <- In_iff_in.
     eapply in_map_iff.
     simpl zrange in *.
@@ -738,7 +738,7 @@ Proof.
     assert (Forall (fun x : Z => (0 <= x)%Z) l).
     eapply Forall_impl.
     2: { invert H. eapply H9. }
-    simpl. lia. apply H1 in H6. 
+    simpl. lia. apply H1 in H6.
     eapply In_zrange in H6. auto.
     auto. invert H. auto.
     invert H. auto.
@@ -808,8 +808,8 @@ Proof.
       eapply Z.ltb_lt in H2. eapply Z.leb_le in H1. propositional.
       reflexivity.
     + rewrite IHargs2; eauto. rewrite andb_false_r. reflexivity.
-Qed.    
-  
+Qed.
+
 Lemma mesh_grid_filter_until :
   forall sh,
     mesh_grid (map Z.of_nat (filter_until sh 0)) =
@@ -818,11 +818,11 @@ Proof.
   intros. pose proof (list_nat_nonneg sh).
   invert H.
   erewrite exists_0_empty_mesh_grid.
-  2: { eapply exists_0_map_of_nat. 
+  2: { eapply exists_0_map_of_nat.
        eapply exists_0_filter_until_0.
        eauto. }
   erewrite exists_0_empty_mesh_grid.
-  2: { eapply exists_0_map_of_nat. 
+  2: { eapply exists_0_map_of_nat.
        eauto. }
   reflexivity.
   erewrite filter_until_0_id by auto. reflexivity.
@@ -849,7 +849,6 @@ Definition is_None {X} (x : option X) :=
   end.
 
 Lemma filter_pad_r_empty : forall k l0 x,
-    (0 <= k) ->
     filter
       (fun x1 : list Z =>
          negb
@@ -871,7 +870,7 @@ Proof.
   intros.
   eapply filter_empty.
   eapply Forall_forall. intros.
-  eapply in_map_iff in H0. invs.
+  eapply in_map_iff in H. invs.
   repeat decomp_index.
   eapply negb_false_iff.
   unfold is_None.
@@ -885,7 +884,6 @@ Qed.
 
 Lemma filter_pad_r_mesh_grid : forall m x l0 k,
     result_has_shape (V (gen_pad_list (k :: l0) ++ x)) (m :: l0) ->
-    (0 <= k) ->
     filter
           (fun x1 : list Z =>
            negb
@@ -908,13 +906,13 @@ Proof.
   repeat rewrite map_cons.
 
   pose proof (result_has_shape_length _ _ _ H).
-  rewrite length_app in H1.
-  rewrite repeat_length in H1.
+  rewrite length_app in H0.
+  rewrite repeat_length in H0.
 
   cases m.
   - reflexivity.
   - rewrite filter_until_0_cons by lia.
-    rewrite <- H1.
+    rewrite <- H0.
     replace (k + length x - k) with (length x) by lia.
     rewrite map_cons at 1.
     rewrite Nat2Z.inj_add by lia.
@@ -925,7 +923,7 @@ Proof.
     simpl map. cases x. simpl. auto. simpl map. simpl length. posnats.
     rewrite app_nil_r.
     eapply filter_ext_in.
-    2: lia. intros.
+    intros.
     repeat decomp_index.
     f_equal. f_equal.
     simpl.
@@ -1158,7 +1156,7 @@ Proof.
          assert (length l <= Z.to_nat 0) by lia.
          eapply nth_error_None in H. rewrite H. simpl.
          cases ((repeat (gen_pad l0) k)).
-         + auto. 
+         + auto.
          + cases k. invert Heq. invert Heq.
            rewrite result_lookup_Z_option_gen_pad. reflexivity.
        - rewrite nth_error_app2 by lia.
@@ -1178,7 +1176,7 @@ Proof.
   cases z; try lia.
   - rewrite nth_error_app1. auto. lia.
   - rewrite nth_error_app1. auto. lia.
-Qed.  
+Qed.
 
 Lemma result_lookup_Z_option_None : forall x2 r,
     result_has_shape r (result_shape_nat r) ->
@@ -1193,7 +1191,7 @@ Proof.
     simpl in *. cases z; simpl in *; propositional.
   - simpl in *.
     cases a; auto.
-    + erewrite filter_In in *. 
+    + erewrite filter_In in *.
       unfold result_shape_Z in *. simpl map in *.
       cases r; auto.
       simpl map in *.
@@ -1203,7 +1201,7 @@ Proof.
       eapply Classical_Prop.not_and_or in H0.
       simpl. invert H0.
       * eapply Classical_Prop.not_and_or in H1. invert H1. lia.
-        eapply IHx2. invert H. eauto. 
+        eapply IHx2. invert H. eauto.
         unfold not. intros. apply H0.
         eapply filter_In in H1. propositional.
       * eapply IHx2. invert H. eauto.
@@ -1213,7 +1211,7 @@ Proof.
       unfold result_shape_Z in *. simpl map in *.
       cases v. rewrite nth_error_empty. auto.
       simpl map in *.
-      erewrite filter_In in *. 
+      erewrite filter_In in *.
       rewrite <- in_mesh_grid_cons__ in H0. posnats.
       eapply Classical_Prop.not_and_or in H0.
       simpl. invert H0.
@@ -1339,7 +1337,7 @@ Proof.
     cases r0; auto.
     rewrite Z2Nat.inj_mod by lia. simpl. rewrite Nat2Z.id. lia.
   - reflexivity.
-Qed.  
+Qed.
 
 Lemma result_lookup_Z_option_split_true : forall z z0 x0 l k m sh,
   negb
@@ -1355,7 +1353,7 @@ Lemma result_lookup_Z_option_split_true : forall z z0 x0 l k m sh,
   result_has_shape (V l) (Z.to_nat m::sh) ->
   (z * k + z0 < m)%Z.
 Proof.
-  intros. 
+  intros.
   erewrite <- result_lookup_Z_option_flatten in H; eauto; try lia.
   4: { eapply result_has_shape_split_result. lia. eauto. }
   2: { erewrite <- Z2Nat_div_distr by lia. rewrite Z2Nat.id by lia. lia. }
@@ -1388,5 +1386,4 @@ Proof.
     rewrite result_lookup_Z_option_gen_pad in *. simpl in *. discriminate.
     rewrite repeat_length in *. lia.
   - discriminate.
-Qed.  
-
+Qed.

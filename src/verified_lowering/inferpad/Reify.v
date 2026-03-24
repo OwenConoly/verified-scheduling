@@ -52,7 +52,7 @@ Ltac reify_Z z :=
   | (?x / ?y)%Z =>
       let lx := reify_Z x in
       let ly := reify_Z y in
-      constr:(ZDivf lx ly)               
+      constr:(ZDivf lx ly)
   | (?x // ?y)%Z =>
       let lx := reify_Z x in
       let ly := reify_Z y in
@@ -85,19 +85,19 @@ Ltac reify_get g :=
       let iz := reify_Z i in
       constr:(match tup with (var,idx) => (var,(idx++[iz])%list)end)
   | _ => let _ := match goal with _ => is_var g end in
-         constr:((ltac:(to_str g), @nil Zexpr)) 
+         constr:((ltac:(to_str g), @nil Zexpr))
   end.
 (*
 Goal forall (i j : Z) (s : string) (v : list (list R)), True.
   intros.
   let s := reify_get constr:(v _[i;j]) in
   idtac s.
- *)  
+ *)
 
 Ltac reify_R s :=
   lazymatch s with
   | 1%R => constr:(Lit 1%Q)
-  | 0%R => constr:(Lit 1%Q)
+  | 0%R => constr:(Lit 0%Q)
   | (?a * ?b)%R =>
       let la := reify_R a in
       let lb := reify_R b in
@@ -159,11 +159,11 @@ Ltac reify prog :=
       let i' := match goal with H : Z |- _ => H end in
       let i := constr:(ltac:(to_str i')) in
       let rn := reify_Z nn in
-    
+
       let body' := constr:(f i') in
       let body := eval lazy beta in body' in
       let rbody := reify body in
-        
+
       constr:(Gen i (|0|)%z rn rbody)
   | GEN [ ?mm <= ii < ?nn ] @?f ii =>
       let _ := match goal with _ => assert Z by exact 0%Z end in
@@ -171,22 +171,22 @@ Ltac reify prog :=
       let i := constr:(ltac:(to_str i')) in
       let rn := reify_Z nn in
       let rm := reify_Z mm in
-      
+
       let body' := constr:(f i') in
       let body := eval lazy beta in body' in
       let rbody := reify body in
-        
+
       constr:(Gen i rm rn rbody)
   | SUM [ ii < ?nn ] @?f ii =>
       let _ := match goal with _ => assert Z by exact 0%Z end in
       let i' := match goal with H : Z |- _ => H end in
       let i := constr:(ltac:(to_str i')) in
       let rn := reify_Z nn in
-    
+
       let body' := constr:(f i') in
       let body := eval lazy beta in body' in
       let rbody := reify body in
-        
+
       constr:(Sum i (|0|)%z rn rbody)
   | let_binding ?e1 ?e2 =>
     let e1t := type of e1 in
@@ -195,7 +195,7 @@ Ltac reify prog :=
                              let tempH := fresh "tempH" in
                              (assert (exists temp, temp = e1) as tempH
                                  by eauto; destruct tempH)
-             end in    
+             end in
     let x := match goal with H : e1t |- _ => H end in
     let xstr := constr:(ltac:(to_str x)) in
     let re1 := reify e1 in
@@ -203,7 +203,7 @@ Ltac reify prog :=
     let body' := constr:(e2 x) in
     let body := eval simpl in body' in
     let re2 := reify body in
-      
+
     constr:(Lbind xstr re1 re2)
   | transpose ?e =>
       let re := reify e in
@@ -256,7 +256,7 @@ Ltac R :=
                            normalize end in
 
   let prog := match goal with |- ?prog = _ => prog end in
-  
+
   let ast := reify prog in
   let ast := eval simpl in ast in
   ast.
@@ -280,7 +280,7 @@ Proof.
 
     let x := match goal with H : e1t |- _ => H end in
     let xstr := constr:(ltac:(to_str x)) in
-    
+
     let body' := constr:(e2 x) in
     let body := eval simpl in body' in
       let re2 := reify body in

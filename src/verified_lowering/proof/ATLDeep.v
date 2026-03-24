@@ -70,85 +70,70 @@ Fixpoint vars_of (e : ATLexpr) : set var :=
   | Scalar _ => constant []
   end.
 
-Fixpoint sizeof (e : ATLexpr) : list Zexpr :=
+Fixpoint sizeof (e : ATLexpr) :=
   match e with
   | Gen i lo hi body =>
       ZMinus hi lo :: sizeof body
   | Sum i lo hi body =>
-    sizeof body
+      sizeof body
   | Guard p body =>
-    sizeof body
+      sizeof body
   | Lbind x e1 e2 =>
-    sizeof e2
+      sizeof e2
   | Concat x y =>
-    let sx := sizeof x in
-    let sy := sizeof y in
-    match sx with
-    | n::rest =>
-      match sy with
-      | m::rest' =>
-        (n + m)%z ::rest
-      | _ => sx
+      match sizeof x, sizeof y with
+      | n :: rest, m :: _ => (n + m)%z :: rest
+      | _, _ => []
       end
-    | _ =>
-      match sy with
-      | m::rest' =>
-        sy
+  | Flatten e =>
+      match sizeof e with
+      | a :: b :: rest => (a * b)%z :: rest
       | _ => []
       end
-    end
-  | Flatten e =>
-    match sizeof e with
-    | a::b::rest => (a * b)%z :: rest
-    | [] => []
-    | s => s
-    end
   | Split k e =>
-    match sizeof e with
-    | a::rest => (a // k)%z :: k :: rest
-    | [] => []
-    end
+      match sizeof e with
+      | a::rest => (a // k)%z :: k :: rest
+      | [] => []
+      end
   | Transpose e =>
-    match sizeof e with
-    | a::b::rest => b::a::rest
-    | [] => []
-    | s => s
-    end
+      match sizeof e with
+      | a::b::rest => b::a::rest
+      | _ => []
+      end
   | Truncr n e =>
-    match sizeof e with
-    | m::rest  =>
-      (m - n)%z :: rest
-    | [] => []
-    end
+      match sizeof e with
+      | m :: rest => (m - n)%z :: rest
+      | [] => []
+      end
   | Truncl n e =>
-    match sizeof e with
-    | m :: rest => (m - n)%z :: rest
-    | [] => []
-    end           
+      match sizeof e with
+      | m :: rest => (m - n)%z :: rest
+      | [] => []
+      end
   | Padr n e =>
-    match sizeof e with
-    | m :: rest => (m + n)%z :: rest
-    | [] => []
-    end         
+      match sizeof e with
+      | m :: rest => (m + n)%z :: rest
+      | [] => []
+      end
   | Padl n e =>
-    match sizeof e with
-    | m :: rest => (m + n)%z :: rest
-    | [] => []
-    end                  
+      match sizeof e with
+      | m :: rest => (m + n)%z :: rest
+      | [] => []
+      end
   | Scalar s =>
-    []
-  end.    
+      []
+  end.
 
 Definition flat_sizeof e :=
   match sizeof e with
   | [] => | 0 |%z
-  | x::xs => fold_left ZTimes xs x
+  | x :: xs => fold_left ZTimes xs x
   end.
 
 Fixpoint lower
   (e : ATLexpr)
   (f : list (Zexpr * Zexpr) -> list (Zexpr * Zexpr))
-  p asn (sh : context) :=
+  p asn sh :=
   match e with
   | Gen i lo hi body =>
       For i lo hi
@@ -179,58 +164,62 @@ Fixpoint lower
       let xlen := match sizeof x with
                   | n::_ => n
                   | _ => | 0 |%z
-                  end in 
+                  end in
       let ylen := match sizeof y with
                   | n::_ => n
                   | _ => | 0 |%z
-                  end in   
+                  end in
       Seq (lower x (fun l =>
                       f (match l with
-                         | (v,d)::xs =>
-                             ((v,(d + ylen)%z)::xs)
+                         | (v, d) :: xs =>
+                             (v,d + ylen)%z :: xs
                          | _ => l
                          end)) p asn sh)
         (lower y (fun l => f (match l with
-                           | (v,d)::xs => ((v + xlen, d + xlen)%z::xs)
+                           | (v, d) :: xs =>
+                               (v + xlen, d + xlen)%z :: xs
                            | _ => l
                            end)) p asn sh)
   | Transpose e =>
       lower e (fun l => f (match l with
-                        | (v,d)::(vi,di)::xs => (vi,di)::(v,d)::xs
+                        | (v, d) :: (vi, di) :: xs =>
+                            (vi, di) :: (v, d) :: xs
                         | _ => l
                         end)) p asn sh
   | Split k e =>
       lower e (fun l => f (match l with
-                        | (v,d)::xs => ((v / k)%z, (d // k)%z) ::(ZMod v k ,k )::xs
+                        | (v, d) :: xs =>
+                            (v / k, d // k)%z :: (ZMod v k, k) :: xs
                         | _ => l
                         end)) p asn sh
   | Flatten e =>
       lower e (fun l => f (match l with
-                        | (v,d)::(vi,di)::xs =>
-                            ((v * di + vi)%z, (d * di)%z)::xs
+                        | (v, d) :: (vi, di) :: xs =>
+                            (v * di + vi, d * di)%z :: xs
                         | _ => l
-                        end)) p asn sh          
+                        end)) p asn sh
   | Truncr n e =>
       lower e (fun l => f (match l with
-                        | (v,d)::xs =>
-                            (v,(d - n)%z)::xs
+                        | (v, d) :: xs =>
+                            (v, d - n)%z :: xs
                         | _ => l
                         end)) p asn sh
   | Truncl n e =>
       lower e (fun l => f (match l with
-                        | (v,d)::xs =>
-                            ((v - n)%z,
-                              (d - n)%z)::xs
+                        | (v, d) :: xs =>
+                            (v - n, d - n)%z :: xs
                         | _ => l
                         end)) p asn sh
   | Padr n e =>
       lower e (fun l => f (match l with
-                        | (v,d)::xs => (v, d + n)%z :: xs
+                        | (v,d)::xs =>
+                            (v, d + n)%z :: xs
                         | _ => l
                         end)) p asn sh
   | Padl n e =>
       lower e (fun l => f (match l with
-                        | (v,d)::xs => (v + n, d + n)%z :: xs
+                        | (v,d)::xs =>
+                            (v + n, d + n)%z :: xs
                         | _ => l
                         end)) p asn sh
   end.
@@ -610,7 +599,7 @@ Lemma length_eval_expr_gen : forall c v e l i lo hi,
       length l = Z.to_nat z.
 Proof.
   induct 1; intros.
-  - simpl in *. invert H2. rewrite H,H0 in *. invert H4. lia. 
+  - simpl in *. invert H2. rewrite H,H0 in *. invert H4. lia.
   - invert H6. rewrite H,H0 in *. invert H8.
     simpl.
     erewrite IHeval_expr2.
@@ -670,7 +659,7 @@ Lemma eq_eval_stmt_for :
 Proof.
   induct 1; intros.
   - rewrite H,H0 in *. invert H4. invert H5.
-    eapply EvalForStep; eauto.    
+    eapply EvalForStep; eauto.
     eapply H6. lia. eassumption.
     eapply IHeval_stmt2. reflexivity.
     simpl. rewrite H. reflexivity.
@@ -729,7 +718,7 @@ Proof.
         try lia; try discriminate; propositional.
       invert H1.
     + eapply EvalReduceV; eauto.
-      * unfold not in *. intros. apply H8.        
+      * unfold not in *. intros. apply H8.
         specialize (H0 []); simpl in *.
         invert H0. invs.
         rewrite H in *.
@@ -799,10 +788,10 @@ Proof.
     eapply result_has_shape_add_result. eassumption.
     2: { eapply IHn in H19. eassumption. eassumption. eassumption.
          simpl. rewrite H2. reflexivity.
-         eauto. lia. } 
+         eauto. lia. }
     eapply H. 3: eassumption.
     { eapply nonneg_bounds_includes; [|eassumption]. sets. }
     { eapply size_of_includes; [|eassumption]. sets. }
     eapply size_of_includes in H1; eauto.
     eq_size_of. apply result_has_shape_gen_pad.
-Qed.      
+Qed.
